@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog, app } from 'electron'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
 import {
   taskQueries,
   projectQueries,
@@ -6,6 +8,8 @@ import {
   somedayQueries,
   reviewQueries,
   aiQueries,
+  settingsQueries,
+  dataQueries,
 } from '../db/database'
 
 export function registerHandlers(): void {
@@ -125,6 +129,40 @@ export function registerHandlers(): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       return { success: false, error: message }
+    }
+  })
+
+  // ─── App Settings ────────────────────────────────────────────────────────────
+  ipcMain.handle('settings:getAll', () => settingsQueries.getAll())
+  ipcMain.handle('settings:set', (_, key: string, value: string) => settingsQueries.set(key, value))
+
+  // ─── Data Management ─────────────────────────────────────────────────────────
+  ipcMain.handle('data:getStats', () => dataQueries.getStats())
+  ipcMain.handle('data:getDbPath', () => dataQueries.getDbPath())
+
+  ipcMain.handle('data:clearCompleted', () => {
+    dataQueries.clearCompletedTasks()
+    return { success: true }
+  })
+
+  ipcMain.handle('data:clearChatHistory', () => {
+    dataQueries.clearAllChatHistory()
+    return { success: true }
+  })
+
+  ipcMain.handle('data:exportJSON', async () => {
+    const result = await dialog.showSaveDialog({
+      title: 'Export Aura GTD Data',
+      defaultPath: join(app.getPath('documents'), `aura-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePath) return { success: false, canceled: true }
+    try {
+      const data = dataQueries.exportAll()
+      writeFileSync(result.filePath, JSON.stringify(data, null, 2), 'utf-8')
+      return { success: true, path: result.filePath }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
     }
   })
 }

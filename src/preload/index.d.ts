@@ -33,6 +33,15 @@ declare global {
       getMessages: (conversationId: string) => Promise<ChatMessage[]>
       deleteConversation: (id: string) => Promise<void>
       sendMessage: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => Promise<{success: boolean; content?: string; error?: string}>
+      // Settings
+      getSettings: () => Promise<Record<string, string>>
+      setSetting: (key: string, value: string) => Promise<void>
+      // Data
+      getStats: () => Promise<{tasks: number; nextActions: number; doneTasks: number; projects: number; waitingItems: number; somedayItems: number; conversations: number; messages: number}>
+      getDbPath: () => Promise<string>
+      clearCompleted: () => Promise<{success: boolean}>
+      clearChatHistory: () => Promise<{success: boolean}>
+      exportJSON: () => Promise<{success: boolean; path?: string; canceled?: boolean; error?: string}>
     }
   }
 }

@@ -10,6 +10,10 @@ const NAV_ITEMS: { id: ViewType; label: string }[] = [
   { id: 'ai-chat',       label: 'AI Assistant' },
 ]
 
+const BOTTOM_ITEMS: { id: ViewType; label: string }[] = [
+  { id: 'settings', label: 'Settings' },
+]
+
 export default function Sidebar() {
   const { currentView, setView, tasks, projects, waitingItems } = useStore()
 
@@ -37,11 +41,26 @@ export default function Sidebar() {
         </ul>
       </div>
 
-      <div className="nav-meta">
-        {nextCount} Actions<br />
-        {activeCount} Projects<br />
-        {waitingItems.length} Waiting<br />
-        <span style={{ opacity: 0.5, marginTop: '0.5rem', display: 'block' }}>{dateStr}</span>
+      <div>
+        <ul className="nav-links" style={{ marginBottom: '1.2rem' }}>
+          {BOTTOM_ITEMS.map(item => (
+            <li key={item.id}>
+              <button
+                className={`nav-link ${currentView === item.id ? 'active' : ''}`}
+                onClick={() => setView(item.id)}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <div className="nav-meta">
+          {nextCount} Actions<br />
+          {activeCount} Projects<br />
+          {waitingItems.length} Waiting<br />
+          <span style={{ opacity: 0.5, marginTop: '0.5rem', display: 'block' }}>{dateStr}</span>
+        </div>
       </div>
     </nav>
   )

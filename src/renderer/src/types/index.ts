@@ -1,4 +1,11 @@
-export type ViewType = 'next-actions' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat'
+export type ViewType = 'next-actions' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings'
+
+export interface AppSettings {
+  app_name: string
+  review_day: number          // 0=Sun ... 6=Sat
+  default_capture_status: 'inbox' | 'next'
+  contexts: string[]          // custom @context list
+}
 
 export interface Task {
   id: string

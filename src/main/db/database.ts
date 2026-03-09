@@ -96,7 +96,24 @@ function createTables(): void {
       created_at TEXT NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
+
+  // Ensure default settings exist
+  const defaultSettings: Record<string, string> = {
+    app_name: 'Aura',
+    review_day: '0',
+    default_capture_status: 'inbox',
+    contexts: JSON.stringify(['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home']),
+  }
+  const upsertSetting = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)')
+  for (const [key, value] of Object.entries(defaultSettings)) {
+    upsertSetting.run(key, value)
+  }
 }
 
 function seedIfEmpty(): void {
@@ -358,4 +375,58 @@ export const aiQueries = {
 
   deleteConversation: (id: string) =>
     db.prepare('DELETE FROM chat_conversations WHERE id = ?').run(id),
+}
+
+// ─── Settings Queries ─────────────────────────────────────────────────────────
+
+export const settingsQueries = {
+  getAll: (): Record<string, string> => {
+    const rows = db.prepare('SELECT key, value FROM app_settings').all() as { key: string; value: string }[]
+    return Object.fromEntries(rows.map(r => [r.key, r.value]))
+  },
+
+  set: (key: string, value: string) =>
+    db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value),
+
+  get: (key: string): string | null => {
+    const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as { value: string } | undefined
+    return row?.value ?? null
+  },
+}
+
+// ─── Data Management Queries ──────────────────────────────────────────────────
+
+export const dataQueries = {
+  getDbPath: (): string => {
+    const row = db.prepare('PRAGMA database_list').get() as { file: string }
+    return row?.file || ''
+  },
+
+  clearCompletedTasks: () =>
+    db.prepare("DELETE FROM tasks WHERE status = 'done'").run(),
+
+  clearAllChatHistory: () => {
+    db.prepare('DELETE FROM chat_messages').run()
+    db.prepare('DELETE FROM chat_conversations').run()
+  },
+
+  getStats: () => ({
+    tasks:         (db.prepare('SELECT COUNT(*) as n FROM tasks').get() as { n: number }).n,
+    nextActions:   (db.prepare("SELECT COUNT(*) as n FROM tasks WHERE status = 'next'").get() as { n: number }).n,
+    doneTasks:     (db.prepare("SELECT COUNT(*) as n FROM tasks WHERE status = 'done'").get() as { n: number }).n,
+    projects:      (db.prepare('SELECT COUNT(*) as n FROM projects').get() as { n: number }).n,
+    waitingItems:  (db.prepare('SELECT COUNT(*) as n FROM waiting_items').get() as { n: number }).n,
+    somedayItems:  (db.prepare('SELECT COUNT(*) as n FROM someday_items').get() as { n: number }).n,
+    conversations: (db.prepare('SELECT COUNT(*) as n FROM chat_conversations').get() as { n: number }).n,
+    messages:      (db.prepare('SELECT COUNT(*) as n FROM chat_messages').get() as { n: number }).n,
+  }),
+
+  exportAll: () => ({
+    exported_at: new Date().toISOString(),
+    tasks:        db.prepare('SELECT * FROM tasks').all(),
+    projects:     db.prepare('SELECT * FROM projects').all(),
+    waiting:      db.prepare('SELECT * FROM waiting_items').all(),
+    someday:      db.prepare('SELECT * FROM someday_items').all(),
+    settings:     db.prepare('SELECT * FROM app_settings').all(),
+  }),
 }

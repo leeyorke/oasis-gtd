@@ -9,6 +9,7 @@ import type {
   AIProvider,
   ChatConversation,
   ChatMessage,
+  AppSettings,
 } from '../types'
 
 interface AppStore {
@@ -70,6 +71,11 @@ interface AppStore {
   // ─── UI ────────────────────────────────────────────────────────────────────
   isCapturing: boolean
   setCapturing: (v: boolean) => void
+
+  // ─── Settings ──────────────────────────────────────────────────────────────
+  settings: AppSettings
+  loadSettings: () => Promise<void>
+  updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>
 }
 
 export const useStore = create<AppStore>((set, get) => ({
@@ -238,4 +244,28 @@ export const useStore = create<AppStore>((set, get) => ({
   // ─── UI ────────────────────────────────────────────────────────────────────
   isCapturing: false,
   setCapturing: (v) => set({ isCapturing: v }),
+
+  // ─── Settings ──────────────────────────────────────────────────────────────
+  settings: {
+    app_name: 'Aura',
+    review_day: 0,
+    default_capture_status: 'inbox',
+    contexts: ['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home'],
+  },
+  loadSettings: async () => {
+    const raw = await window.api.getSettings()
+    set({
+      settings: {
+        app_name: raw.app_name ?? 'Aura',
+        review_day: Number(raw.review_day ?? 0),
+        default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
+        contexts: raw.contexts ? JSON.parse(raw.contexts) : [],
+      },
+    })
+  },
+  updateSetting: async (key, value) => {
+    const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value)
+    await window.api.setSetting(key, serialized)
+    set(state => ({ settings: { ...state.settings, [key]: value } }))
+  },
 }))

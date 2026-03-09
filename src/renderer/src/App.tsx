@@ -7,9 +7,10 @@ import WaitingFor from './views/WaitingFor'
 import Someday from './views/Someday'
 import WeeklyReview from './views/WeeklyReview'
 import AIChat from './views/AIChat'
+import Settings from './views/Settings'
 
 export default function App() {
-  const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadReview, loadProviders, loadConversations } = useStore()
+  const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadReview, loadProviders, loadConversations, loadSettings } = useStore()
 
   useEffect(() => {
     loadTasks('next')
@@ -19,6 +20,7 @@ export default function App() {
     loadReview()
     loadProviders()
     loadConversations()
+    loadSettings()
   }, [])
 
   const renderView = () => {
@@ -29,6 +31,7 @@ export default function App() {
       case 'someday':       return <Someday />
       case 'weekly-review': return <WeeklyReview />
       case 'ai-chat':       return <AIChat />
+      case 'settings':      return <Settings />
       default:              return <NextActions />
     }
   }

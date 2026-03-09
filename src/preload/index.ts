@@ -49,6 +49,17 @@ const api = {
   deleteConversation: (id: string) => ipcRenderer.invoke('chat:deleteConversation', id),
   sendMessage: (conversationId: string, messages: unknown[], provider: unknown) =>
     ipcRenderer.invoke('ai:sendMessage', conversationId, messages, provider),
+
+  // Settings
+  getSettings: () => ipcRenderer.invoke('settings:getAll'),
+  setSetting: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
+
+  // Data management
+  getStats: () => ipcRenderer.invoke('data:getStats'),
+  getDbPath: () => ipcRenderer.invoke('data:getDbPath'),
+  clearCompleted: () => ipcRenderer.invoke('data:clearCompleted'),
+  clearChatHistory: () => ipcRenderer.invoke('data:clearChatHistory'),
+  exportJSON: () => ipcRenderer.invoke('data:exportJSON'),
 }
 
 if (process.contextIsolated) {
