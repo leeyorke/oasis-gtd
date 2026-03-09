@@ -66,7 +66,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.aura.gtd')
+  electronApp.setAppUserModelId('com.oasis.gtd')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

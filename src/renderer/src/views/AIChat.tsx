@@ -143,7 +143,7 @@ export default function AIChat() {
           <div className="chat-messages">
             {!currentConversationId ? (
               <div className="chat-empty-state">
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'rgba(20,28,58,0.08)', letterSpacing: '-0.03em' }}>Aura AI</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'rgba(20,28,58,0.08)', letterSpacing: '-0.03em' }}>Oasis AI</div>
                 <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', textAlign: 'center', maxWidth: '320px', lineHeight: 1.6 }}>
                   {activeProvider ? 'Start a new conversation to begin chatting with your AI assistant.' : 'Configure a provider first to get started.'}
                 </div>

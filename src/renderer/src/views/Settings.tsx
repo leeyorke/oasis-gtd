@@ -134,7 +134,7 @@ export default function Settings() {
 
           {/* Version info */}
           <div style={{ marginTop: 'auto', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', color: 'rgba(20,28,58,0.25)', letterSpacing: '0.08em', lineHeight: 1.7 }}>
-            Aura GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
+            Oasis GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export default function Settings() {
                   className="form-input"
                   value={settings.app_name}
                   onChange={e => updateSetting('app_name', e.target.value)}
-                  placeholder="Aura"
+                  placeholder="Oasis"
                   style={{ maxWidth: '240px' }}
                 />
                 <FieldHint>Shown in the sidebar header</FieldHint>

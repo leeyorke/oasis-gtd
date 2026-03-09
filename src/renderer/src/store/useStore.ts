@@ -273,7 +273,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ─── Settings ──────────────────────────────────────────────────────────────
   settings: {
-    app_name: 'Aura',
+    app_name: 'Oasis',
     review_day: 0,
     default_capture_status: 'inbox',
     contexts: ['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home'],
@@ -282,7 +282,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const raw = await window.api.getSettings()
     set({
       settings: {
-        app_name: raw.app_name ?? 'Aura',
+        app_name: raw.app_name ?? 'Oasis',
         review_day: Number(raw.review_day ?? 0),
         default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
         contexts: raw.contexts ? JSON.parse(raw.contexts) : [],

@@ -1,5 +1,5 @@
-appId: com.aura.gtd
-productName: Aura GTD
+appId: com.oasis.gtd
+productName: Oasis GTD
 copyright: Copyright © 2024
 directories:
   buildResources: resources
@@ -23,7 +23,7 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
-  artifactName: Aura-GTD-Setup-${version}.${ext}
+  artifactName: Oasis-GTD-Setup-${version}.${ext}
 
 nsis:
   oneClick: false
@@ -35,7 +35,7 @@ nsis:
   installerHeaderIcon: resources/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Aura GTD
+  shortcutName: Oasis GTD
 
 mac:
   target:
@@ -44,7 +44,7 @@ mac:
         - arm64
         - x64
   icon: resources/icon.icns
-  artifactName: Aura-GTD-${version}.${ext}
+  artifactName: Oasis-GTD-${version}.${ext}
 
 linux:
   target:
@@ -52,4 +52,4 @@ linux:
       arch:
         - x64
   icon: resources/icon.png
-  artifactName: Aura-GTD-${version}.${ext}
+  artifactName: Oasis-GTD-${version}.${ext}

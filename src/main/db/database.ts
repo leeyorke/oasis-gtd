@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 let db: Database.Database
 
 export function initDatabase(): void {
-  const dbPath = join(app.getPath('userData'), 'aura-gtd.db')
+  const dbPath = join(app.getPath('userData'), 'oasis-gtd.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
@@ -105,7 +105,7 @@ function createTables(): void {
 
   // Ensure default settings exist
   const defaultSettings: Record<string, string> = {
-    app_name: 'Aura',
+    app_name: 'Oasis',
     review_day: '0',
     default_capture_status: 'inbox',
     contexts: JSON.stringify(['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home']),

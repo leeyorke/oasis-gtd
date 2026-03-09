@@ -26,7 +26,7 @@ export default function Sidebar() {
   return (
     <nav className="nav-sidebar">
       <div>
-        <div className="nav-brand">Aura</div>
+        <div className="nav-brand">Oasis</div>
         <ul className="nav-links">
           {NAV_ITEMS.map(item => (
             <li key={item.id}>

@@ -1,7 +1,7 @@
 {
-  "name": "aura-gtd",
+  "name": "oasis-gtd",
   "version": "0.1.0-alpha",
-  "description": "Aura — Premium GTD Desktop System",
+  "description": "Oasis — Premium GTD Desktop System",
   "main": "./out/main/index.js",
   "scripts": {
     "start": "electron-vite preview",

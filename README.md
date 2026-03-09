@@ -1,4 +1,4 @@
-# Aura GTD — Alpha
+# Oasis GTD — Alpha
 
 Premium desktop GTD system built with Electron + React + TypeScript.
 
@@ -53,7 +53,7 @@ npm run dev
 npm run build:win
 ```
 
-Output: `dist/Aura-GTD-Setup-0.1.0-alpha.exe`
+Output: `dist/Oasis-GTD-Setup-0.1.0-alpha.exe`
 
 ### Build for other platforms
 
@@ -73,7 +73,7 @@ You can generate these from any PNG using [electron-icon-maker](https://www.npmj
 
 ## AI Provider Setup
 
-Aura supports multiple AI providers for the AI Assistant view:
+Oasis supports multiple AI providers for the AI Assistant view:
 
 | Provider | Base URL | Notes |
 |----------|----------|-------|
@@ -88,9 +88,9 @@ Configure providers in the AI Assistant view → **Configure →**
 ## Data Storage
 
 All data is stored locally in SQLite at:
-- **Windows:** `%APPDATA%\aura-gtd\aura-gtd.db`
-- **macOS:** `~/Library/Application Support/aura-gtd/aura-gtd.db`
-- **Linux:** `~/.config/aura-gtd/aura-gtd.db`
+- **Windows:** `%APPDATA%\oasis-gtd\oasis-gtd.db`
+- **macOS:** `~/Library/Application Support/oasis-gtd/oasis-gtd.db`
+- **Linux:** `~/.config/oasis-gtd/oasis-gtd.db`
 
 ## GTD Views
 
