@@ -4,6 +4,20 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './db/database'
 import { registerHandlers } from './ipc/handlers'
 
+// Fix Windows console encoding — without this, Chinese (and other CJK) characters
+// appear as mojibake because the default Windows console code page is GBK/CP936.
+if (process.platform === 'win32') {
+  try {
+    // Node 21+ has reconfigure(); fall back gracefully for older versions
+    ;(process.stdout as NodeJS.WriteStream & { reconfigure?: (opts: object) => void })
+      .reconfigure?.({ encoding: 'utf8' })
+    ;(process.stderr as NodeJS.WriteStream & { reconfigure?: (opts: object) => void })
+      .reconfigure?.({ encoding: 'utf8' })
+  } catch {
+    // non-critical, ignore
+  }
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1400,

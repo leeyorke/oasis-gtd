@@ -375,6 +375,10 @@ export const aiQueries = {
 
   deleteConversation: (id: string) =>
     db.prepare('DELETE FROM chat_conversations WHERE id = ?').run(id),
+
+  renameConversation: (id: string, title: string) =>
+    db.prepare('UPDATE chat_conversations SET title = ?, updated_at = ? WHERE id = ?')
+      .run(title, new Date().toISOString(), id),
 }
 
 // ─── Settings Queries ─────────────────────────────────────────────────────────
