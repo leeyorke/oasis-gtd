@@ -30,9 +30,15 @@ declare global {
       deleteProvider: (id: string) => Promise<void>
       getConversations: () => Promise<ChatConversation[]>
       createConversation: (title: string, providerId: string) => Promise<string>
+      updateConversationTitle: (id: string, title: string) => Promise<void>
       getMessages: (conversationId: string) => Promise<ChatMessage[]>
       deleteConversation: (id: string) => Promise<void>
-      sendMessage: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => Promise<{success: boolean; content?: string; error?: string}>
+      sendMessage: (conversationId: string, messages: ChatMessage[], provider: AIProvider, isFirstMessage?: boolean) => Promise<{success: boolean; content?: string; error?: string; title?: string}>
+      startStream: (conversationId: string, messages: ChatMessage[], provider: AIProvider, isFirstMessage?: boolean) => void
+      onStreamChunk: (callback: (conversationId: string, chunk: string) => void) => void
+      onStreamError: (callback: (conversationId: string, error: string) => void) => void
+      onStreamEnd: (callback: (conversationId: string, title?: string) => void) => void
+      removeStreamListeners: () => void
       // Settings
       getSettings: () => Promise<Record<string, string>>
       setSetting: (key: string, value: string) => Promise<void>

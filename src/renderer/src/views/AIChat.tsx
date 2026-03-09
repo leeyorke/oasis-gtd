@@ -11,10 +11,10 @@ const PROVIDER_PRESETS = [
 
 export default function AIChat() {
   const {
-    providers, activeProvider, conversations, currentConversationId, messages, isAILoading,
+    providers, activeProvider, conversations, currentConversationId, messages, isAILoading, isStreaming, streamingContent,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
     loadConversations, selectConversation, newConversation, deleteConversation,
-    sendChatMessage,
+    sendChatMessage, setupStreamListeners,
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -29,9 +29,15 @@ export default function AIChat() {
   })
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Setup stream listeners
+  useEffect(() => {
+    const cleanup = setupStreamListeners()
+    return cleanup
+  }, [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, streamingContent])
 
   const handleSend = async () => {
     if (!input.trim() || isAILoading || !currentConversationId) return
@@ -70,6 +76,12 @@ export default function AIChat() {
 
   const applyPreset = (preset: typeof PROVIDER_PRESETS[0]) => {
     setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model }))
+  }
+
+  // Combine messages with streaming content
+  const displayMessages = [...messages]
+  if (isStreaming && streamingContent) {
+    displayMessages.push({ role: 'assistant', content: streamingContent })
   }
 
   return (
@@ -173,13 +185,13 @@ export default function AIChat() {
                 {activeProvider ? 'New Conversation' : 'Configure Provider'}
               </button>
             </div>
-          ) : messages.length === 0 ? (
+          ) : displayMessages.length === 0 ? (
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>
               What's on your mind?
             </div>
           ) : (
-            messages.map((msg, i) => (
-              <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${i * 0.03}s` }}>
+            displayMessages.map((msg, i) => (
+              <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${!isStreaming || i < displayMessages.length - 1 ? i * 0.03 : 0}s` }}>
                 <div className="chat-role-label">{msg.role === 'user' ? 'You' : 'Assistant'}</div>
                 <div className={`chat-bubble ${msg.role}`} style={{ whiteSpace: 'pre-wrap' }}>
                   {msg.content}
@@ -188,7 +200,7 @@ export default function AIChat() {
             ))
           )}
 
-          {isAILoading && (
+          {isAILoading && !isStreaming && (
             <div className="chat-message assistant">
               <div className="chat-role-label">Assistant</div>
               <div className="chat-bubble assistant" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.8rem 1rem' }}>

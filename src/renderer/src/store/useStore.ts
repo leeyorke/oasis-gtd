@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useEffect } from 'react'
 import type {
   ViewType,
   Task,
@@ -58,6 +59,8 @@ interface AppStore {
   currentConversationId: string | null
   messages: ChatMessage[]
   isAILoading: boolean
+  isStreaming: boolean
+  streamingContent: string
   loadProviders: () => Promise<void>
   saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'>) => Promise<void>
   setActiveProvider: (id: string) => Promise<void>
@@ -67,6 +70,8 @@ interface AppStore {
   newConversation: () => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
+  setupStreamListeners: () => () => void
+  updateConversationTitle: (id: string, title: string) => Promise<void>
 
   // ─── UI ────────────────────────────────────────────────────────────────────
   isCapturing: boolean
@@ -183,6 +188,8 @@ export const useStore = create<AppStore>((set, get) => ({
   currentConversationId: null,
   messages: [],
   isAILoading: false,
+  isStreaming: false,
+  streamingContent: '',
 
   loadProviders: async () => {
     const providers = await window.api.getProviders()
@@ -222,23 +229,63 @@ export const useStore = create<AppStore>((set, get) => ({
     const currentId = get().currentConversationId === id ? null : get().currentConversationId
     set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [] })
   },
+  updateConversationTitle: async (id, title) => {
+    await window.api.updateConversationTitle(id, title)
+    await get().loadConversations()
+  },
+  setupStreamListeners: () => {
+    const { currentConversationId } = get()
+
+    const handleChunk = (convId: string, chunk: string) => {
+      if (convId !== get().currentConversationId) return
+      set(state => ({ streamingContent: state.streamingContent + chunk }))
+    }
+
+    const handleError = (convId: string, error: string) => {
+      if (convId !== get().currentConversationId) return
+      const errorMsg: ChatMessage = { role: 'assistant', content: `Error: ${error}` }
+      set(state => ({
+        messages: [...state.messages, errorMsg],
+        isAILoading: false,
+        isStreaming: false,
+        streamingContent: '',
+      }))
+    }
+
+    const handleEnd = (convId: string, title?: string) => {
+      if (convId !== get().currentConversationId) return
+      const { messages, streamingContent } = get()
+      const assistantMsg: ChatMessage = { role: 'assistant', content: streamingContent }
+      set(state => ({
+        messages: [...state.messages, assistantMsg],
+        isAILoading: false,
+        isStreaming: false,
+        streamingContent: '',
+      }))
+      if (title) {
+        get().loadConversations()
+      }
+    }
+
+    window.api.onStreamChunk(handleChunk)
+    window.api.onStreamError(handleError)
+    window.api.onStreamEnd(handleEnd)
+
+    return () => {
+      window.api.removeStreamListeners()
+    }
+  },
   sendChatMessage: async (content) => {
     const { currentConversationId, messages, activeProvider } = get()
     if (!currentConversationId || !activeProvider) return
 
+    const isFirstMessage = messages.length === 0
     const userMsg: ChatMessage = { role: 'user', content }
     const updatedMessages = [...messages, userMsg]
-    set({ messages: updatedMessages, isAILoading: true })
+    set({ messages: updatedMessages, isAILoading: true, isStreaming: true, streamingContent: '' })
 
-    const result = await window.api.sendMessage(currentConversationId, updatedMessages, activeProvider)
-
-    if (result.success && result.content) {
-      const assistantMsg: ChatMessage = { role: 'assistant', content: result.content }
-      set({ messages: [...updatedMessages, assistantMsg], isAILoading: false })
-    } else {
-      const errorMsg: ChatMessage = { role: 'assistant', content: `Error: ${result.error || 'Unknown error'}` }
-      set({ messages: [...updatedMessages, errorMsg], isAILoading: false })
-    }
+    // Use streaming
+    window.api.startStream(currentConversationId, updatedMessages, activeProvider, isFirstMessage)
   },
 
   // ─── UI ────────────────────────────────────────────────────────────────────

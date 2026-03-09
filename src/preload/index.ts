@@ -45,10 +45,27 @@ const api = {
   getConversations: () => ipcRenderer.invoke('chat:getConversations'),
   createConversation: (title: string, providerId: string) =>
     ipcRenderer.invoke('chat:createConversation', title, providerId),
+  updateConversationTitle: (id: string, title: string) =>
+    ipcRenderer.invoke('chat:updateConversationTitle', id, title),
   getMessages: (conversationId: string) => ipcRenderer.invoke('chat:getMessages', conversationId),
   deleteConversation: (id: string) => ipcRenderer.invoke('chat:deleteConversation', id),
-  sendMessage: (conversationId: string, messages: unknown[], provider: unknown) =>
-    ipcRenderer.invoke('ai:sendMessage', conversationId, messages, provider),
+  sendMessage: (conversationId: string, messages: unknown[], provider: unknown, isFirstMessage: boolean = false) =>
+    ipcRenderer.invoke('ai:sendMessage', conversationId, messages, provider, isFirstMessage),
+
+  // Streaming AI
+  startStream: (conversationId: string, messages: unknown[], provider: unknown, isFirstMessage: boolean = false) =>
+    ipcRenderer.send('ai:startStream', conversationId, messages, provider, isFirstMessage),
+  onStreamChunk: (callback: (conversationId: string, chunk: string) => void) =>
+    ipcRenderer.on('ai:streamChunk', (_, convId, chunk) => callback(convId, chunk)),
+  onStreamError: (callback: (conversationId: string, error: string) => void) =>
+    ipcRenderer.on('ai:streamError', (_, convId, error) => callback(convId, error)),
+  onStreamEnd: (callback: (conversationId: string, title?: string) => void) =>
+    ipcRenderer.on('ai:streamEnd', (_, convId, title) => callback(convId, title)),
+  removeStreamListeners: () => {
+    ipcRenderer.removeAllListeners('ai:streamChunk')
+    ipcRenderer.removeAllListeners('ai:streamError')
+    ipcRenderer.removeAllListeners('ai:streamEnd')
+  },
 
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:getAll'),

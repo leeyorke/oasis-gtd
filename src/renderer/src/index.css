@@ -649,7 +649,20 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;        /* critical: allows flex child to shrink below content size */
   padding: 2rem 2.5rem;
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 0;        /* critical: same reason */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-right: 0.8rem;
+  scroll-behavior: smooth;
 }
 
 .chat-header {
@@ -668,14 +681,6 @@ body {
   letter-spacing: -0.02em;
 }
 
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding-right: 0.5rem;
-}
 
 .chat-message {
   display: flex;
