@@ -132,7 +132,7 @@ export function registerHandlers(): void {
   ipcMain.handle('ai:getProviders', () => aiQueries.getProviders())
   ipcMain.handle('ai:saveProvider', (_, provider) => aiQueries.saveProvider(provider))
   ipcMain.handle('ai:setActive', (_, id: string) => aiQueries.setActive(id))
-  ipcMain.handle('ai:deleteProvider', (_, id: string) => aiQueries.deleteProvider(id))
+  ipcMain.handle('ai:deleteProvider', (_, id: string) => aiQueries.delete(id))
 
   // ─── Chat Conversations ──────────────────────────────────────────────────────
   ipcMain.handle('chat:getConversations', () => aiQueries.getConversations())

@@ -11,10 +11,10 @@ const PROVIDER_PRESETS = [
 
 export default function AIChat() {
   const {
-    providers, activeProvider, conversations, currentConversationId, messages, isAILoading, isStreaming, streamingContent,
+    providers, activeProvider, conversations, currentConversationId, messages, isAILoading,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
     loadConversations, selectConversation, newConversation, deleteConversation,
-    sendChatMessage, setupStreamListeners,
+    sendChatMessage,
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -28,16 +28,12 @@ export default function AIChat() {
     is_active: 1,
   })
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Setup stream listeners
-  useEffect(() => {
-    const cleanup = setupStreamListeners()
-    return cleanup
-  }, [])
-
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }, [messages])
 
   const handleSend = async () => {
     if (!input.trim() || isAILoading || !currentConversationId) return
@@ -72,24 +68,19 @@ export default function AIChat() {
       is_active: 1,
     })
     setShowSettings(false)
+    setProviderForm({ name: 'Ollama (Local)', provider_type: 'ollama', base_url: 'http://localhost:11434', model: 'llama3', api_key: '', is_active: 1 })
+    await loadProviders()
   }
 
   const applyPreset = (preset: typeof PROVIDER_PRESETS[0]) => {
     setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model }))
   }
 
-  // Combine messages with streaming content
-  const displayMessages = [...messages]
-  if (isStreaming && streamingContent) {
-    displayMessages.push({ role: 'assistant', content: streamingContent })
-  }
-
   return (
     <div className="chat-composition">
-      {/* ─── Conversation Sidebar ─────────────────────────────── */}
+      {/* Conversation Sidebar */}
       <div className="chat-sidebar">
         <div className="chat-sidebar-title">Conversations</div>
-
         <button
           className="btn-primary"
           onClick={handleNewConversation}
@@ -97,7 +88,6 @@ export default function AIChat() {
         >
           + New Chat
         </button>
-
         {conversations.map(conv => (
           <div
             key={conv.id}
@@ -112,43 +102,28 @@ export default function AIChat() {
             >×</button>
           </div>
         ))}
-
         {conversations.length === 0 && (
           <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'rgba(20,28,58,0.3)', padding: '0.5rem', fontStyle: 'italic' }}>
             No conversations yet
           </div>
         )}
-
-        {/* Provider info */}
         <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(20,28,58,0.08)' }}>
           {activeProvider ? (
             <div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(20,28,58,0.3)', marginBottom: '0.3rem' }}>
-                Active Provider
-              </div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'var(--ink-secondary)' }}>
-                {activeProvider.name}
-              </div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.6rem', color: 'rgba(20,28,58,0.35)', marginTop: '0.1rem' }}>
-                {activeProvider.model}
-              </div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(20,28,58,0.3)', marginBottom: '0.3rem' }}>Active Provider</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'var(--ink-secondary)' }}>{activeProvider.name}</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.6rem', color: 'rgba(20,28,58,0.35)', marginTop: '0.1rem' }}>{activeProvider.model}</div>
             </div>
           ) : (
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'rgba(20,28,58,0.3)', fontStyle: 'italic' }}>
-              No provider set
-            </div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'rgba(20,28,58,0.3)', fontStyle: 'italic' }}>No provider set</div>
           )}
-          <button
-            className="btn-text"
-            onClick={() => setShowSettings(true)}
-            style={{ marginTop: '0.5rem', paddingLeft: 0, display: 'block' }}
-          >
+          <button className="btn-text" onClick={() => setShowSettings(true)} style={{ marginTop: '0.5rem', paddingLeft: 0, display: 'block' }}>
             Configure →
           </button>
         </div>
       </div>
 
-      {/* ─── Chat Main Area ───────────────────────────────────── */}
+      {/* Chat Main Area */}
       <div className="chat-main">
         <div className="chat-header">
           <div className="chat-title">
@@ -156,62 +131,52 @@ export default function AIChat() {
               ? conversations.find(c => c.id === currentConversationId)?.title || 'Chat'
               : 'AI Assistant'}
           </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {activeProvider && (
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.58rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-secondary)' }}>
-                {activeProvider.name} · {activeProvider.model}
-              </div>
-            )}
-          </div>
+          {activeProvider && (
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.58rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-secondary)' }}>
+              {activeProvider.name} · {activeProvider.model}
+            </div>
+          )}
         </div>
 
-        {/* Messages */}
-        <div className="chat-messages">
-          {!currentConversationId ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'rgba(20,28,58,0.08)', letterSpacing: '-0.03em' }}>
-                Aura AI
+        {/* Scrollable wrapper — this is the ONLY element with overflow-y: auto */}
+        <div className="chat-messages-wrapper" ref={wrapperRef}>
+          <div className="chat-messages">
+            {!currentConversationId ? (
+              <div className="chat-empty-state">
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'rgba(20,28,58,0.08)', letterSpacing: '-0.03em' }}>Aura AI</div>
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', textAlign: 'center', maxWidth: '320px', lineHeight: 1.6 }}>
+                  {activeProvider ? 'Start a new conversation to begin chatting with your AI assistant.' : 'Configure a provider first to get started.'}
+                </div>
+                <button className="btn-primary" onClick={activeProvider ? handleNewConversation : () => setShowSettings(true)} style={{ marginTop: '0.5rem' }}>
+                  {activeProvider ? 'New Conversation' : 'Configure Provider'}
+                </button>
               </div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', textAlign: 'center', maxWidth: '320px', lineHeight: 1.6 }}>
-                {activeProvider
-                  ? 'Start a new conversation to begin chatting with your AI assistant.'
-                  : 'Configure a provider first to get started.'}
+            ) : messages.length === 0 ? (
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>
+                What's on your mind?
               </div>
-              <button
-                className="btn-primary"
-                onClick={activeProvider ? handleNewConversation : () => setShowSettings(true)}
-                style={{ marginTop: '0.5rem' }}
-              >
-                {activeProvider ? 'New Conversation' : 'Configure Provider'}
-              </button>
-            </div>
-          ) : displayMessages.length === 0 ? (
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>
-              What's on your mind?
-            </div>
-          ) : (
-            displayMessages.map((msg, i) => (
-              <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${!isStreaming || i < displayMessages.length - 1 ? i * 0.03 : 0}s` }}>
-                <div className="chat-role-label">{msg.role === 'user' ? 'You' : 'Assistant'}</div>
-                <div className={`chat-bubble ${msg.role}`} style={{ whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
+            ) : (
+              messages.map((msg, i) => (
+                <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${i * 0.03}s` }}>
+                  <div className="chat-role-label">{msg.role === 'user' ? 'You' : 'Assistant'}</div>
+                  <div className={`chat-bubble ${msg.role}`} style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                </div>
+              ))
+            )}
+
+            {isAILoading && (
+              <div className="chat-message assistant">
+                <div className="chat-role-label">Assistant</div>
+                <div className="chat-bubble assistant" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.8rem 1rem' }}>
+                  <div className="loading-dot" />
+                  <div className="loading-dot" />
+                  <div className="loading-dot" />
                 </div>
               </div>
-            ))
-          )}
+            )}
 
-          {isAILoading && !isStreaming && (
-            <div className="chat-message assistant">
-              <div className="chat-role-label">Assistant</div>
-              <div className="chat-bubble assistant" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.8rem 1rem' }}>
-                <div className="loading-dot" />
-                <div className="loading-dot" />
-                <div className="loading-dot" />
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Input area */}
@@ -236,13 +201,11 @@ export default function AIChat() {
         </div>
       </div>
 
-      {/* ─── Provider Settings Modal ───────────────────────────── */}
+      {/* Provider Settings Modal */}
       {showSettings && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
           <div className="modal-sheet fade-in" style={{ width: '520px' }}>
             <div className="modal-title">AI Provider</div>
-
-            {/* Presets */}
             <div style={{ marginBottom: '1.5rem' }}>
               <div className="form-label" style={{ marginBottom: '0.6rem' }}>Quick Setup</div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -252,18 +215,14 @@ export default function AIChat() {
                     className="btn-text"
                     onClick={() => applyPreset(preset)}
                     style={{
-                      border: '1px solid rgba(20,28,58,0.1)',
-                      padding: '0.3rem 0.8rem',
+                      border: '1px solid rgba(20,28,58,0.1)', padding: '0.3rem 0.8rem',
                       color: providerForm.provider_type === preset.type ? 'var(--ink-primary)' : 'var(--ink-secondary)',
                       borderColor: providerForm.provider_type === preset.type ? 'rgba(20,28,58,0.3)' : 'rgba(20,28,58,0.1)',
                     }}
-                  >
-                    {preset.name}
-                  </button>
+                  >{preset.name}</button>
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-field">
                 <label className="form-label">Provider Name</label>
@@ -274,18 +233,14 @@ export default function AIChat() {
                 <input className="form-input" value={providerForm.model || ''} onChange={e => setProviderForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g. gpt-4o, llama3" />
               </div>
             </div>
-
             <div className="form-field">
               <label className="form-label">Base URL</label>
-              <input className="form-input" value={providerForm.base_url || ''} onChange={e => setProviderForm(f => ({ ...f, base_url: e.target.value }))} placeholder="https://api.openai.com" />
+              <input className="form-input" value={providerForm.base_url || ''} onChange={e => setProviderForm(f => ({ ...f, base_url: e.target.value }))} />
             </div>
-
             <div className="form-field">
-              <label className="form-label">API Key (leave empty for local providers)</label>
+              <label className="form-label">API Key <span style={{ opacity: 0.5, textTransform: 'none' }}>(leave empty for local providers)</span></label>
               <input className="form-input" type="password" value={providerForm.api_key || ''} onChange={e => setProviderForm(f => ({ ...f, api_key: e.target.value }))} placeholder="sk-..." />
             </div>
-
-            {/* Existing providers */}
             {providers.length > 0 && (
               <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(20,28,58,0.08)' }}>
                 <div className="form-label" style={{ marginBottom: '0.5rem' }}>Saved Providers</div>
@@ -306,7 +261,6 @@ export default function AIChat() {
                 </div>
               </div>
             )}
-
             <div className="modal-actions">
               <button className="btn-text" onClick={() => setShowSettings(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleSaveProvider}>Save & Activate</button>
