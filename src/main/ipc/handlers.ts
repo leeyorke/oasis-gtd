@@ -12,6 +12,9 @@ import {
   dataQueries,
 } from '../db/database'
 
+// Global store for AbortControllers per conversation
+const streamControllers = new Map<string, AbortController>()
+
 // Helper: safely parse JSON, returning null on empty/invalid body
 const safeJson = async (res: Response): Promise<Record<string, unknown> | null> => {
   const text = await res.text()
@@ -74,7 +77,8 @@ async function streamOpenAICompatible(
   provider: {provider_type: string; base_url: string; model: string; api_key?: string},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
-  isTitleCall: boolean
+  isTitleCall: boolean,
+  signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/v1/chat/completions`
   const maxTokens = isTitleCall ? 30 : 2048
@@ -91,6 +95,7 @@ async function streamOpenAICompatible(
       max_tokens: maxTokens,
       stream: true,
     }),
+    signal,
   })
 
   if (!response.ok) {
@@ -126,7 +131,8 @@ async function streamAnthropic(
   provider: {provider_type: string; base_url: string; model: string; api_key?: string},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
-  isTitleCall: boolean
+  isTitleCall: boolean,
+  signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/v1/messages`
   const maxTokens = isTitleCall ? 30 : 2048
@@ -145,6 +151,7 @@ async function streamAnthropic(
       system: messages.find(m => m.role === 'system')?.content,
       stream: true,
     }),
+    signal,
   })
 
   if (!response.ok) {
@@ -182,7 +189,8 @@ async function streamOllama(
   provider: {provider_type: string; base_url: string; model: string; api_key?: string},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
-  isTitleCall: boolean
+  isTitleCall: boolean,
+  signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/api/chat`
 
@@ -190,6 +198,7 @@ async function streamOllama(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: provider.model, messages, stream: true }),
+    signal,
   })
 
   if (!response.ok) {
@@ -386,6 +395,10 @@ export function registerHandlers(): void {
       console.log('[AI] provider_type:', provider.provider_type)
     }
 
+    // Create AbortController for this stream
+    const controller = new AbortController()
+    streamControllers.set(conversationId, controller)
+
     try {
       // Save user message first
       if (!isTitleCall) {
@@ -397,11 +410,11 @@ export function registerHandlers(): void {
       let fullContent = ''
 
       if (provider.provider_type === 'anthropic') {
-        fullContent = await streamAnthropic(webContents, provider, messages, conversationId, isTitleCall)
+        fullContent = await streamAnthropic(webContents, provider, messages, conversationId, isTitleCall, controller.signal)
       } else if (provider.provider_type === 'ollama') {
-        fullContent = await streamOllama(webContents, provider, messages, conversationId, isTitleCall)
+        fullContent = await streamOllama(webContents, provider, messages, conversationId, isTitleCall, controller.signal)
       } else {
-        fullContent = await streamOpenAICompatible(webContents, provider, messages, conversationId, isTitleCall)
+        fullContent = await streamOpenAICompatible(webContents, provider, messages, conversationId, isTitleCall, controller.signal)
       }
 
       if (!isTitleCall) {
@@ -472,9 +485,32 @@ export function registerHandlers(): void {
       webContents.send('ai:streamEnd', { conversationId, content: fullContent, title: generatedTitle })
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      if (!isTitleCall) console.error('[AI] ERROR:', message)
-      webContents.send('ai:streamError', { conversationId, error: message })
+      // Check if this was an abort (user stopped)
+      if (err instanceof Error && err.name === 'AbortError') {
+        if (!isTitleCall) {
+          console.log('[AI] Stream aborted by user')
+          // Send streamEnd with current content (partial response)
+          // The content has already been streamed to renderer via ai:streamChunk
+          webContents.send('ai:streamEnd', { conversationId, content: '', aborted: true })
+        }
+      } else {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        if (!isTitleCall) console.error('[AI] ERROR:', message)
+        webContents.send('ai:streamError', { conversationId, error: message })
+      }
+    } finally {
+      // Clean up the controller
+      streamControllers.delete(conversationId)
+    }
+  })
+
+  // ─── AI Stop Stream ──────────────────────────────────────────────────────────
+  ipcMain.on('ai:stopStream', (_, conversationId: string) => {
+    const controller = streamControllers.get(conversationId)
+    if (controller) {
+      console.log('[AI] Stopping stream for conversation:', conversationId)
+      controller.abort()
+      streamControllers.delete(conversationId)
     }
   })
 

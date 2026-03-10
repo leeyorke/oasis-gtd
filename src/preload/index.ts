@@ -3,7 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 type AIStreamStartCallback = (event: IpcRendererEvent, data: { conversationId: string }) => void
 type AIStreamChunkCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string }) => void
-type AIStreamEndCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string; title?: string }) => void
+type AIStreamEndCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string; title?: string; aborted?: boolean }) => void
 type AIStreamErrorCallback = (event: IpcRendererEvent, data: { conversationId: string; error: string }) => void
 
 const api = {
@@ -59,6 +59,8 @@ const api = {
   // AI Streaming
   sendMessageStream: (conversationId: string, messages: unknown[], provider: unknown) =>
     ipcRenderer.send('ai:sendMessageStream', conversationId, messages, provider),
+  stopStream: (conversationId: string) =>
+    ipcRenderer.send('ai:stopStream', conversationId),
   onAIStreamStart: (callback: AIStreamStartCallback) =>
     ipcRenderer.on('ai:startStream', callback),
   onAIStreamChunk: (callback: AIStreamChunkCallback) =>

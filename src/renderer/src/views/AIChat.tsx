@@ -226,7 +226,7 @@ export default function AIChat() {
     streamingMessageId, streamingContent,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
     selectConversation, newConversation, deleteConversation, renameConversation,
-    sendChatMessage,
+    sendChatMessage, stopStreaming,
   } = useStore()
   const t = useT()
 
@@ -260,6 +260,10 @@ export default function AIChat() {
     const text = input.trim()
     setInput('')
     await sendChatMessage(text)
+  }
+
+  const handleStop = () => {
+    stopStreaming()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -471,8 +475,17 @@ export default function AIChat() {
             disabled={!currentConversationId || isAILoading}
             rows={1}
           />
-          <button className="btn-primary" onClick={handleSend} disabled={!input.trim() || isAILoading || !currentConversationId} style={{ flexShrink: 0, opacity: (!input.trim() || isAILoading || !currentConversationId) ? 0.4 : 1 }}>
-            {t.chat_send}
+          <button
+            className="btn-primary"
+            onClick={isAILoading ? handleStop : handleSend}
+            disabled={!isAILoading && (!input.trim() || !currentConversationId)}
+            style={{
+              flexShrink: 0,
+              opacity: (!isAILoading && (!input.trim() || !currentConversationId)) ? 0.4 : 1,
+              background: isAILoading ? 'rgba(168,50,50,0.9)' : undefined,
+            }}
+          >
+            {isAILoading ? t.chat_stop : t.chat_send}
           </button>
         </div>
       </div>

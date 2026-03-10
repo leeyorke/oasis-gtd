@@ -36,13 +36,14 @@ declare global {
       sendMessage: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => Promise<{success: boolean; content?: string; error?: string}>
       // Streaming API
       sendMessageStream: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => void
+      stopStream: (conversationId: string) => void
       onAIStreamStart: (callback: (event: any, data: { conversationId: string }) => void) => void
       onAIStreamChunk: (callback: (event: any, data: { conversationId: string; content: string }) => void) => void
-      onAIStreamEnd: (callback: (event: any, data: { conversationId: string; content: string; title?: string }) => void) => void
+      onAIStreamEnd: (callback: (event: any, data: { conversationId: string; content: string; title?: string; aborted?: boolean }) => void) => void
       onAIStreamError: (callback: (event: any, data: { conversationId: string; error: string }) => void) => void
       offAIStreamStart: (callback: (event: any, data: { conversationId: string }) => void) => void
       offAIStreamChunk: (callback: (event: any, data: { conversationId: string; content: string }) => void) => void
-      offAIStreamEnd: (callback: (event: any, data: { conversationId: string; content: string; title?: string }) => void) => void
+      offAIStreamEnd: (callback: (event: any, data: { conversationId: string; content: string; title?: string; aborted?: boolean }) => void) => void
       offAIStreamError: (callback: (event: any, data: { conversationId: string; error: string }) => void) => void
       // Settings
       getSettings: () => Promise<Record<string, string>>

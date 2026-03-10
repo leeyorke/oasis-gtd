@@ -62,6 +62,8 @@ interface AppStore {
   isAILoading: boolean
   streamingMessageId: string | null
   streamingContent: string
+  streamCleanup: (() => void) | null
+  streamUpdatedMessages: ChatMessage[] | null
   loadProviders: () => Promise<void>
   saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'>) => Promise<void>
   setActiveProvider: (id: string) => Promise<void>
@@ -72,6 +74,7 @@ interface AppStore {
   deleteConversation: (id: string) => Promise<void>
   renameConversation: (id: string, title: string) => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
+  stopStreaming: () => void
 
   // ─── UI ────────────────────────────────────────────────────────────────────
   isCapturing: boolean
@@ -192,6 +195,8 @@ export const useStore = create<AppStore>((set, get) => ({
   isAILoading: false,
   streamingMessageId: null,
   streamingContent: '',
+  streamCleanup: null,
+  streamUpdatedMessages: null,
 
   loadProviders: async () => {
     const providers = await window.api.getProviders()
@@ -257,6 +262,8 @@ export const useStore = create<AppStore>((set, get) => ({
       isAILoading: true,
       streamingMessageId: tempAssistantId,
       streamingContent: '',
+      streamCleanup: cleanup,
+      streamUpdatedMessages: updatedMessages,
     })
 
     // Event handlers
@@ -271,16 +278,35 @@ export const useStore = create<AppStore>((set, get) => ({
       }))
     }
 
-    const onStreamEnd = (_event: any, data: { conversationId: string; content: string; title?: string }) => {
+    const onStreamEnd = (_event: any, data: { conversationId: string; content: string; title?: string; aborted?: boolean }) => {
       if (data.conversationId !== currentConversationId) return
 
-      const assistantMsg: ChatMessage = { role: 'assistant', content: data.content }
-      set(state => ({
-        messages: [...updatedMessages, assistantMsg],
-        isAILoading: false,
-        streamingMessageId: null,
-        streamingContent: '',
-      }))
+      // Use the streamed content if available, otherwise use what was passed
+      const finalContent = data.aborted ? get().streamingContent : data.content
+      const streamedContent = get().streamingContent
+
+      // If aborted and we have partial content, use that; otherwise use the data content
+      const assistantContent = data.aborted && streamedContent ? streamedContent : data.content
+
+      if (assistantContent) {
+        const assistantMsg: ChatMessage = { role: 'assistant', content: assistantContent }
+        set(state => ({
+          messages: [...updatedMessages, assistantMsg],
+          isAILoading: false,
+          streamingMessageId: null,
+          streamingContent: '',
+          streamCleanup: null,
+          streamUpdatedMessages: null,
+        }))
+      } else {
+        set({
+          isAILoading: false,
+          streamingMessageId: null,
+          streamingContent: '',
+          streamCleanup: null,
+          streamUpdatedMessages: null,
+        })
+      }
 
       // Update conversation title if one was generated
       if (data.title) {
@@ -303,6 +329,8 @@ export const useStore = create<AppStore>((set, get) => ({
         isAILoading: false,
         streamingMessageId: null,
         streamingContent: '',
+        streamCleanup: null,
+        streamUpdatedMessages: null,
       }))
 
       cleanup()
@@ -319,6 +347,38 @@ export const useStore = create<AppStore>((set, get) => ({
 
     // Also reload conversations to get any updated list
     await get().loadConversations()
+  },
+
+  stopStreaming: () => {
+    const { currentConversationId, isAILoading, streamingContent, streamCleanup, streamUpdatedMessages } = get()
+    if (!currentConversationId || !isAILoading) return
+
+    // 1. Call API to stop the stream
+    window.api.stopStream(currentConversationId)
+
+    // 2. Clean up event listeners
+    if (streamCleanup) streamCleanup()
+
+    // 3. If we have partial content, save it as a message
+    if (streamingContent.trim() && streamUpdatedMessages) {
+      const assistantMsg: ChatMessage = { role: 'assistant', content: streamingContent }
+      set({
+        messages: [...streamUpdatedMessages, assistantMsg],
+        isAILoading: false,
+        streamingContent: '',
+        streamingMessageId: null,
+        streamCleanup: null,
+        streamUpdatedMessages: null,
+      })
+    } else {
+      set({
+        isAILoading: false,
+        streamingContent: '',
+        streamingMessageId: null,
+        streamCleanup: null,
+        streamUpdatedMessages: null,
+      })
+    }
   },
 
   // ─── UI ────────────────────────────────────────────────────────────────────
