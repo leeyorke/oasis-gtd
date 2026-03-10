@@ -23,6 +23,128 @@ const EMPTY_FORM: Partial<AIProvider & { provider_type: string }> = {
   is_active: 1,
 }
 
+function markdownToPlainText(md: string): string {
+  return md
+    // Remove headers
+    .replace(/^#{1,6}\s+/gm, '')
+    // Remove bold/italic
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    // Remove strikethrough
+    .replace(/~~(.*?)~~/g, '$1')
+    // Remove inline code markers but keep content
+    .replace(/`([^`]+)`/g, '$1')
+    // Remove code blocks but keep content
+    .replace(/```[\s\S]*?```/g, (match) => match.replace(/```[\s\S]*?\n/, '').replace(/```$/, ''))
+    // Remove links but keep text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Remove blockquotes
+    .replace(/^>\s+/gm, '')
+    // Remove horizontal rules
+    .replace(/^[-*_]{3,}\s*$/gm, '')
+    // Remove list markers
+    .replace(/^[*+-]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    // Remove task list checkboxes
+    .replace(/^\[ \]\s+/gm, '')
+    .replace(/^\[x\]\s+/gm, '')
+    // Clean up extra newlines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+interface CopyButtonProps {
+  content: string
+}
+
+function CopyButton({ content }: CopyButtonProps) {
+  const { t } = { t: (key: string) => key } // Will be replaced with real hook
+  const [showMenu, setShowMenu] = useState(false)
+  const [copied, setCopied] = useState<'text' | 'markdown' | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Get real t hook
+  const RealT = useT()
+  const tReal = (key: string) => {
+    const fullKey = `chat_${key}` as keyof typeof RealT
+    return (RealT as any)[fullKey] || key
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleMouseEnter = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = null
+    }
+    setShowMenu(true)
+  }
+
+  const handleMouseLeave = () => {
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowMenu(false)
+    }, 150)
+  }
+
+  const handleCopy = async (type: 'text' | 'markdown') => {
+    try {
+      const text = type === 'text' ? markdownToPlainText(content) : content
+      await navigator.clipboard.writeText(text)
+      setCopied(type)
+      setShowMenu(false)
+      setTimeout(() => setCopied(null), 2000)
+    } catch (err) {
+      console.error('Copy failed:', err)
+    }
+  }
+
+  return (
+    <div
+      className="copy-button-container"
+      ref={menuRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        className="copy-button"
+        title="Copy"
+      >
+        {copied ? (
+          <span className="copy-copied">{tReal('copied')}</span>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        )}
+      </button>
+      {showMenu && (
+        <div className="copy-dropdown">
+          <button className="copy-dropdown-item" onClick={() => handleCopy('text')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            {tReal('copyText')}
+          </button>
+          <button className="copy-dropdown-item" onClick={() => handleCopy('markdown')}>
+            <span style={{ marginRight: '0.5rem', fontWeight: 'bold', fontSize: '0.8rem', lineHeight: '1' }}>M</span>
+            {tReal('copyMarkdown')}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface MarkdownMessageProps {
   content: string
 }
@@ -94,6 +216,7 @@ export default function AIChat() {
   const [providerForm, setProviderForm] = useState<Partial<AIProvider & { provider_type: string }>>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ show: boolean; x: number; y: number; convId: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -154,6 +277,50 @@ export default function AIChat() {
     setEditingId(null)
   }
 
+  const handleContextMenu = (e: React.MouseEvent, convId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ show: true, x: e.clientX, y: e.clientY, convId })
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu(null)
+  }
+
+  const handleExportConversation = async (convId: string) => {
+    const conv = conversations.find(c => c.id === convId)
+    if (!conv) return
+    try {
+      // Need to load messages for this conversation
+      const msgs = await window.api.getMessages(convId)
+      const result = await window.api.exportConversationMarkdown(
+        convId,
+        conv.title,
+        msgs
+      )
+      if (result.success) {
+        alert(t.chat_exportOk)
+      } else if (!result.canceled) {
+        alert(t.chat_exportErr)
+      }
+    } catch (err) {
+      console.error('Export failed:', err)
+      alert(t.chat_exportErr)
+    }
+    closeContextMenu()
+  }
+
+  const handleDeleteConversation = (convId: string) => {
+    deleteConversation(convId)
+    closeContextMenu()
+  }
+
+  useEffect(() => {
+    const handleClickOutside = () => closeContextMenu()
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
   return (
     <div className="chat-composition">
       {/* Conversation Sidebar */}
@@ -163,9 +330,13 @@ export default function AIChat() {
           {t.chat_newChat}
         </button>
         {conversations.map(conv => (
-          <div key={conv.id} className={`chat-conv-item ${currentConversationId === conv.id ? 'active' : ''}`} onClick={() => selectConversation(conv.id)}>
+          <div
+            key={conv.id}
+            className={`chat-conv-item ${currentConversationId === conv.id ? 'active' : ''}`}
+            onClick={() => selectConversation(conv.id)}
+            onContextMenu={(e) => handleContextMenu(e, conv.id)}
+          >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.title}</span>
-            <button className="btn-text" onClick={e => { e.stopPropagation(); deleteConversation(conv.id) }} style={{ flexShrink: 0, fontSize: '0.75rem', padding: 0, opacity: 0.5 }}>×</button>
           </div>
         ))}
         {conversations.length === 0 && (
@@ -216,12 +387,15 @@ export default function AIChat() {
               displayMessages.map((msg, i) => (
                 <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${i * 0.03}s` }}>
                   <div className="chat-role-label">{msg.role === 'user' ? t.chat_you : t.chat_assistant}</div>
-                  <div className={`chat-bubble ${msg.role}`}>
-                    {msg.role === 'assistant' ? (
-                      <MarkdownMessage content={msg.content} />
-                    ) : (
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                    )}
+                  <div className={`chat-bubble-wrapper ${msg.role}`}>
+                    <div className={`chat-bubble ${msg.role}`}>
+                      {msg.role === 'assistant' ? (
+                        <MarkdownMessage content={msg.content} />
+                      ) : (
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                      )}
+                    </div>
+                    {msg.role === 'assistant' && <CopyButton content={msg.content} />}
                   </div>
                 </div>
               ))
@@ -330,6 +504,41 @@ export default function AIChat() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Context Menu for conversations */}
+      {contextMenu && contextMenu.show && (
+        <div
+          className="chat-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000,
+          }}
+        >
+          <button
+            className="chat-context-menu-item"
+            onClick={() => handleExportConversation(contextMenu.convId)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            {t.chat_export}
+          </button>
+          <button
+            className="chat-context-menu-item chat-context-menu-item-delete"
+            onClick={() => handleDeleteConversation(contextMenu.convId)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            {t.delete}
+          </button>
         </div>
       )}
     </div>

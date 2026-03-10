@@ -86,6 +86,10 @@ const api = {
   clearCompleted: () => ipcRenderer.invoke('data:clearCompleted'),
   clearChatHistory: () => ipcRenderer.invoke('data:clearChatHistory'),
   exportJSON: () => ipcRenderer.invoke('data:exportJSON'),
+
+  // Chat export
+  exportConversationMarkdown: (conversationId: string, title: string, messages: Array<{role: string; content: string}>) =>
+    ipcRenderer.invoke('chat:exportMarkdown', conversationId, title, messages),
 }
 
 if (process.contextIsolated) {

@@ -713,12 +713,16 @@ body {
   align-items: flex-end;
 }
 
+.chat-message.user .chat-bubble-wrapper {
+  justify-content: flex-end;
+}
+
 .chat-message.assistant {
   align-items: flex-start;
 }
 
 .chat-bubble {
-  max-width: 70%;
+  width: 100%;
   padding: 0.9rem 1.2rem;
   font-family: var(--font-sans);
   font-size: 0.82rem;
@@ -1230,4 +1234,130 @@ body {
 .markdown-body del {
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+/* Chat bubble wrapper for copy button */
+.chat-bubble-wrapper {
+  position: relative;
+  display: inline-flex;
+  /* Ai 输出消息区域宽度 */
+  max-width: 100%;
+}
+
+.chat-bubble-wrapper.user {
+  margin-left: auto;
+}
+
+/* Copy Button */
+.copy-button-container {
+  position: absolute;
+  bottom: -32px;
+  left: 0;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chat-bubble-wrapper:hover .copy-button-container {
+  opacity: 1;
+}
+
+.copy-button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-secondary);
+  transition: all 0.2s ease;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.copy-button:hover {
+  background: rgba(20, 28, 58, 0.08);
+  color: var(--ink-primary);
+}
+
+.copy-copied {
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.copy-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  background: var(--sheet-white);
+  border: 1px solid rgba(20, 28, 58, 0.15);
+  border-radius: 4px;
+  box-shadow: var(--shadow-lift);
+  min-width: 140px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.copy-dropdown-item {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  color: var(--ink-primary);
+  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.copy-dropdown-item:hover {
+  background: rgba(20, 28, 58, 0.06);
+}
+
+
+/* Conversation Context Menu */
+.chat-context-menu {
+  background: var(--sheet-white);
+  border: 1px solid rgba(20, 28, 58, 0.15);
+  border-radius: 4px;
+  box-shadow: var(--shadow-lift);
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.chat-context-menu-item {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  color: var(--ink-primary);
+  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.chat-context-menu-item:hover {
+  background: rgba(20, 28, 58, 0.06);
+}
+
+.chat-context-menu-item-delete {
+  color: rgba(168, 50, 50, 0.8);
+}
+
+.chat-context-menu-item-delete:hover {
+  background: rgba(168, 50, 50, 0.06);
+  color: #a83232;
 }

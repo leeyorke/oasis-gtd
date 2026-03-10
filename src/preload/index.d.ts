@@ -53,6 +53,9 @@ declare global {
       clearCompleted: () => Promise<{success: boolean}>
       clearChatHistory: () => Promise<{success: boolean}>
       exportJSON: () => Promise<{success: boolean; path?: string; canceled?: boolean; error?: string}>
+      // Chat export
+      exportConversationMarkdown: (conversationId: string, title: string, messages: Array<{role: string; content: string}>) =>
+        Promise<{success: boolean; path?: string; canceled?: boolean; error?: string}>
     }
   }
 }

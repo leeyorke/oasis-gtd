@@ -511,4 +511,38 @@ export function registerHandlers(): void {
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
     }
   })
+
+  // ─── Export Conversation Markdown ───────────────────────────────────────────
+  ipcMain.handle('chat:exportMarkdown', async (_, conversationId: string, title: string, messages: Array<{role: string; content: string}>) => {
+    // Sanitize title for filename
+    const sanitizedTitle = title.replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, '-').slice(0, 60)
+    const dateStr = new Date().toISOString().split('T')[0]
+
+    const result = await dialog.showSaveDialog({
+      title: 'Export Conversation',
+      defaultPath: join(app.getPath('documents'), `${sanitizedTitle || 'conversation'}-${dateStr}.md`),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+
+    if (result.canceled || !result.filePath) return { success: false, canceled: true }
+
+    try {
+      // Build Markdown content
+      let mdContent = `# ${title || 'Conversation'}\n`
+      mdContent += `${new Date().toLocaleDateString()}\n\n`
+      mdContent += `---\n\n`
+
+      for (const msg of messages) {
+        const roleLabel = msg.role === 'user' ? 'You' : 'Assistant'
+        mdContent += `## ${roleLabel}\n\n`
+        mdContent += `${msg.content}\n\n`
+        mdContent += `---\n\n`
+      }
+
+      writeFileSync(result.filePath, mdContent, 'utf-8')
+      return { success: true, path: result.filePath }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+    }
+  })
 }

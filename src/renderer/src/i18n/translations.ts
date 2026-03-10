@@ -186,6 +186,14 @@ const translations = {
     chat_savedProviders:'Saved Providers',
     chat_saveActivate:  'Save & Activate',
     chat_active:        'Active',
+    // Copy & Export
+    chat_copyText:       'Copy as Text',
+    chat_copyMarkdown:   'Copy as Markdown',
+    chat_copied:         'Copied!',
+    chat_export:         'Export',
+    chat_exportTitle:    'Export Conversation',
+    chat_exportOk:       'Exported!',
+    chat_exportErr:      'Export failed',
 
     // ─── Settings ─────────────────────────────────────────────────────────────
     settings_title:     'Settings',
@@ -420,6 +428,14 @@ const translations = {
     chat_savedProviders:'已保存提供商',
     chat_saveActivate:  '保存并激活',
     chat_active:        '已激活',
+    // Copy & Export
+    chat_copyText:       '复制为纯文本',
+    chat_copyMarkdown:   '复制为Markdown',
+    chat_copied:         '已复制！',
+    chat_export:         '导出',
+    chat_exportTitle:    '导出对话',
+    chat_exportOk:       '已导出！',
+    chat_exportErr:      '导出失败',
 
     // ─── Settings ─────────────────────────────────────────────────────────────
     settings_title:     '设置',
