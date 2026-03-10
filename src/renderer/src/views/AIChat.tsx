@@ -157,10 +157,29 @@ function MarkdownMessage({ content }: MarkdownMessageProps) {
         components={{
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '')
+            const codeContent = String(children).replace(/\n$/, '')
             return !inline && match ? (
               <div className="code-block-wrapper">
                 <div className="code-block-header">
                   <span className="code-language">{match[1]}</span>
+                  <button
+                    className="code-copy-btn"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(codeContent)
+                        const btn = document.activeElement as HTMLButtonElement
+                        if (btn) {
+                          const originalText = btn.textContent
+                          btn.textContent = 'Copied!'
+                          setTimeout(() => { btn.textContent = originalText }, 1500)
+                        }
+                      } catch (err) {
+                        console.error('Copy failed:', err)
+                      }
+                    }}
+                  >
+                    Copy
+                  </button>
                 </div>
                 <SyntaxHighlighter
                   style={tomorrow as any}
@@ -170,7 +189,7 @@ function MarkdownMessage({ content }: MarkdownMessageProps) {
                   customStyle={{ margin: 0, borderRadius: '0 0 6px 6px' }}
                   {...props}
                 >
-                  {String(children).replace(/\n$/, '')}
+                  {codeContent}
                 </SyntaxHighlighter>
               </div>
             ) : (
