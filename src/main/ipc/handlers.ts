@@ -91,12 +91,19 @@ export function registerHandlers(): void {
         console.log('[AI] user message saved to DB')
       }
 
+      // Helper: safely parse JSON, returning null on empty/invalid body
+      const safeJson = async (res: Response): Promise<Record<string, unknown> | null> => {
+        const text = await res.text()
+        if (!text.trim()) return null
+        try { return JSON.parse(text) } catch { return { __raw: text } }
+      }
+
       let responseText = ''
       const maxTokens = isTitleCall ? 30 : 2048
 
       if (provider.provider_type === 'anthropic') {
         const url = `${provider.base_url}/v1/messages`
-        if (!isTitleCall) console.log('[AI] → Anthropic request to:', url)
+        if (!isTitleCall) console.log('[AI] -> Anthropic:', url)
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -112,29 +119,37 @@ export function registerHandlers(): void {
           }),
         })
         if (!isTitleCall) console.log('[AI] Anthropic HTTP status:', response.status, response.statusText)
-        const data = await response.json() as Record<string, unknown>
-        if (!isTitleCall) console.log('[AI] Anthropic response body:', JSON.stringify(data).slice(0, 300))
-        const content = data.content as Array<{text: string}> | undefined
+        if (!response.ok) {
+          const body = await response.text()
+          throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+        }
+        const data = await safeJson(response)
+        if (!isTitleCall) console.log('[AI] Anthropic response:', JSON.stringify(data).slice(0, 300))
+        const content = data?.content as Array<{text: string}> | undefined
         responseText = content?.[0]?.text || 'No response'
 
       } else if (provider.provider_type === 'ollama') {
         const url = `${provider.base_url}/api/chat`
-        if (!isTitleCall) console.log('[AI] → Ollama request to:', url)
+        if (!isTitleCall) console.log('[AI] -> Ollama:', url)
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: provider.model, messages, stream: false }),
         })
         if (!isTitleCall) console.log('[AI] Ollama HTTP status:', response.status, response.statusText)
-        const data = await response.json() as Record<string, unknown>
-        if (!isTitleCall) console.log('[AI] Ollama response body:', JSON.stringify(data).slice(0, 300))
-        const msg = data.message as { content: string } | undefined
+        if (!response.ok) {
+          const body = await response.text()
+          throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+        }
+        const data = await safeJson(response)
+        if (!isTitleCall) console.log('[AI] Ollama response:', JSON.stringify(data).slice(0, 300))
+        const msg = data?.message as { content: string } | undefined
         responseText = msg?.content || 'No response'
 
       } else {
         // OpenAI-compatible
         const url = `${provider.base_url}/v1/chat/completions`
-        if (!isTitleCall) console.log('[AI] → OpenAI-compatible request to:', url)
+        if (!isTitleCall) console.log('[AI] -> OpenAI-compatible:', url)
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -144,23 +159,27 @@ export function registerHandlers(): void {
           body: JSON.stringify({ model: provider.model, messages, max_tokens: maxTokens }),
         })
         if (!isTitleCall) console.log('[AI] OpenAI HTTP status:', response.status, response.statusText)
-        const data = await response.json() as Record<string, unknown>
-        if (!isTitleCall) console.log('[AI] OpenAI response body:', JSON.stringify(data).slice(0, 300))
-        const choices = data.choices as Array<{message: {content: string}}> | undefined
+        if (!response.ok) {
+          const body = await response.text()
+          throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+        }
+        const data = await safeJson(response)
+        if (!isTitleCall) console.log('[AI] OpenAI response:', JSON.stringify(data).slice(0, 300))
+        const choices = data?.choices as Array<{message: {content: string}}> | undefined
         responseText = choices?.[0]?.message?.content || 'No response'
       }
 
       if (!isTitleCall) {
-        console.log('[AI] responseText (first 100 chars):', responseText.slice(0, 100))
+        console.log('[AI] response (first 100):', responseText.slice(0, 100))
         aiQueries.addMessage(conversationId, 'assistant', responseText)
         console.log('[AI] assistant message saved to DB')
-        console.log('[AI] ── done ─────────────────────────────────────────\n')
+        console.log('[AI] done\n')
       }
 
       return { success: true, content: responseText }
 
     } catch (err) {
-      if (!isTitleCall) console.error('[AI] !! ERROR:', err)
+      if (!isTitleCall) console.error('[AI] ERROR:', err instanceof Error ? err.message : err)
       const message = err instanceof Error ? err.message : 'Unknown error'
       return { success: false, error: message }
     }
@@ -186,8 +205,8 @@ export function registerHandlers(): void {
 
   ipcMain.handle('data:exportJSON', async () => {
     const result = await dialog.showSaveDialog({
-      title: 'Export Oasis GTD Data',
-      defaultPath: join(app.getPath('documents'), `oasis-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
+      title: 'Export Aura GTD Data',
+      defaultPath: join(app.getPath('documents'), `aura-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     if (result.canceled || !result.filePath) return { success: false, canceled: true }
