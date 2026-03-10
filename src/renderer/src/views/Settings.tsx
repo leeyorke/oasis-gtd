@@ -49,24 +49,36 @@ export default function Settings() {
   }
 
   // ─── Provider form ────────────────────────────────────────────────────────
-  const [providerForm, setProviderForm] = useState<Partial<AIProvider & { provider_type: string }>>({
-    name: '', provider_type: 'ollama', base_url: 'http://localhost:11434', model: 'llama3', api_key: '', is_active: 1,
-  })
+  const EMPTY_PROVIDER_FORM: Partial<AIProvider & { provider_type: string }> = {
+    name: 'Custom OpenAI-Compatible', provider_type: 'custom', base_url: '', model: '', api_key: '', is_active: 1,
+  }
+  const [providerForm, setProviderForm] = useState<Partial<AIProvider & { provider_type: string }>>(EMPTY_PROVIDER_FORM)
   const [showProviderForm, setShowProviderForm] = useState(false)
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null)
+  const [showApiKey, setShowApiKey] = useState(false)
 
   const handleSaveProvider = async () => {
     if (!providerForm.name || !providerForm.base_url || !providerForm.model) return
     await saveProvider({
       name: providerForm.name!,
-      provider_type: (providerForm.provider_type as AIProvider['provider_type']) || 'openai',
+      provider_type: (providerForm.provider_type as AIProvider['provider_type']) || 'custom',
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
-      is_active: 1,
+      is_active: editingProviderId ? (providerForm.is_active ?? 1) : 1,
     })
     setShowProviderForm(false)
-    setProviderForm({ name: '', provider_type: 'ollama', base_url: 'http://localhost:11434', model: 'llama3', api_key: '', is_active: 1 })
+    setEditingProviderId(null)
+    setShowApiKey(false)
+    setProviderForm(EMPTY_PROVIDER_FORM)
     await loadProviders()
+  }
+
+  const handleEditProvider = (p: AIProvider) => {
+    setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', is_active: p.is_active })
+    setEditingProviderId(p.id)
+    setShowApiKey(false)
+    setShowProviderForm(true)
   }
 
   // ─── Data actions ─────────────────────────────────────────────────────────
@@ -134,7 +146,7 @@ export default function Settings() {
 
           {/* Version info */}
           <div style={{ marginTop: 'auto', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', color: 'rgba(20,28,58,0.25)', letterSpacing: '0.08em', lineHeight: 1.7 }}>
-            Oasis GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
+            Aura GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
           </div>
         </div>
 
@@ -151,7 +163,7 @@ export default function Settings() {
                   className="form-input"
                   value={settings.app_name}
                   onChange={e => updateSetting('app_name', e.target.value)}
-                  placeholder="Oasis"
+                  placeholder="Aura"
                   style={{ maxWidth: '240px' }}
                 />
                 <FieldHint>Shown in the sidebar header</FieldHint>
@@ -281,8 +293,8 @@ export default function Settings() {
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         padding: '0.9rem 1.2rem',
                         border: '1px solid',
-                        borderColor: p.is_active ? 'rgba(20,28,58,0.2)' : 'rgba(20,28,58,0.07)',
-                        background: p.is_active ? 'rgba(20,28,58,0.03)' : 'transparent',
+                        borderColor: editingProviderId === p.id ? 'rgba(20,28,58,0.25)' : p.is_active ? 'rgba(20,28,58,0.2)' : 'rgba(20,28,58,0.07)',
+                        background: editingProviderId === p.id ? 'rgba(20,28,58,0.05)' : p.is_active ? 'rgba(20,28,58,0.03)' : 'transparent',
                       }}
                     >
                       <div>
@@ -302,6 +314,13 @@ export default function Settings() {
                         )}
                         <button
                           className="btn-text"
+                          onClick={() => editingProviderId === p.id ? (setEditingProviderId(null), setShowProviderForm(false)) : handleEditProvider(p)}
+                          style={{ color: editingProviderId === p.id ? 'var(--ink-primary)' : 'var(--ink-secondary)' }}
+                        >
+                          {editingProviderId === p.id ? 'Cancel' : 'Edit'}
+                        </button>
+                        <button
+                          className="btn-text"
                           onClick={() => deleteProvider(p.id)}
                           style={{ color: 'rgba(168,50,50,0.6)' }}
                           onMouseEnter={e => (e.currentTarget.style.color = '#a83232')}
@@ -313,22 +332,27 @@ export default function Settings() {
                 </div>
               )}
 
-              {/* Add provider form */}
+              {/* Add / Edit provider form */}
               {showProviderForm ? (
                 <div style={{ border: '1px solid rgba(20,28,58,0.1)', padding: '1.5rem', background: 'rgba(255,255,255,0.3)' }}>
-                  <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--ink-secondary)', marginBottom: '1rem' }}>Quick Setup</div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
-                    {PROVIDER_PRESETS.map(preset => (
-                      <button
-                        key={preset.name}
-                        className="btn-text"
-                        onClick={() => setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model }))}
-                        style={{ border: '1px solid rgba(20,28,58,0.1)', padding: '0.25rem 0.7rem', color: providerForm.name === preset.name ? 'var(--ink-primary)' : 'var(--ink-secondary)', borderColor: providerForm.name === preset.name ? 'rgba(20,28,58,0.3)' : 'rgba(20,28,58,0.1)' }}
-                      >
-                        {preset.name}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Quick Setup presets — only for new providers */}
+                  {!editingProviderId && (
+                    <>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--ink-secondary)', marginBottom: '0.8rem' }}>Quick Setup</div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+                        {PROVIDER_PRESETS.map(preset => (
+                          <button
+                            key={preset.name}
+                            className="btn-text"
+                            onClick={() => setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model }))}
+                            style={{ border: '1px solid rgba(20,28,58,0.1)', padding: '0.25rem 0.7rem', color: providerForm.name === preset.name ? 'var(--ink-primary)' : 'var(--ink-secondary)', borderColor: providerForm.name === preset.name ? 'rgba(20,28,58,0.3)' : 'rgba(20,28,58,0.1)', background: providerForm.name === preset.name ? 'rgba(20,28,58,0.04)' : 'transparent' }}
+                          >
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-field">
@@ -346,16 +370,35 @@ export default function Settings() {
                   </div>
                   <div className="form-field">
                     <label className="form-label">API Key <span style={{ opacity: 0.5 }}>(leave empty for local providers)</span></label>
-                    <input className="form-input" type="password" value={providerForm.api_key || ''} onChange={e => setProviderForm(f => ({ ...f, api_key: e.target.value }))} placeholder="sk-..." />
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        className="form-input"
+                        type={showApiKey ? 'text' : 'password'}
+                        value={providerForm.api_key || ''}
+                        onChange={e => setProviderForm(f => ({ ...f, api_key: e.target.value }))}
+                        placeholder="sk-..."
+                        style={{ paddingRight: '2.5rem', flex: 1 }}
+                      />
+                      <button
+                        onClick={() => setShowApiKey(v => !v)}
+                        style={{ position: 'absolute', right: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(20,28,58,0.35)', fontSize: '0.7rem', fontFamily: 'var(--font-sans)', letterSpacing: '0.05em', padding: '0.2rem 0.3rem', transition: 'color 0.2s' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink-primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(20,28,58,0.35)')}
+                      >
+                        {showApiKey ? 'HIDE' : 'SHOW'}
+                      </button>
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(20,28,58,0.06)' }}>
-                    <button className="btn-primary" onClick={handleSaveProvider}>Save & Activate</button>
-                    <button className="btn-text" onClick={() => setShowProviderForm(false)}>Cancel</button>
+                    <button className="btn-primary" onClick={handleSaveProvider}>
+                      {editingProviderId ? 'Update' : 'Save & Activate'}
+                    </button>
+                    <button className="btn-text" onClick={() => { setShowProviderForm(false); setEditingProviderId(null); setShowApiKey(false) }}>Cancel</button>
                   </div>
                 </div>
               ) : (
-                <button className="btn-primary" onClick={() => setShowProviderForm(true)}>+ Add Provider</button>
+                <button className="btn-primary" onClick={() => { setProviderForm(EMPTY_PROVIDER_FORM); setShowProviderForm(true) }}>+ Add Provider</button>
               )}
             </div>
           )}

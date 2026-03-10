@@ -25,7 +25,7 @@ declare global {
       updateReviewItem: (id: string, completed: boolean) => Promise<void>
       resetReview: () => Promise<void>
       getProviders: () => Promise<AIProvider[]>
-      saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'>) => Promise<string>
+      saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'> & { id?: string }) => Promise<string>
       setActiveProvider: (id: string) => Promise<void>
       deleteProvider: (id: string) => Promise<void>
       getConversations: () => Promise<ChatConversation[]>
