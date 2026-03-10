@@ -1,26 +1,29 @@
 import { useStore } from '../store/useStore'
+import { useT } from '../i18n/useT'
 import type { ViewType } from '../types'
 
-const NAV_ITEMS: { id: ViewType; label: string }[] = [
-  { id: 'next-actions',  label: 'Next Actions' },
-  { id: 'projects',      label: 'Projects' },
-  { id: 'waiting',       label: 'Waiting For' },
-  { id: 'someday',       label: 'Someday' },
-  { id: 'weekly-review', label: 'Weekly Review' },
-  { id: 'ai-chat',       label: 'AI Assistant' },
-]
-
-const BOTTOM_ITEMS: { id: ViewType; label: string }[] = [
-  { id: 'settings', label: 'Settings' },
-]
-
 export default function Sidebar() {
-  const { currentView, setView, tasks, projects, waitingItems } = useStore()
+  const { currentView, setView, tasks, projects, waitingItems, settings } = useStore()
+  const t = useT()
 
+  const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
   const now = new Date()
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  const dateStr = now.toLocaleDateString(lang, { weekday: 'long', month: 'short', day: 'numeric' })
 
-  const nextCount = tasks.filter(t => t.status === 'next').length
+  const NAV_ITEMS: { id: ViewType; label: string }[] = [
+    { id: 'next-actions',  label: t.nav_nextActions },
+    { id: 'projects',      label: t.nav_projects },
+    { id: 'waiting',       label: t.nav_waiting },
+    { id: 'someday',       label: t.nav_someday },
+    { id: 'weekly-review', label: t.nav_weeklyReview },
+    { id: 'ai-chat',       label: t.nav_aiChat },
+  ]
+
+  const BOTTOM_ITEMS: { id: ViewType; label: string }[] = [
+    { id: 'settings', label: t.nav_settings },
+  ]
+
+  const nextCount = tasks.filter(tk => tk.status === 'next').length
   const activeCount = projects.filter(p => p.status === 'active').length
 
   return (
@@ -56,9 +59,9 @@ export default function Sidebar() {
         </ul>
 
         <div className="nav-meta">
-          {nextCount} Actions<br />
-          {activeCount} Projects<br />
-          {waitingItems.length} Waiting<br />
+          {nextCount} {t.nav_meta_actions}<br />
+          {activeCount} {t.nav_meta_projects}<br />
+          {waitingItems.length} {t.nav_meta_waiting}<br />
           <span style={{ opacity: 0.5, marginTop: '0.5rem', display: 'block' }}>{dateStr}</span>
         </div>
       </div>

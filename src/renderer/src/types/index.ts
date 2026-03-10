@@ -5,6 +5,7 @@ export interface AppSettings {
   review_day: number          // 0=Sun ... 6=Sat
   default_capture_status: 'inbox' | 'next'
   contexts: string[]          // custom @context list
+  language: 'en' | 'zh'
 }
 
 export interface Task {

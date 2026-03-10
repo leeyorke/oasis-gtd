@@ -281,6 +281,7 @@ export const useStore = create<AppStore>((set, get) => ({
     review_day: 0,
     default_capture_status: 'inbox',
     contexts: ['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home'],
+    language: 'en',
   },
   loadSettings: async () => {
     const raw = await window.api.getSettings()
@@ -290,6 +291,7 @@ export const useStore = create<AppStore>((set, get) => ({
         review_day: Number(raw.review_day ?? 0),
         default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
         contexts: raw.contexts ? JSON.parse(raw.contexts) : [],
+        language: (raw.language as AppSettings['language']) ?? 'en',
       },
     })
   },

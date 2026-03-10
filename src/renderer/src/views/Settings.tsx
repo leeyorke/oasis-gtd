@@ -1,17 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import type { AIProvider } from '../types'
+import { useT } from '../i18n/useT'
 
 type Section = 'general' | 'contexts' | 'ai-providers' | 'data'
-
-const SECTIONS: { id: Section; label: string; description: string }[] = [
-  { id: 'general',      label: 'General',      description: 'App preferences & review schedule' },
-  { id: 'contexts',     label: 'Contexts',     description: 'Manage your @context tags' },
-  { id: 'ai-providers', label: 'AI Providers', description: 'Configure LLM endpoints' },
-  { id: 'data',         label: 'Data',         description: 'Export, clean up & database info' },
-]
-
-const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI',                  type: 'openai' as const,    base_url: 'https://api.openai.com',   model: 'gpt-4o' },
@@ -23,7 +15,15 @@ const PROVIDER_PRESETS = [
 
 export default function Settings() {
   const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack } = useStore()
+  const t = useT()
   const [activeSection, setActiveSection] = useState<Section>('general')
+
+  const SECTIONS: { id: Section; label: string; description: string }[] = [
+    { id: 'general',      label: t.settings_general,      description: t.settings_generalDesc },
+    { id: 'contexts',     label: t.settings_contexts,     description: t.settings_contextsDesc },
+    { id: 'ai-providers', label: t.settings_aiProviders,  description: t.settings_aiProvidersDesc },
+    { id: 'data',         label: t.settings_data,         description: t.settings_dataDesc },
+  ]
 
   // ─── Stats & DB path ──────────────────────────────────────────────────────
   const [stats, setStats] = useState<Record<string, number>>({})
@@ -134,7 +134,7 @@ export default function Settings() {
           gap: '0.2rem',
         }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', letterSpacing: '-0.02em', color: 'var(--ink-primary)', marginBottom: '2rem', lineHeight: 1 }}>
-            Settings
+            {t.settings_title}
           </div>
           {SECTIONS.map(s => (
             <button
@@ -171,9 +171,9 @@ export default function Settings() {
           {/* ── GENERAL ───────────────────────────────────────────── */}
           {activeSection === 'general' && (
             <div className="fade-in">
-              <SectionTitle>General</SectionTitle>
+              <SectionTitle>{t.settings_general}</SectionTitle>
 
-              <FieldGroup label="App Name">
+              <FieldGroup label={t.settings_appName}>
                 <input
                   className="form-input"
                   value={settings.app_name}
@@ -186,9 +186,9 @@ export default function Settings() {
 
               <Divider />
 
-              <FieldGroup label="Weekly Review Day">
+              <FieldGroup label={t.settings_reviewDay}>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {WEEK_DAYS.map((day, idx) => (
+                  {t.weekdays.map((day, idx) => (
                     <button
                       key={day}
                       onClick={() => updateSetting('review_day', idx)}
@@ -205,16 +205,15 @@ export default function Settings() {
                         letterSpacing: '0.04em',
                       }}
                     >
-                      {day.slice(0, 3)}
+                      {day.slice(0, 2)}
                     </button>
                   ))}
                 </div>
-                <FieldHint>Your default day to do a weekly review</FieldHint>
               </FieldGroup>
 
               <Divider />
 
-              <FieldGroup label="Default Capture Status">
+              <FieldGroup label={t.settings_captureStatus}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {(['inbox', 'next'] as const).map(s => (
                     <button
@@ -234,11 +233,36 @@ export default function Settings() {
                         letterSpacing: '0.08em',
                       }}
                     >
-                      {s === 'inbox' ? 'Inbox' : 'Next Action'}
+                      {s === 'inbox' ? t.capture_inbox : t.modal_statusNext}
                     </button>
                   ))}
                 </div>
-                <FieldHint>Where Quick Capture sends items by default</FieldHint>
+              </FieldGroup>
+
+              <Divider />
+
+              <FieldGroup label={t.settings_language}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {(['en', 'zh'] as const).map(lang => (
+                    <button
+                      key={lang}
+                      onClick={() => updateSetting('language', lang)}
+                      style={{
+                        background: settings.language === lang ? 'var(--ink-primary)' : 'transparent',
+                        color: settings.language === lang ? 'var(--ink-light)' : 'var(--ink-secondary)',
+                        border: '1px solid',
+                        borderColor: settings.language === lang ? 'var(--ink-primary)' : 'rgba(20,28,58,0.12)',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.62rem',
+                        padding: '0.35rem 0.9rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {lang === 'en' ? t.settings_langEn : t.settings_langZh}
+                    </button>
+                  ))}
+                </div>
               </FieldGroup>
             </div>
           )}

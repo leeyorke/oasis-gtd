@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useStore } from '../store/useStore'
+import { useT } from '../i18n/useT'
 
 interface QuickCaptureProps {
   style?: React.CSSProperties
@@ -11,14 +12,11 @@ export default function QuickCapture({ style }: QuickCaptureProps) {
   const [showContext, setShowContext] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { addTask } = useStore()
+  const t = useT()
 
   const handleCapture = async () => {
     if (!text.trim()) return
-    await addTask({
-      title: text.trim(),
-      context: context || undefined,
-      status: 'inbox',
-    })
+    await addTask({ title: text.trim(), context: context || undefined, status: 'inbox' })
     setText('')
     setContext('')
     setShowContext(false)
@@ -26,9 +24,7 @@ export default function QuickCapture({ style }: QuickCaptureProps) {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      handleCapture()
-    }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCapture()
   }
 
   return (
@@ -38,14 +34,14 @@ export default function QuickCapture({ style }: QuickCaptureProps) {
       </svg>
 
       <div className="capture-header">
-        <span>Quick Capture</span>
-        <span>Inbox</span>
+        <span>{t.capture_title}</span>
+        <span>{t.capture_inbox}</span>
       </div>
 
       <textarea
         ref={textareaRef}
         className="capture-input"
-        placeholder="What has your attention?"
+        placeholder={t.capture_placeholder}
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -55,7 +51,7 @@ export default function QuickCapture({ style }: QuickCaptureProps) {
       {showContext && (
         <input
           className="form-input"
-          placeholder="@Context (e.g. @Email, @Office)"
+          placeholder={t.capture_ctxHint}
           value={context}
           onChange={e => setContext(e.target.value)}
           style={{ marginBottom: '0.8rem', fontSize: '0.72rem', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -63,19 +59,13 @@ export default function QuickCapture({ style }: QuickCaptureProps) {
       )}
 
       <div className="capture-actions">
-        <button className="btn-text" onClick={handleCapture}>
-          Add to Inbox
-        </button>
-        <button
-          className="btn-text"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setShowContext(!showContext)}
-        >
-          {showContext ? 'Hide Context' : 'Assign Context'}
+        <button className="btn-text" onClick={handleCapture}>{t.capture_addInbox}</button>
+        <button className="btn-text" style={{ marginLeft: 'auto' }} onClick={() => setShowContext(!showContext)}>
+          {showContext ? t.capture_hideCtx : t.capture_assignCtx}
         </button>
       </div>
 
-      <div className="emboss-text">capture</div>
+      <div className="emboss-text">{t.capture_emboss}</div>
     </div>
   )
 }
