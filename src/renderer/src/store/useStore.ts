@@ -70,6 +70,7 @@ interface AppStore {
   selectConversation: (id: string) => Promise<void>
   newConversation: () => Promise<void>
   deleteConversation: (id: string) => Promise<void>
+  renameConversation: (id: string, title: string) => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
 
   // ─── UI ────────────────────────────────────────────────────────────────────
@@ -229,6 +230,11 @@ export const useStore = create<AppStore>((set, get) => ({
     const conversations = get().conversations.filter(c => c.id !== id)
     const currentId = get().currentConversationId === id ? null : get().currentConversationId
     set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [], streamingMessageId: null, streamingContent: '' })
+  },
+  renameConversation: async (id, title) => {
+    await window.api.renameConversation(id, title)
+    const conversations = get().conversations.map(c => c.id === id ? { ...c, title } : c)
+    set({ conversations })
   },
   sendChatMessage: async (content) => {
     const { currentConversationId, messages: currentMessages, activeProvider } = get()

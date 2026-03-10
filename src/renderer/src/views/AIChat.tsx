@@ -225,7 +225,7 @@ export default function AIChat() {
     providers, activeProvider, conversations, currentConversationId, messages, isAILoading,
     streamingMessageId, streamingContent,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
-    selectConversation, newConversation, deleteConversation,
+    selectConversation, newConversation, deleteConversation, renameConversation,
     sendChatMessage,
   } = useStore()
   const t = useT()
@@ -236,6 +236,9 @@ export default function AIChat() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ show: boolean; x: number; y: number; convId: string } | null>(null)
+  const [showRenameInput, setShowRenameInput] = useState(false)
+  const [renameInput, setRenameInput] = useState('')
+  const [renameConvId, setRenameConvId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -332,6 +335,29 @@ export default function AIChat() {
   const handleDeleteConversation = (convId: string) => {
     deleteConversation(convId)
     closeContextMenu()
+  }
+
+  const handleOpenRename = (convId: string) => {
+    const conv = conversations.find(c => c.id === convId)
+    setRenameInput(conv?.title || '')
+    setRenameConvId(convId)
+    setShowRenameInput(true)
+    closeContextMenu()
+  }
+
+  const handleRename = async () => {
+    if (renameConvId && renameInput.trim()) {
+      await renameConversation(renameConvId, renameInput.trim())
+      setShowRenameInput(false)
+      setRenameConvId(null)
+      setRenameInput('')
+    }
+  }
+
+  const cancelRename = () => {
+    setShowRenameInput(false)
+    setRenameConvId(null)
+    setRenameInput('')
   }
 
   useEffect(() => {
@@ -539,6 +565,16 @@ export default function AIChat() {
         >
           <button
             className="chat-context-menu-item"
+            onClick={() => handleOpenRename(contextMenu.convId)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            {t.rename || 'Rename'}
+          </button>
+          <button
+            className="chat-context-menu-item"
             onClick={() => handleExportConversation(contextMenu.convId)}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
@@ -558,6 +594,30 @@ export default function AIChat() {
             </svg>
             {t.delete}
           </button>
+        </div>
+      )}
+
+      {/* Rename Input Dialog */}
+      {showRenameInput && (
+        <div className="modal-overlay" onClick={cancelRename}>
+          <div className="rename-dialog" onClick={e => e.stopPropagation()}>
+            <div className="rename-dialog-title">{t.rename || 'Rename Conversation'}</div>
+            <input
+              type="text"
+              className="form-input"
+              value={renameInput}
+              onChange={e => setRenameInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleRename()
+                if (e.key === 'Escape') cancelRename()
+              }}
+              autoFocus
+            />
+            <div className="rename-dialog-actions">
+              <button className="btn-text" onClick={cancelRename}>{t.cancel}</button>
+              <button className="btn-primary" onClick={handleRename} disabled={!renameInput.trim()} style={{ opacity: renameInput.trim() ? 1 : 0.5 }}>{t.save || 'Save'}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
