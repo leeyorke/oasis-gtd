@@ -22,7 +22,7 @@ const PROVIDER_PRESETS = [
 ]
 
 export default function Settings() {
-  const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders } = useStore()
+  const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack } = useStore()
   const [activeSection, setActiveSection] = useState<Section>('general')
 
   // ─── Stats & DB path ──────────────────────────────────────────────────────
@@ -106,7 +106,22 @@ export default function Settings() {
 
   return (
     <div className="composition" style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <div className="review-full-sheet fade-in" style={{ flexDirection: 'row', padding: 0, gap: 0 }}>
+      <div className="review-full-sheet fade-in" style={{ flexDirection: 'row', padding: 0, gap: 0, position: 'relative' }}>
+
+        {/* ─── Close button top-right ───────────────────────────── */}
+        <button
+          onClick={goBack}
+          title="Close"
+          style={{
+            position: 'absolute', top: '1.2rem', right: '1.2rem', zIndex: 10,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'rgba(20,28,58,0.25)', fontSize: '1rem', lineHeight: 1,
+            padding: '0.3rem 0.4rem',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink-primary)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(20,28,58,0.25)')}
+        >✕</button>
 
         {/* ─── Left panel: section list ─────────────────────────── */}
         <div style={{
@@ -146,7 +161,7 @@ export default function Settings() {
 
           {/* Version info */}
           <div style={{ marginTop: 'auto', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', color: 'rgba(20,28,58,0.25)', letterSpacing: '0.08em', lineHeight: 1.7 }}>
-            Aura GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
+            Oasis GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
           </div>
         </div>
 
@@ -163,7 +178,7 @@ export default function Settings() {
                   className="form-input"
                   value={settings.app_name}
                   onChange={e => updateSetting('app_name', e.target.value)}
-                  placeholder="Aura"
+                  placeholder="Oasis"
                   style={{ maxWidth: '240px' }}
                 />
                 <FieldHint>Shown in the sidebar header</FieldHint>

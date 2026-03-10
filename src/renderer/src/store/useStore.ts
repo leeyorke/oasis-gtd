@@ -15,7 +15,9 @@ import type {
 interface AppStore {
   // ─── Navigation ────────────────────────────────────────────────────────────
   currentView: ViewType
+  previousView: ViewType
   setView: (view: ViewType) => void
+  goBack: () => void
 
   // ─── Tasks ─────────────────────────────────────────────────────────────────
   tasks: Task[]
@@ -81,7 +83,9 @@ interface AppStore {
 export const useStore = create<AppStore>((set, get) => ({
   // ─── Navigation ────────────────────────────────────────────────────────────
   currentView: 'next-actions',
-  setView: (view) => set({ currentView: view }),
+  previousView: 'next-actions',
+  setView: (view) => set(state => ({ previousView: state.currentView, currentView: view })),
+  goBack: () => set(state => ({ currentView: state.previousView })),
 
   // ─── Tasks ─────────────────────────────────────────────────────────────────
   tasks: [],
