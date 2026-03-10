@@ -205,8 +205,8 @@ export function registerHandlers(): void {
 
   ipcMain.handle('data:exportJSON', async () => {
     const result = await dialog.showSaveDialog({
-      title: 'Export Aura GTD Data',
-      defaultPath: join(app.getPath('documents'), `aura-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
+      title: 'Export Oasis GTD Data',
+      defaultPath: join(app.getPath('documents'), `oasis-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     if (result.canceled || !result.filePath) return { success: false, canceled: true }
