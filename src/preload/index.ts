@@ -1,5 +1,10 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+
+type AIStreamStartCallback = (event: IpcRendererEvent, data: { conversationId: string }) => void
+type AIStreamChunkCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string }) => void
+type AIStreamEndCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string; title?: string }) => void
+type AIStreamErrorCallback = (event: IpcRendererEvent, data: { conversationId: string; error: string }) => void
 
 const api = {
   // Window controls
@@ -50,6 +55,26 @@ const api = {
   renameConversation: (id: string, title: string) => ipcRenderer.invoke('chat:renameConversation', id, title),
   sendMessage: (conversationId: string, messages: unknown[], provider: unknown) =>
     ipcRenderer.invoke('ai:sendMessage', conversationId, messages, provider),
+
+  // AI Streaming
+  sendMessageStream: (conversationId: string, messages: unknown[], provider: unknown) =>
+    ipcRenderer.send('ai:sendMessageStream', conversationId, messages, provider),
+  onAIStreamStart: (callback: AIStreamStartCallback) =>
+    ipcRenderer.on('ai:startStream', callback),
+  onAIStreamChunk: (callback: AIStreamChunkCallback) =>
+    ipcRenderer.on('ai:streamChunk', callback),
+  onAIStreamEnd: (callback: AIStreamEndCallback) =>
+    ipcRenderer.on('ai:streamEnd', callback),
+  onAIStreamError: (callback: AIStreamErrorCallback) =>
+    ipcRenderer.on('ai:streamError', callback),
+  offAIStreamStart: (callback: AIStreamStartCallback) =>
+    ipcRenderer.off('ai:startStream', callback),
+  offAIStreamChunk: (callback: AIStreamChunkCallback) =>
+    ipcRenderer.off('ai:streamChunk', callback),
+  offAIStreamEnd: (callback: AIStreamEndCallback) =>
+    ipcRenderer.off('ai:streamEnd', callback),
+  offAIStreamError: (callback: AIStreamErrorCallback) =>
+    ipcRenderer.off('ai:streamError', callback),
 
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:getAll'),

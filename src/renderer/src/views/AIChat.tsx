@@ -1,7 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import type { AIProvider } from '../types'
 import { useT } from '../i18n/useT'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI', type: 'openai' as const, base_url: 'https://api.openai.com', model: 'gpt-4o' },
@@ -19,9 +23,66 @@ const EMPTY_FORM: Partial<AIProvider & { provider_type: string }> = {
   is_active: 1,
 }
 
+interface MarkdownMessageProps {
+  content: string
+}
+
+function MarkdownMessage({ content }: MarkdownMessageProps) {
+  return (
+    <div className="markdown-body">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ node, inline, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '')
+            return !inline && match ? (
+              <div className="code-block-wrapper">
+                <div className="code-block-header">
+                  <span className="code-language">{match[1]}</span>
+                </div>
+                <SyntaxHighlighter
+                  style={tomorrow as any}
+                  language={match[1]}
+                  PreTag="div"
+                  className="code-block-content"
+                  customStyle={{ margin: 0, borderRadius: '0 0 6px 6px' }}
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              </div>
+            ) : (
+              <code className={`inline-code ${className || ''}`} {...props}>
+                {children}
+              </code>
+            )
+          },
+          a({ children, href, ...props }: any) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                {children}
+              </a>
+            )
+          },
+          table({ children, ...props }: any) {
+            return (
+              <div className="table-wrapper">
+                <table {...props}>{children}</table>
+              </div>
+            )
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
 export default function AIChat() {
   const {
     providers, activeProvider, conversations, currentConversationId, messages, isAILoading,
+    streamingMessageId, streamingContent,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
     selectConversation, newConversation, deleteConversation,
     sendChatMessage,
@@ -36,9 +97,18 @@ export default function AIChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
+  // Combine actual messages with streaming content for display
+  const displayMessages = useMemo(() => {
+    if (!streamingMessageId || !streamingContent) return messages
+    return [
+      ...messages,
+      { role: 'assistant' as const, content: streamingContent }
+    ]
+  }, [messages, streamingMessageId, streamingContent])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [displayMessages])
 
   const handleSend = async () => {
     if (!input.trim() || isAILoading || !currentConversationId) return
@@ -140,17 +210,23 @@ export default function AIChat() {
                   {activeProvider ? t.chat_newConversation : t.chat_configProvider}
                 </button>
               </div>
-            ) : messages.length === 0 ? (
+            ) : displayMessages.length === 0 ? (
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>{t.chat_whatsOnMind}</div>
             ) : (
-              messages.map((msg, i) => (
+              displayMessages.map((msg, i) => (
                 <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${i * 0.03}s` }}>
                   <div className="chat-role-label">{msg.role === 'user' ? t.chat_you : t.chat_assistant}</div>
-                  <div className={`chat-bubble ${msg.role}`} style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                  <div className={`chat-bubble ${msg.role}`}>
+                    {msg.role === 'assistant' ? (
+                      <MarkdownMessage content={msg.content} />
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                    )}
+                  </div>
                 </div>
               ))
             )}
-            {isAILoading && (
+            {isAILoading && !streamingContent && (
               <div className="chat-message assistant">
                 <div className="chat-role-label">{t.chat_assistant}</div>
                 <div className="chat-bubble assistant" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.8rem 1rem' }}>

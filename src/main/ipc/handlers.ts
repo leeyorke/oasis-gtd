@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app } from 'electron'
+import { ipcMain, dialog, app, WebContents } from 'electron'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import {
@@ -11,6 +11,214 @@ import {
   settingsQueries,
   dataQueries,
 } from '../db/database'
+
+// Helper: safely parse JSON, returning null on empty/invalid body
+const safeJson = async (res: Response): Promise<Record<string, unknown> | null> => {
+  const text = await res.text()
+  if (!text.trim()) return null
+  try { return JSON.parse(text) } catch { return { __raw: text } }
+}
+
+// Parse SSE (Server-Sent Events) stream line by line
+async function* parseSSE(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6)
+          if (data && data !== '[DONE]') {
+            yield data
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+// Parse NDJSON (Newline-Delimited JSON) stream for Ollama
+async function* parseNDJSON(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed) {
+          yield trimmed
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+async function streamOpenAICompatible(
+  webContents: WebContents,
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  messages: Array<{role: string; content: string}>,
+  conversationId: string,
+  isTitleCall: boolean
+): Promise<string> {
+  const url = `${provider.base_url}/v1/chat/completions`
+  const maxTokens = isTitleCall ? 30 : 2048
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages,
+      max_tokens: maxTokens,
+      stream: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body')
+  }
+
+  let fullContent = ''
+  webContents.send('ai:startStream', { conversationId })
+
+  for await (const dataStr of parseSSE(response.body)) {
+    try {
+      const data = JSON.parse(dataStr)
+      const delta = data.choices?.[0]?.delta?.content
+      if (delta) {
+        fullContent += delta
+        webContents.send('ai:streamChunk', { conversationId, content: delta })
+      }
+    } catch {
+      // ignore parse errors for individual chunks
+    }
+  }
+
+  return fullContent
+}
+
+async function streamAnthropic(
+  webContents: WebContents,
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  messages: Array<{role: string; content: string}>,
+  conversationId: string,
+  isTitleCall: boolean
+): Promise<string> {
+  const url = `${provider.base_url}/v1/messages`
+  const maxTokens = isTitleCall ? 30 : 2048
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': provider.api_key || '',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      max_tokens: maxTokens,
+      messages: messages.filter(m => m.role !== 'system'),
+      system: messages.find(m => m.role === 'system')?.content,
+      stream: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body')
+  }
+
+  let fullContent = ''
+  webContents.send('ai:startStream', { conversationId })
+
+  for await (const dataStr of parseSSE(response.body)) {
+    try {
+      const data = JSON.parse(dataStr)
+      if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+        const delta = data.delta.text
+        if (delta) {
+          fullContent += delta
+          webContents.send('ai:streamChunk', { conversationId, content: delta })
+        }
+      }
+    } catch {
+      // ignore parse errors for individual chunks
+    }
+  }
+
+  return fullContent
+}
+
+async function streamOllama(
+  webContents: WebContents,
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  messages: Array<{role: string; content: string}>,
+  conversationId: string,
+  isTitleCall: boolean
+): Promise<string> {
+  const url = `${provider.base_url}/api/chat`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: provider.model, messages, stream: true }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body')
+  }
+
+  let fullContent = ''
+  webContents.send('ai:startStream', { conversationId })
+
+  for await (const dataStr of parseNDJSON(response.body)) {
+    try {
+      const data = JSON.parse(dataStr)
+      const delta = data.message?.content
+      if (delta) {
+        fullContent += delta
+        webContents.send('ai:streamChunk', { conversationId, content: delta })
+      }
+    } catch {
+      // ignore parse errors for individual chunks
+    }
+  }
+
+  return fullContent
+}
 
 export function registerHandlers(): void {
   // ─── Tasks ──────────────────────────────────────────────────────────────────
@@ -68,19 +276,14 @@ export function registerHandlers(): void {
     aiQueries.renameConversation(id, title)
   )
 
-  // ─── AI Send Message ────────────────────────────────────────────────────────
+  // ─── AI Send Message (Non-streaming for backwards compatibility & title generation) ───────────────────
   ipcMain.handle('ai:sendMessage', async (_, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string}) => {
     const isTitleCall = conversationId === '__title__'
 
     if (!isTitleCall) {
-      console.log('\n[AI] ── sendMessage called ──────────────────────────')
+      console.log('\n[AI] ── sendMessage called (non-streaming) ───────────')
       console.log('[AI] conversationId:', conversationId)
       console.log('[AI] provider_type:', provider.provider_type)
-      console.log('[AI] base_url:', provider.base_url)
-      console.log('[AI] model:', provider.model)
-      console.log('[AI] api_key set:', !!provider.api_key)
-      console.log('[AI] messages count:', messages.length)
-      console.log('[AI] last message:', messages[messages.length - 1])
     }
 
     try {
@@ -89,13 +292,6 @@ export function registerHandlers(): void {
         const lastMsg = messages[messages.length - 1]
         aiQueries.addMessage(conversationId, lastMsg.role, lastMsg.content)
         console.log('[AI] user message saved to DB')
-      }
-
-      // Helper: safely parse JSON, returning null on empty/invalid body
-      const safeJson = async (res: Response): Promise<Record<string, unknown> | null> => {
-        const text = await res.text()
-        if (!text.trim()) return null
-        try { return JSON.parse(text) } catch { return { __raw: text } }
       }
 
       let responseText = ''
@@ -118,13 +314,11 @@ export function registerHandlers(): void {
             system: messages.find(m => m.role === 'system')?.content,
           }),
         })
-        if (!isTitleCall) console.log('[AI] Anthropic HTTP status:', response.status, response.statusText)
         if (!response.ok) {
           const body = await response.text()
           throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
         }
         const data = await safeJson(response)
-        if (!isTitleCall) console.log('[AI] Anthropic response:', JSON.stringify(data).slice(0, 300))
         const content = data?.content as Array<{text: string}> | undefined
         responseText = content?.[0]?.text || 'No response'
 
@@ -136,13 +330,11 @@ export function registerHandlers(): void {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: provider.model, messages, stream: false }),
         })
-        if (!isTitleCall) console.log('[AI] Ollama HTTP status:', response.status, response.statusText)
         if (!response.ok) {
           const body = await response.text()
           throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
         }
         const data = await safeJson(response)
-        if (!isTitleCall) console.log('[AI] Ollama response:', JSON.stringify(data).slice(0, 300))
         const msg = data?.message as { content: string } | undefined
         responseText = msg?.content || 'No response'
 
@@ -158,13 +350,11 @@ export function registerHandlers(): void {
           },
           body: JSON.stringify({ model: provider.model, messages, max_tokens: maxTokens }),
         })
-        if (!isTitleCall) console.log('[AI] OpenAI HTTP status:', response.status, response.statusText)
         if (!response.ok) {
           const body = await response.text()
           throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
         }
         const data = await safeJson(response)
-        if (!isTitleCall) console.log('[AI] OpenAI response:', JSON.stringify(data).slice(0, 300))
         const choices = data?.choices as Array<{message: {content: string}}> | undefined
         responseText = choices?.[0]?.message?.content || 'No response'
       }
@@ -182,6 +372,109 @@ export function registerHandlers(): void {
       if (!isTitleCall) console.error('[AI] ERROR:', err instanceof Error ? err.message : err)
       const message = err instanceof Error ? err.message : 'Unknown error'
       return { success: false, error: message }
+    }
+  })
+
+  // ─── AI Send Message Streaming ──────────────────────────────────────────────
+  ipcMain.on('ai:sendMessageStream', async (event, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string}) => {
+    const webContents = event.sender
+    const isTitleCall = conversationId === '__title__'
+
+    if (!isTitleCall) {
+      console.log('\n[AI] ── sendMessageStream called ──────────────────────')
+      console.log('[AI] conversationId:', conversationId)
+      console.log('[AI] provider_type:', provider.provider_type)
+    }
+
+    try {
+      // Save user message first
+      if (!isTitleCall) {
+        const lastMsg = messages[messages.length - 1]
+        aiQueries.addMessage(conversationId, lastMsg.role, lastMsg.content)
+        console.log('[AI] user message saved to DB')
+      }
+
+      let fullContent = ''
+
+      if (provider.provider_type === 'anthropic') {
+        fullContent = await streamAnthropic(webContents, provider, messages, conversationId, isTitleCall)
+      } else if (provider.provider_type === 'ollama') {
+        fullContent = await streamOllama(webContents, provider, messages, conversationId, isTitleCall)
+      } else {
+        fullContent = await streamOpenAICompatible(webContents, provider, messages, conversationId, isTitleCall)
+      }
+
+      if (!isTitleCall) {
+        console.log('[AI] full response (first 100):', fullContent.slice(0, 100))
+        aiQueries.addMessage(conversationId, 'assistant', fullContent)
+        console.log('[AI] assistant message saved to DB')
+        console.log('[AI] done\n')
+      }
+
+      // Auto-generate title if it's the first message
+      let generatedTitle: string | undefined
+      if (!isTitleCall && messages.length === 1) {
+        try {
+          const lang = 'en' // We'll get this from settings in a real implementation
+          const titlePrompt: Array<{role: string; content: string}> = [
+            {
+              role: 'user',
+              content: `Summarize this conversation exchange in 5 words or fewer as a conversation title. Reply with ONLY the title, no punctuation, no quotes.\n\nUser: ${messages[messages.length - 1].content}\nAssistant: ${fullContent}`,
+            },
+          ]
+          // Use non-streaming for title generation
+          const titleResult = await (async () => {
+            if (provider.provider_type === 'anthropic') {
+              const url = `${provider.base_url}/v1/messages`
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': provider.api_key || '',
+                  'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                  model: provider.model,
+                  max_tokens: 30,
+                  messages: titlePrompt.filter(m => m.role !== 'system'),
+                }),
+              })
+              if (!response.ok) return { success: false }
+              const data = await safeJson(response)
+              const content = data?.content as Array<{text: string}> | undefined
+              return { success: true, content: content?.[0]?.text }
+            } else {
+              const url = `${provider.base_url}/v1/chat/completions`
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
+                },
+                body: JSON.stringify({ model: provider.model, messages: titlePrompt, max_tokens: 30 }),
+              })
+              if (!response.ok) return { success: false }
+              const data = await safeJson(response)
+              const choices = data?.choices as Array<{message: {content: string}}> | undefined
+              return { success: true, content: choices?.[0]?.message?.content }
+            }
+          })()
+
+          if (titleResult.success && titleResult.content) {
+            generatedTitle = titleResult.content.trim().slice(0, 60)
+            await aiQueries.renameConversation(conversationId, generatedTitle)
+          }
+        } catch {
+          // Title generation failing is non-critical
+        }
+      }
+
+      webContents.send('ai:streamEnd', { conversationId, content: fullContent, title: generatedTitle })
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      if (!isTitleCall) console.error('[AI] ERROR:', message)
+      webContents.send('ai:streamError', { conversationId, error: message })
     }
   })
 

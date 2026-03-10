@@ -60,6 +60,8 @@ interface AppStore {
   currentConversationId: string | null
   messages: ChatMessage[]
   isAILoading: boolean
+  streamingMessageId: string | null
+  streamingContent: string
   loadProviders: () => Promise<void>
   saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'>) => Promise<void>
   setActiveProvider: (id: string) => Promise<void>
@@ -187,6 +189,8 @@ export const useStore = create<AppStore>((set, get) => ({
   currentConversationId: null,
   messages: [],
   isAILoading: false,
+  streamingMessageId: null,
+  streamingContent: '',
 
   loadProviders: async () => {
     const providers = await window.api.getProviders()
@@ -211,64 +215,104 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   selectConversation: async (id) => {
     const messages = await window.api.getMessages(id)
-    set({ currentConversationId: id, messages })
+    set({ currentConversationId: id, messages, streamingMessageId: null, streamingContent: '' })
   },
   newConversation: async () => {
     const { activeProvider } = get()
     if (!activeProvider) return
     const id = await window.api.createConversation('New Conversation', activeProvider.id)
     await get().loadConversations()
-    set({ currentConversationId: id, messages: [] })
+    set({ currentConversationId: id, messages: [], streamingMessageId: null, streamingContent: '' })
   },
   deleteConversation: async (id) => {
     await window.api.deleteConversation(id)
     const conversations = get().conversations.filter(c => c.id !== id)
     const currentId = get().currentConversationId === id ? null : get().currentConversationId
-    set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [] })
+    set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [], streamingMessageId: null, streamingContent: '' })
   },
   sendChatMessage: async (content) => {
-    const { currentConversationId, messages, activeProvider } = get()
+    const { currentConversationId, messages: currentMessages, activeProvider } = get()
     if (!currentConversationId || !activeProvider) return
 
-    const userMsg: ChatMessage = { role: 'user', content }
-    const updatedMessages = [...messages, userMsg]
-    set({ messages: updatedMessages, isAILoading: true })
-
-    const result = await window.api.sendMessage(currentConversationId, updatedMessages, activeProvider)
-
-    if (result.success && result.content) {
-      const assistantMsg: ChatMessage = { role: 'assistant', content: result.content }
-      const finalMessages = [...updatedMessages, assistantMsg]
-      set({ messages: finalMessages, isAILoading: false })
-
-      // Auto-generate title after the very first exchange (1 user + 1 assistant)
-      if (messages.length === 0) {
-        const lang = navigator.language || 'en'
-        const titlePrompt: ChatMessage[] = [
-          {
-            role: 'user',
-            content: `Summarize this conversation exchange in 5 words or fewer as a conversation title. Reply with ONLY the title, no punctuation, no quotes. Use the language: ${lang}.\n\nUser: ${content}\nAssistant: ${result.content}`,
-          },
-        ]
-        try {
-          const titleResult = await window.api.sendMessage('__title__', titlePrompt, activeProvider)
-          if (titleResult.success && titleResult.content) {
-            const title = titleResult.content.trim().slice(0, 60)
-            await window.api.renameConversation(currentConversationId, title)
-            // Update local conversations list
-            const conversations = get().conversations.map(c =>
-              c.id === currentConversationId ? { ...c, title } : c
-            )
-            set({ conversations })
-          }
-        } catch {
-          // Title generation failing is non-critical, silently ignore
-        }
-      }
-    } else {
-      const errorMsg: ChatMessage = { role: 'assistant', content: `Error: ${result.error || 'Unknown error'}` }
-      set({ messages: [...updatedMessages, errorMsg], isAILoading: false })
+    // Clean up any existing listeners first
+    const cleanup = () => {
+      window.api.offAIStreamStart(onStreamStart)
+      window.api.offAIStreamChunk(onStreamChunk)
+      window.api.offAIStreamEnd(onStreamEnd)
+      window.api.offAIStreamError(onStreamError)
     }
+
+    // Add user message immediately
+    const userMsg: ChatMessage = { role: 'user', content }
+    const updatedMessages = [...currentMessages, userMsg]
+    const tempAssistantId = Date.now().toString()
+    set({
+      messages: updatedMessages,
+      isAILoading: true,
+      streamingMessageId: tempAssistantId,
+      streamingContent: '',
+    })
+
+    // Event handlers
+    const onStreamStart = (_event: any, data: { conversationId: string }) => {
+      if (data.conversationId !== currentConversationId) return
+    }
+
+    const onStreamChunk = (_event: any, data: { conversationId: string; content: string }) => {
+      if (data.conversationId !== currentConversationId) return
+      set(state => ({
+        streamingContent: state.streamingContent + data.content,
+      }))
+    }
+
+    const onStreamEnd = (_event: any, data: { conversationId: string; content: string; title?: string }) => {
+      if (data.conversationId !== currentConversationId) return
+
+      const assistantMsg: ChatMessage = { role: 'assistant', content: data.content }
+      set(state => ({
+        messages: [...updatedMessages, assistantMsg],
+        isAILoading: false,
+        streamingMessageId: null,
+        streamingContent: '',
+      }))
+
+      // Update conversation title if one was generated
+      if (data.title) {
+        set(state => ({
+          conversations: state.conversations.map(c =>
+            c.id === currentConversationId ? { ...c, title: data.title } : c
+          ),
+        }))
+      }
+
+      cleanup()
+    }
+
+    const onStreamError = (_event: any, data: { conversationId: string; error: string }) => {
+      if (data.conversationId !== currentConversationId) return
+
+      const errorMsg: ChatMessage = { role: 'assistant', content: `Error: ${data.error}` }
+      set(state => ({
+        messages: [...updatedMessages, errorMsg],
+        isAILoading: false,
+        streamingMessageId: null,
+        streamingContent: '',
+      }))
+
+      cleanup()
+    }
+
+    // Register listeners
+    window.api.onAIStreamStart(onStreamStart)
+    window.api.onAIStreamChunk(onStreamChunk)
+    window.api.onAIStreamEnd(onStreamEnd)
+    window.api.onAIStreamError(onStreamError)
+
+    // Start streaming
+    window.api.sendMessageStream(currentConversationId, updatedMessages, activeProvider)
+
+    // Also reload conversations to get any updated list
+    await get().loadConversations()
   },
 
   // ─── UI ────────────────────────────────────────────────────────────────────
