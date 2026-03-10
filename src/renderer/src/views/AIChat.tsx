@@ -370,24 +370,28 @@ export default function AIChat() {
     <div className="chat-composition">
       {/* Conversation Sidebar */}
       <div className="chat-sidebar">
-        <div className="chat-sidebar-title">{t.chat_conversations}</div>
-        <button className="btn-primary" onClick={handleNewConversation} style={{ marginBottom: '0.8rem', width: '100%', fontSize: '0.6rem', padding: '0.5rem' }}>
-          {t.chat_newChat}
-        </button>
-        {conversations.map(conv => (
-          <div
-            key={conv.id}
-            className={`chat-conv-item ${currentConversationId === conv.id ? 'active' : ''}`}
-            onClick={() => selectConversation(conv.id)}
-            onContextMenu={(e) => handleContextMenu(e, conv.id)}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.title}</span>
-          </div>
-        ))}
-        {conversations.length === 0 && (
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'rgba(20,28,58,0.3)', padding: '0.5rem', fontStyle: 'italic' }}>{t.chat_noConvs}</div>
-        )}
-        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(20,28,58,0.08)' }}>
+        <div className="chat-sidebar-fixed">
+          <div className="chat-sidebar-title">{t.chat_conversations}</div>
+          <button className="btn-primary" onClick={handleNewConversation} style={{ marginBottom: '0.8rem', width: '100%', fontSize: '0.6rem', padding: '0.5rem' }}>
+            {t.chat_newChat}
+          </button>
+        </div>
+        <div className="chat-conv-list">
+          {conversations.map(conv => (
+            <div
+              key={conv.id}
+              className={`chat-conv-item ${currentConversationId === conv.id ? 'active' : ''}`}
+              onClick={() => selectConversation(conv.id)}
+              onContextMenu={(e) => handleContextMenu(e, conv.id)}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.title}</span>
+            </div>
+          ))}
+          {conversations.length === 0 && (
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'rgba(20,28,58,0.3)', padding: '0.5rem', fontStyle: 'italic' }}>{t.chat_noConvs}</div>
+          )}
+        </div>
+        <div className="chat-sidebar-footer">
           {activeProvider ? (
             <div>
               <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(20,28,58,0.3)', marginBottom: '0.3rem' }}>{t.chat_activeProvider}</div>
