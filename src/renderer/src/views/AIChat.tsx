@@ -586,23 +586,23 @@ export default function AIChat() {
             )}
             <div ref={messagesEndRef} />
           </div>
+          {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
+          {showScrollButton && (
+            <button
+              className="chat-scroll-to-bottom-btn"
+              onClick={handleScrollToBottom}
+              style={{
+                position: 'fixed',
+                right: '16px',
+                bottom: '16px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+            </button>
+          )}
         </div>
-        {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
-        {showScrollButton && (
-          <button
-            className="chat-scroll-to-bottom-btn"
-            onClick={handleScrollToBottom}
-            style={{
-              position: 'fixed',
-              right: `${buttonPosition.right}px`,
-              bottom: `${buttonPosition.bottom}px`,
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 5v14M5 12l7 7 7-7"/>
-            </svg>
-          </button>
-        )}
 
         <div className="chat-input-area">
           <textarea
