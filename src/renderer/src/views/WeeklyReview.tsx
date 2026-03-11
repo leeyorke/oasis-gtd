@@ -43,7 +43,7 @@ export default function WeeklyReview() {
               {t.wr_label}
             </div>
             <div className="review-title">
-              {t.wr_title1}<br />{t.wr_title2}<br />{t.wr_title3}
+              {t.wr_title1} {t.wr_title2} {t.wr_title3}
             </div>
           </div>
 
@@ -72,7 +72,7 @@ export default function WeeklyReview() {
               {grouped[category].map((item, i) => (
                 <div key={item.id} className={`review-item fade-in ${item.completed ? 'done' : ''}`} style={{ animationDelay: `${i * 0.03}s` }} onClick={() => toggleReviewItem(item.id, !item.completed)}>
                   <div className="review-checkbox">
-                    {item.completed && (
+                    {item.completed === 1 && (
                       <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
                         <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
