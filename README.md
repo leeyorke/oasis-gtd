@@ -62,14 +62,26 @@ npm run build:mac    # macOS
 npm run build:linux  # Linux AppImage
 ```
 
-## Windows App Icon
+## Release Script
 
-Place your icon files in `resources/`:
-- `resources/icon.ico` — Windows icon (required for build)
-- `resources/icon.icns` — macOS icon
-- `resources/icon.png` — Linux icon (256×256)
+The project includes a release script that automates version updates, building, and packaging:
 
-You can generate these from any PNG using [electron-icon-maker](https://www.npmjs.com/package/electron-icon-maker) or online tools.
+```bash
+# Run interactive release wizard
+npm run release
+
+# Or specify version directly
+node scripts/release.js 1.0.0
+
+# Dry run (no actual file changes)
+node scripts/release.js --dry-run 1.0.0
+```
+
+The script will:
+1. Update package.json version number
+2. Create git commit and tag
+3. Auto-detect platform and build appropriate installer
+4. Output build summary
 
 ## AI Provider Setup
 
@@ -85,7 +97,35 @@ Oasis supports multiple AI providers for the AI Assistant view:
 
 Configure providers in the AI Assistant view → **Configure →**
 
-## Data Storage
+## Windows App Icon
+
+Place your icon files in `resources/`:
+- `resources/icon.ico` — Windows icon (required for build)
+- `resources/icon.icns` — macOS icon
+- `resources/icon.png` — Linux icon (256×256)
+
+You can generate these from any PNG using [electron-icon-maker](https://www.npmjs.com/package/electron-icon-maker) or online tools.
+
+## Release Script
+
+The project includes a release script that automates version updates, building, and packaging:
+
+```bash
+# Run interactive release wizard
+npm run release
+
+# Or specify version directly
+node scripts/release.js 1.0.0
+
+# Dry run (no actual file changes)
+node scripts/release.js --dry-run 1.0.0
+```
+
+The script will:
+1. Update package.json version number
+2. Create git commit and tag
+3. Auto-detect platform and build appropriate installer
+4. Output build summary
 
 All data is stored locally in SQLite at:
 - **Windows:** `%APPDATA%\oasis-gtd\oasis-gtd.db`
