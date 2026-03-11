@@ -239,6 +239,8 @@ export default function AIChat() {
   const [showRenameInput, setShowRenameInput] = useState(false)
   const [renameInput, setRenameInput] = useState('')
   const [renameConvId, setRenameConvId] = useState<string | null>(null)
+  // Provider quick switch
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false)
   // Scroll state
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -277,7 +279,7 @@ export default function AIChat() {
       const rect = container.getBoundingClientRect()
       setButtonPosition({
         right: window.innerWidth - rect.right + 16, // 1rem from right edge of wrapper
-        bottom: rect.height - 80, // 80px from bottom of wrapper (above input area)
+        bottom: rect.height - 400, // 40px from bottom of wrapper (above input area)
       })
     }
 
@@ -342,6 +344,12 @@ export default function AIChat() {
 
   const handleStop = () => {
     stopStreaming()
+  }
+
+  // Provider quick switch
+  const handleSwitchProvider = async (providerId: string) => {
+    await setActiveProvider(providerId)
+    setShowProviderDropdown(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -426,6 +434,7 @@ export default function AIChat() {
     setRenameConvId(convId)
     setShowRenameInput(true)
     closeContextMenu()
+    setShowProviderDropdown(false)
   }
 
   const handleRename = async () => {
@@ -444,7 +453,10 @@ export default function AIChat() {
   }
 
   useEffect(() => {
-    const handleClickOutside = () => closeContextMenu()
+    const handleClickOutside = () => {
+      closeContextMenu()
+      setShowProviderDropdown(false)
+    }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
@@ -494,9 +506,41 @@ export default function AIChat() {
           <div className="chat-title">
             {currentConversationId ? conversations.find(c => c.id === currentConversationId)?.title || 'Chat' : t.chat_headerTitle}
           </div>
-          {activeProvider && (
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.58rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-secondary)' }}>
-              {activeProvider.name} · {activeProvider.model}
+          {providers.length > 0 && (
+            <div className="chat-provider-switch" onClick={(e) => { e.stopPropagation(); setShowProviderDropdown(!showProviderDropdown) }}>
+              <button className="chat-provider-btn">
+                {activeProvider ? (
+                  <>
+                    <span>{activeProvider.model.toUpperCase()}</span>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: '0.4rem', color: 'rgba(20,28,58,0.4)' }}>
+                      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </>
+                ) : (
+                  <span>No Provider</span>
+                )}
+              </button>
+              {showProviderDropdown && (
+                <div className="chat-provider-dropdown">
+                  {providers.map(p => (
+                    <div
+                      key={p.id}
+                      className={`chat-provider-item ${activeProvider?.id === p.id ? 'active' : ''}`}
+                      onClick={() => handleSwitchProvider(p.id)}
+                    >
+                      <div className="chat-provider-info">
+                        <div className="chat-provider-name">{p.name}</div>
+                        <div className="chat-provider-model">{p.model}</div>
+                      </div>
+                      {activeProvider?.id === p.id && (
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--sheet-blue)' }}>
+                          <path d="M4 7L7 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
