@@ -13,8 +13,8 @@
   --nav-text: rgba(20, 28, 58, 0.45);
   --nav-text-active: #141C3A;
 
-  --font-display: 'Cormorant', serif;
-  --font-sans: 'Manrope', sans-serif;
+  --font-display: 'Microsoft YaHei', '微软雅黑', serif;
+  --font-sans: 'Microsoft YaHei', '微软雅黑', sans-serif;
 
   --shadow-float: 0 30px 60px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
   --shadow-lift: 0 10px 30px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
