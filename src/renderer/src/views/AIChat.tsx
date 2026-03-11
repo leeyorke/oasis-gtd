@@ -239,8 +239,15 @@ export default function AIChat() {
   const [showRenameInput, setShowRenameInput] = useState(false)
   const [renameInput, setRenameInput] = useState('')
   const [renameConvId, setRenameConvId] = useState<string | null>(null)
+  // Scroll state
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [buttonPosition, setButtonPosition] = useState<{ right: number; bottom: number }>({ right: 0, bottom: 0 })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const chatMessagesRef = useRef<HTMLDivElement>(null)
+  const chatMainRef = useRef<HTMLDivElement>(null)
+  const prevMessageCountRef = useRef<number>(0)
 
   // Combine actual messages with streaming content for display
   const displayMessages = useMemo(() => {
@@ -251,9 +258,80 @@ export default function AIChat() {
     ]
   }, [messages, streamingMessageId, streamingContent])
 
+  // Check if user is at bottom of scroll
+  const checkIsAtBottom = () => {
+    const container = wrapperRef.current
+    if (!container) return true
+    const { scrollTop, scrollHeight, clientHeight } = container
+    // Consider at bottom if within 50px of bottom
+    return scrollHeight - scrollTop - clientHeight < 50
+  }
+
+  // Handle scroll events
   useEffect(() => {
+    const container = wrapperRef.current
+    if (!container) return
+
+    // Update button position based on wrapper
+    const updateButtonPosition = () => {
+      const rect = container.getBoundingClientRect()
+      setButtonPosition({
+        right: window.innerWidth - rect.right + 16, // 1rem from right edge of wrapper
+        bottom: rect.height - 80, // 80px from bottom of wrapper (above input area)
+      })
+    }
+
+    const handleScroll = () => {
+      const atBottom = checkIsAtBottom()
+      setIsAtBottom(atBottom)
+      // Show scroll button when content overflows and user is not at bottom
+      const shouldShowButton = container.scrollHeight > container.clientHeight && !atBottom
+      setShowScrollButton(shouldShowButton)
+      updateButtonPosition()
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    // Update position on mount and resize
+    updateButtonPosition()
+    window.addEventListener('resize', updateButtonPosition)
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', updateButtonPosition)
+    }
+  }, [])
+
+  // Auto-scroll logic: only scroll if user is already at bottom
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevMessageCountRef.current === 0) {
+      prevMessageCountRef.current = displayMessages.length
+      return
+    }
+
+    // Only auto-scroll if user is at bottom
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevMessageCountRef.current = displayMessages.length
+  }, [displayMessages, isAtBottom])
+
+  // Scroll to bottom when button clicked
+  const handleScrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [displayMessages])
+    setIsAtBottom(true)
+    setShowScrollButton(false)
+  }
+
+  // Update button position when messages change
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper || !showScrollButton) return
+    const rect = wrapper.getBoundingClientRect()
+    setButtonPosition({
+      right: window.innerWidth - rect.right + 16, // 1rem from right edge of wrapper
+      bottom: rect.height - 80, // 80px from bottom of wrapper (above input area)
+    })
+  }, [displayMessages, showScrollButton])
 
   const handleSend = async () => {
     if (!input.trim() || isAILoading || !currentConversationId) return
@@ -423,7 +501,7 @@ export default function AIChat() {
         </div>
 
         <div className="chat-messages-wrapper" ref={wrapperRef}>
-          <div className="chat-messages">
+          <div className="chat-messages" ref={chatMessagesRef}>
             {!currentConversationId ? (
               <div className="chat-empty-state">
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'rgba(20,28,58,0.08)', letterSpacing: '-0.03em' }}>{t.chat_emptyTitle}</div>
@@ -464,6 +542,22 @@ export default function AIChat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+        {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
+        {showScrollButton && (
+          <button
+            className="chat-scroll-to-bottom-btn"
+            onClick={handleScrollToBottom}
+            style={{
+              position: 'fixed',
+              right: `${buttonPosition.right}px`,
+              bottom: `${buttonPosition.bottom}px`,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 5v14M5 12l7 7 7-7"/>
+            </svg>
+          </button>
+        )}
 
         <div className="chat-input-area">
           <textarea
