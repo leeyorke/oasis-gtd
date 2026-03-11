@@ -1,6 +1,6 @@
 {
   "name": "oasis-gtd",
-  "version": "0.0.4-alpha",
+  "version": "0.0.5-alpha",
   "description": "Oasis — Premium GTD Desktop System",
   "main": "./out/main/index.js",
   "scripts": {
