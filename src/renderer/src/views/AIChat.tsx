@@ -370,7 +370,7 @@ export default function AIChat() {
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
-      is_active: editingId ? (providerForm.is_active ?? 1) : 1,
+      is_active: 0, // Don't activate on save, user must explicitly click "Use" button
     })
     closeModal()
     await loadProviders()

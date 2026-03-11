@@ -185,7 +185,7 @@ const translations = {
     chat_apiKey:        'API Key',
     chat_apiKeyHint:    '(leave empty for local providers)',
     chat_savedProviders:'Saved Providers',
-    chat_saveActivate:  'Save & Activate',
+    chat_saveActivate:  'Save',
     chat_active:        'Active',
     // Copy & Export
     chat_copyText:       'Copy as Text',
@@ -428,7 +428,7 @@ const translations = {
     chat_apiKey:        'API 密钥',
     chat_apiKeyHint:    '（本地服务可留空）',
     chat_savedProviders:'已保存提供商',
-    chat_saveActivate:  '保存并激活',
+    chat_saveActivate:  '保存',
     chat_active:        '已激活',
     // Copy & Export
     chat_copyText:       '复制为纯文本',
