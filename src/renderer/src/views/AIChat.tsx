@@ -362,7 +362,13 @@ export default function AIChat() {
   }
 
   const openModal = () => { setProviderForm(EMPTY_FORM); setEditingId(null); setShowApiKey(false); setShowSettings(true) }
-  const closeModal = () => { setShowSettings(false); setProviderForm(EMPTY_FORM); setEditingId(null); setShowApiKey(false) }
+  const closeModal = () => {
+    console.log('Close modal clicked');
+    setShowSettings(false);
+    setProviderForm(EMPTY_FORM);
+    setEditingId(null);
+    setShowApiKey(false)
+  }
 
   const handleEditProvider = (p: AIProvider) => {
     setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', is_active: p.is_active })
@@ -496,7 +502,7 @@ export default function AIChat() {
           ) : (
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'rgba(20,28,58,0.3)', fontStyle: 'italic' }}>{t.chat_noProvider}</div>
           )}
-          <button className="btn-text" onClick={openModal} style={{ marginTop: '0.5rem', paddingLeft: 0, display: 'block' }}>{t.chat_configure}</button>
+          <button className="btn-text" onClick={() => { console.log('Settings button clicked'); openModal(); }} style={{ marginTop: '0.5rem', paddingLeft: 0, display: 'block' }}>{t.chat_configure}</button>
         </div>
       </div>
 
@@ -586,23 +592,23 @@ export default function AIChat() {
             )}
             <div ref={messagesEndRef} />
           </div>
-          {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
-          {showScrollButton && (
-            <button
-              className="chat-scroll-to-bottom-btn"
-              onClick={handleScrollToBottom}
-              style={{
-                position: 'fixed',
-                right: '16px',
-                bottom: '16px',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14M5 12l7 7 7-7"/>
-              </svg>
-            </button>
-          )}
         </div>
+        {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
+        {showScrollButton && (
+          <button
+            className="chat-scroll-to-bottom-btn"
+            onClick={handleScrollToBottom}
+            style={{
+              position: 'fixed',
+              right: '16px',
+              bottom: '16px',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 5v14M5 12l7 7 7-7"/>
+            </svg>
+          </button>
+        )}
 
         <div className="chat-input-area">
           <textarea

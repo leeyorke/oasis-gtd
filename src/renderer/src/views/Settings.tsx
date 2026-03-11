@@ -111,7 +111,7 @@ export default function Settings() {
 
         {/* ─── Close button top-right ───────────────────────────── */}
         <button
-          onClick={goBack}
+          onClick={() => { console.log('Settings close button clicked'); goBack(); }}
           title="Close"
           style={{
             position: 'absolute', top: '1.2rem', right: '1.2rem', zIndex: 10,

@@ -3,7 +3,7 @@ import { useT } from '../i18n/useT'
 import type { ViewType } from '../types'
 
 export default function Sidebar() {
-  const { currentView, setView, tasks, projects, waitingItems, settings } = useStore()
+  const { currentView, setView, goBack, tasks, projects, waitingItems, settings } = useStore()
   const t = useT()
 
   const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
@@ -35,7 +35,7 @@ export default function Sidebar() {
             <li key={item.id}>
               <button
                 className={`nav-link ${currentView === item.id ? 'active' : ''}`}
-                onClick={() => setView(item.id)}
+                onClick={() => { console.log('Navigation button clicked:', item.id); setView(item.id); }}
               >
                 {item.label}
               </button>
@@ -50,7 +50,15 @@ export default function Sidebar() {
             <li key={item.id}>
               <button
                 className={`nav-link ${currentView === item.id ? 'active' : ''}`}
-                onClick={() => setView(item.id)}
+                onClick={() => {
+                  console.log('Settings button clicked, current view:', currentView);
+                  if (currentView === 'settings') {
+                    console.log('Already on settings view, going back to previous view');
+                    goBack();
+                  } else {
+                    setView(item.id);
+                  }
+                }}
               >
                 {item.label}
               </button>
