@@ -327,14 +327,57 @@ export const aiQueries = {
 
   saveProvider: (provider: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const id = uuidv4()
+    let id: string
+
+    // Check if provider has an id and exists in database
+    if (provider.id) {
+      id = String(provider.id)
+      const exists = (db.prepare('SELECT COUNT(*) as count FROM ai_providers WHERE id = ?').get(id) as { count: number }).count > 0
+
+      if (exists) {
+        // Update existing provider - always update all fields
+        db.prepare(`
+          UPDATE ai_providers
+          SET name = @name,
+              provider_type = @provider_type,
+              base_url = @base_url,
+              model = @model,
+              api_key = @api_key,
+              is_active = @is_active
+          WHERE id = @id
+        `).run({
+          ...provider,
+          id,
+          api_key: provider.api_key || null,
+          is_active: provider.is_active ?? 0,
+        })
+
+        // If this provider is being set active, deactivate others
+        if (provider.is_active) {
+          db.prepare('UPDATE ai_providers SET is_active = 0 WHERE id != ?').run(id)
+        }
+
+        return id
+      }
+    }
+
+    // Create new provider
+    id = uuidv4()
     db.prepare(`
-      INSERT OR REPLACE INTO ai_providers (id, name, provider_type, base_url, model, api_key, is_active, created_at)
+      INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, is_active, created_at)
       VALUES (@id, @name, @provider_type, @base_url, @model, @api_key, @is_active, @created_at)
-    `).run({ ...provider, id, created_at: now })
+    `).run({
+      ...provider,
+      id,
+      created_at: now,
+      is_active: provider.is_active ?? 0
+    })
+
+    // If this provider is being set active, deactivate others
     if (provider.is_active) {
       db.prepare('UPDATE ai_providers SET is_active = 0 WHERE id != ?').run(id)
     }
+
     return id
   },
 

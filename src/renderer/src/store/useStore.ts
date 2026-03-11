@@ -65,7 +65,7 @@ interface AppStore {
   streamCleanup: (() => void) | null
   streamUpdatedMessages: ChatMessage[] | null
   loadProviders: () => Promise<void>
-  saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'>) => Promise<void>
+  saveProvider: (provider: Omit<AIProvider, 'id' | 'created_at'> & { id?: string }) => Promise<void>
   setActiveProvider: (id: string) => Promise<void>
   deleteProvider: (id: string) => Promise<void>
   loadConversations: () => Promise<void>

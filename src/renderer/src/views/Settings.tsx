@@ -60,12 +60,13 @@ export default function Settings() {
   const handleSaveProvider = async () => {
     if (!providerForm.name || !providerForm.base_url || !providerForm.model) return
     await saveProvider({
+      id: editingProviderId || undefined,
       name: providerForm.name!,
       provider_type: (providerForm.provider_type as AIProvider['provider_type']) || 'custom',
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
-      is_active: editingProviderId ? (providerForm.is_active ?? 1) : 1,
+      is_active: editingProviderId ? (providerForm.is_active ?? 0) : 0,
     })
     setShowProviderForm(false)
     setEditingProviderId(null)
@@ -270,7 +271,7 @@ export default function Settings() {
           {/* ── CONTEXTS ──────────────────────────────────────────── */}
           {activeSection === 'contexts' && (
             <div className="fade-in">
-              <SectionTitle>Contexts</SectionTitle>
+              <SectionTitle>{t.settings_contextsTitle}</SectionTitle>
               <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', marginBottom: '1.5rem', lineHeight: 1.6, maxWidth: '480px' }}>
                 Contexts define where or how an action is done. They appear as tags on your next actions and help you batch similar tasks together.
               </p>
@@ -299,7 +300,7 @@ export default function Settings() {
 
               <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-end' }}>
                 <div className="form-field" style={{ margin: 0, flex: 1, maxWidth: '220px' }}>
-                  <label className="form-label">New Context</label>
+                  <label className="form-label">{t.settings_newContext}</label>
                   <input
                     className="form-input"
                     value={newContext}
@@ -308,18 +309,18 @@ export default function Settings() {
                     placeholder="@Context"
                   />
                 </div>
-                <button className="btn-primary" onClick={addContext} style={{ marginBottom: '2px' }}>Add</button>
+                <button className="btn-primary" onClick={addContext} style={{ marginBottom: '2px' }}>{t.settings_addContext}</button>
               </div>
-              <FieldHint style={{ marginTop: '0.5rem' }}>Prefix with @ is added automatically if missing</FieldHint>
+              <FieldHint style={{ marginTop: '0.5rem' }}>{t.settings_ctxHint}</FieldHint>
             </div>
           )}
 
           {/* ── AI PROVIDERS ──────────────────────────────────────── */}
           {activeSection === 'ai-providers' && (
             <div className="fade-in">
-              <SectionTitle>AI Providers</SectionTitle>
+              <SectionTitle>{t.settings_aiProviders}</SectionTitle>
               <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', marginBottom: '1.5rem', lineHeight: 1.6, maxWidth: '480px' }}>
-                Connect any OpenAI-compatible endpoint, Anthropic, or a local Ollama instance. The active provider is used in the AI Assistant view.
+                {t.settings_aiDesc}
               </p>
 
               {/* Existing providers */}
@@ -349,14 +350,14 @@ export default function Settings() {
                       </div>
                       <div style={{ display: 'flex', gap: '0.6rem' }}>
                         {!p.is_active && (
-                          <button className="btn-text" onClick={() => setActiveProvider(p.id)}>Set Active</button>
+                          <button className="btn-text" onClick={() => setActiveProvider(p.id)}>{t.settings_setActive}</button>
                         )}
                         <button
                           className="btn-text"
                           onClick={() => editingProviderId === p.id ? (setEditingProviderId(null), setShowProviderForm(false)) : handleEditProvider(p)}
                           style={{ color: editingProviderId === p.id ? 'var(--ink-primary)' : 'var(--ink-secondary)' }}
                         >
-                          {editingProviderId === p.id ? 'Cancel' : 'Edit'}
+                          {editingProviderId === p.id ? t.settings_cancel : t.edit}
                         </button>
                         <button
                           className="btn-text"
@@ -364,7 +365,7 @@ export default function Settings() {
                           style={{ color: 'rgba(168,50,50,0.6)' }}
                           onMouseEnter={e => (e.currentTarget.style.color = '#a83232')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'rgba(168,50,50,0.6)')}
-                        >Remove</button>
+                        >{t.settings_remove}</button>
                       </div>
                     </div>
                   ))}
@@ -377,7 +378,7 @@ export default function Settings() {
                   {/* Quick Setup presets — only for new providers */}
                   {!editingProviderId && (
                     <>
-                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--ink-secondary)', marginBottom: '0.8rem' }}>Quick Setup</div>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--ink-secondary)', marginBottom: '0.8rem' }}>{t.settings_quickSetup}</div>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
                         {PROVIDER_PRESETS.map(preset => (
                           <button
@@ -395,20 +396,20 @@ export default function Settings() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-field">
-                      <label className="form-label">Name</label>
+                      <label className="form-label">{t.settings_name}</label>
                       <input className="form-input" value={providerForm.name || ''} onChange={e => setProviderForm(f => ({ ...f, name: e.target.value }))} />
                     </div>
                     <div className="form-field">
-                      <label className="form-label">Model</label>
+                      <label className="form-label">{t.settings_model}</label>
                       <input className="form-input" value={providerForm.model || ''} onChange={e => setProviderForm(f => ({ ...f, model: e.target.value }))} placeholder="gpt-4o / llama3" />
                     </div>
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Base URL</label>
+                    <label className="form-label">{t.settings_baseUrl}</label>
                     <input className="form-input" value={providerForm.base_url || ''} onChange={e => setProviderForm(f => ({ ...f, base_url: e.target.value }))} />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">API Key <span style={{ opacity: 0.5 }}>(leave empty for local providers)</span></label>
+                    <label className="form-label">{t.settings_apiKey} <span style={{ opacity: 0.5 }}>{t.settings_apiKeyHint}</span></label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input
                         className="form-input"
@@ -424,20 +425,20 @@ export default function Settings() {
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink-primary)')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'rgba(20,28,58,0.35)')}
                       >
-                        {showApiKey ? 'HIDE' : 'SHOW'}
+                        {showApiKey ? t.hide : t.show}
                       </button>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(20,28,58,0.06)' }}>
                     <button className="btn-primary" onClick={handleSaveProvider}>
-                      {editingProviderId ? 'Update' : 'Save & Activate'}
+                      {editingProviderId ? t.settings_update : t.chat_saveActivate}
                     </button>
-                    <button className="btn-text" onClick={() => { setShowProviderForm(false); setEditingProviderId(null); setShowApiKey(false) }}>Cancel</button>
+                    <button className="btn-text" onClick={() => { setShowProviderForm(false); setEditingProviderId(null); setShowApiKey(false) }}>{t.settings_cancel}</button>
                   </div>
                 </div>
               ) : (
-                <button className="btn-primary" onClick={() => { setProviderForm(EMPTY_PROVIDER_FORM); setShowProviderForm(true) }}>+ Add Provider</button>
+                <button className="btn-primary" onClick={() => { setProviderForm(EMPTY_PROVIDER_FORM); setShowProviderForm(true) }}>{t.settings_addProvider}</button>
               )}
             </div>
           )}
@@ -445,19 +446,19 @@ export default function Settings() {
           {/* ── DATA ──────────────────────────────────────────────── */}
           {activeSection === 'data' && (
             <div className="fade-in">
-              <SectionTitle>Data</SectionTitle>
+              <SectionTitle>{t.settings_data}</SectionTitle>
 
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', marginBottom: '2rem' }}>
                 {[
-                  { label: 'Next Actions', value: stats.nextActions ?? '—' },
-                  { label: 'Total Tasks',  value: stats.tasks ?? '—' },
-                  { label: 'Projects',     value: stats.projects ?? '—' },
-                  { label: 'Waiting For',  value: stats.waitingItems ?? '—' },
-                  { label: 'Someday Items',value: stats.somedayItems ?? '—' },
-                  { label: 'Completed',    value: stats.doneTasks ?? '—' },
-                  { label: 'Conversations',value: stats.conversations ?? '—' },
-                  { label: 'Chat Messages',value: stats.messages ?? '—' },
+                  { label: t.settings_stat_next, value: stats.nextActions ?? '—' },
+                  { label: t.settings_stat_tasks,  value: stats.tasks ?? '—' },
+                  { label: t.settings_stat_projects,     value: stats.projects ?? '—' },
+                  { label: t.settings_stat_waiting,  value: stats.waitingItems ?? '—' },
+                  { label: t.settings_stat_someday,value: stats.somedayItems ?? '—' },
+                  { label: t.settings_stat_done,    value: stats.doneTasks ?? '—' },
+                  { label: t.settings_stat_convs,value: stats.conversations ?? '—' },
+                  { label: t.settings_stat_messages,value: stats.messages ?? '—' },
                 ].map(item => (
                   <div key={item.label} style={{ padding: '0.8rem', border: '1px solid rgba(20,28,58,0.07)', background: 'rgba(255,255,255,0.2)' }}>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--ink-primary)', lineHeight: 1 }}>{item.value}</div>
@@ -469,11 +470,11 @@ export default function Settings() {
               <Divider />
 
               {/* Export */}
-              <FieldGroup label="Export Data">
+              <FieldGroup label={t.settings_exportJSON}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <button className="btn-primary" onClick={handleExport}>Export as JSON</button>
-                  {exportStatus === 'ok' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#4a7c59' }}>✓ Exported successfully</span>}
-                  {exportStatus === 'err' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#a83232' }}>Export failed</span>}
+                  <button className="btn-primary" onClick={handleExport}>{t.settings_exportJSON}</button>
+                  {exportStatus === 'ok' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#4a7c59' }}>✓ {t.settings_exportOk}</span>}
+                  {exportStatus === 'err' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#a83232' }}>{t.settings_exportErr}</span>}
                 </div>
                 <FieldHint>Exports all tasks, projects, waiting items and someday items as JSON</FieldHint>
               </FieldGroup>
@@ -481,7 +482,7 @@ export default function Settings() {
               <Divider />
 
               {/* Cleanup */}
-              <FieldGroup label="Clean Up">
+              <FieldGroup label={t.settings_purgeCompleted}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleClearCompleted}
@@ -489,7 +490,7 @@ export default function Settings() {
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,50,50,0.06)'; e.currentTarget.style.color = '#a83232' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'rgba(168,50,50,0.7)' }}
                   >
-                    Purge Completed Tasks
+                    {t.settings_purgeCompleted}
                   </button>
                   <button
                     onClick={handleClearChat}
@@ -497,17 +498,17 @@ export default function Settings() {
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,50,50,0.06)'; e.currentTarget.style.color = '#a83232' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'rgba(168,50,50,0.7)' }}
                   >
-                    Clear Chat History
+                    {t.settings_clearChat}
                   </button>
-                  {clearStatus === 'ok' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#4a7c59' }}>✓ Done</span>}
+                  {clearStatus === 'ok' && <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: '#4a7c59' }}>✓ {t.settings_purgeOk}</span>}
                 </div>
-                <FieldHint>These actions are permanent and cannot be undone</FieldHint>
+                <FieldHint>{t.settings_cleanupHint}</FieldHint>
               </FieldGroup>
 
               <Divider />
 
               {/* DB Path */}
-              <FieldGroup label="Database Location">
+              <FieldGroup label={t.settings_dbPath}>
                 <div style={{
                   fontFamily: 'var(--font-sans)', fontSize: '0.68rem', color: 'var(--ink-secondary)',
                   background: 'rgba(20,28,58,0.03)', border: '1px solid rgba(20,28,58,0.07)',
@@ -516,7 +517,7 @@ export default function Settings() {
                 }}>
                   {dbPath || 'Loading…'}
                 </div>
-                <FieldHint>Your data is stored locally. Back up this file to preserve your data.</FieldHint>
+                <FieldHint>{t.settings_dbPathHint}</FieldHint>
               </FieldGroup>
             </div>
           )}

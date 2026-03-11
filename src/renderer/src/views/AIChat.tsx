@@ -365,12 +365,13 @@ export default function AIChat() {
   const handleSaveProvider = async () => {
     if (!providerForm.name || !providerForm.base_url || !providerForm.model) return
     await saveProvider({
+      id: editingId || undefined,
       name: providerForm.name!,
       provider_type: (providerForm.provider_type as AIProvider['provider_type']) || 'custom',
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
-      is_active: 0, // Don't activate on save, user must explicitly click "Use" button
+      is_active: editingId ? (providerForm.is_active ?? 0) : 0,
     })
     closeModal()
     await loadProviders()
