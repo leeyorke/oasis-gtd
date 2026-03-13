@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import type { AIProvider } from '../types'
 import { useT } from '../i18n/useT'
@@ -57,7 +57,7 @@ interface CopyButtonProps {
   content: string
 }
 
-function CopyButton({ content }: CopyButtonProps) {
+const CopyButton = React.memo(function CopyButton({ content }: CopyButtonProps) {
   const { t } = { t: (key: string) => key } // Will be replaced with real hook
   const [showMenu, setShowMenu] = useState(false)
   const [copied, setCopied] = useState<'text' | 'markdown' | null>(null)
@@ -143,13 +143,67 @@ function CopyButton({ content }: CopyButtonProps) {
       )}
     </div>
   )
-}
+}, (prevProps, nextProps) => prevProps.content === nextProps.content)
 
 interface MarkdownMessageProps {
   content: string
 }
 
-function MarkdownMessage({ content }: MarkdownMessageProps) {
+// Code block component with lazy highlighting
+function CodeBlock({ language, content }: { language: string; content: string }) {
+  const [isHighlighted, setIsHighlighted] = useState(false)
+
+  useEffect(() => {
+    // Delay highlighting to not block main rendering
+    const id = requestAnimationFrame(() => setIsHighlighted(true))
+    return () => cancelAnimationFrame(id)
+  }, [content])
+
+  return isHighlighted ? (
+    <SyntaxHighlighter
+      style={tomorrow as any}
+      language={language}
+      PreTag="div"
+      className="code-block-content"
+      customStyle={{ margin: 0, borderRadius: '0 0 6px 6px' }}
+    >
+      {content}
+    </SyntaxHighlighter>
+  ) : (
+    <pre className="code-block-content" style={{ margin: 0, borderRadius: '0 0 6px 6px', padding: '1rem', background: '#f5f5f5', overflow: 'auto' }}>
+      {content}
+    </pre>
+  )
+}
+
+// Memoized Code block wrapper
+const CodeBlockWrapper = React.memo(function CodeBlockWrapper({ language, content }: { language: string; content: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error('Copy failed:', err)
+    }
+  }
+
+  return (
+    <div className="code-block-wrapper">
+      <div className="code-block-header">
+        <span className="code-language">{language}</span>
+        <button className="code-copy-btn" onClick={handleCopy}>
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      <CodeBlock language={language} content={content} />
+    </div>
+  )
+})
+
+const MarkdownMessage = React.memo(function MarkdownMessage({ content }: MarkdownMessageProps) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
@@ -159,39 +213,7 @@ function MarkdownMessage({ content }: MarkdownMessageProps) {
             const match = /language-(\w+)/.exec(className || '')
             const codeContent = String(children).replace(/\n$/, '')
             return !inline && match ? (
-              <div className="code-block-wrapper">
-                <div className="code-block-header">
-                  <span className="code-language">{match[1]}</span>
-                  <button
-                    className="code-copy-btn"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(codeContent)
-                        const btn = document.activeElement as HTMLButtonElement
-                        if (btn) {
-                          const originalText = btn.textContent
-                          btn.textContent = 'Copied!'
-                          setTimeout(() => { btn.textContent = originalText }, 1500)
-                        }
-                      } catch (err) {
-                        console.error('Copy failed:', err)
-                      }
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <SyntaxHighlighter
-                  style={tomorrow as any}
-                  language={match[1]}
-                  PreTag="div"
-                  className="code-block-content"
-                  customStyle={{ margin: 0, borderRadius: '0 0 6px 6px' }}
-                  {...props}
-                >
-                  {codeContent}
-                </SyntaxHighlighter>
-              </div>
+              <CodeBlockWrapper language={match[1]} content={codeContent} />
             ) : (
               <code className={`inline-code ${className || ''}`} {...props}>
                 {children}
@@ -218,7 +240,7 @@ function MarkdownMessage({ content }: MarkdownMessageProps) {
       </ReactMarkdown>
     </div>
   )
-}
+}, (prevProps, nextProps) => prevProps.content === nextProps.content)
 
 export default function AIChat() {
   const {
@@ -567,7 +589,7 @@ export default function AIChat() {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>{t.chat_whatsOnMind}</div>
             ) : (
               displayMessages.map((msg, i) => (
-                <div key={i} className={`chat-message ${msg.role} fade-in`} style={{ animationDelay: `${i * 0.03}s` }}>
+                <div key={msg.role + '-' + i} className={`chat-message ${msg.role} fade-in`}>
                   <div className="chat-role-label">{msg.role === 'user' ? t.chat_you : t.chat_assistant}</div>
                   <div className={`chat-bubble-wrapper ${msg.role}`}>
                     <div className={`chat-bubble ${msg.role}`}>
