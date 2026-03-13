@@ -20,6 +20,9 @@ const EMPTY_FORM: Partial<AIProvider & { provider_type: string }> = {
   base_url: '',
   model: '',
   api_key: '',
+  system_prompt: '',
+  temperature: 0.7,
+  max_tokens: 2048,
   is_active: 1,
 }
 
@@ -392,7 +395,7 @@ export default function AIChat() {
   }
 
   const handleEditProvider = (p: AIProvider) => {
-    setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', is_active: p.is_active })
+    setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', system_prompt: p.system_prompt || '', temperature: p.temperature ?? 0.7, max_tokens: p.max_tokens ?? 2048, is_active: p.is_active })
     setEditingId(p.id)
     setShowApiKey(false)
   }
@@ -406,6 +409,9 @@ export default function AIChat() {
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
+      system_prompt: providerForm.system_prompt || '',
+      temperature: providerForm.temperature ?? 0.7,
+      max_tokens: providerForm.max_tokens ?? 2048,
       is_active: editingId ? (providerForm.is_active ?? 0) : 0,
     })
     closeModal()
@@ -698,6 +704,44 @@ export default function AIChat() {
                 <button onClick={() => setShowApiKey(v => !v)} style={{ position: 'absolute', right: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(20,28,58,0.35)', fontSize: '0.7rem', fontFamily: 'var(--font-sans)', letterSpacing: '0.05em', padding: '0.2rem 0.3rem', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink-primary)')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(20,28,58,0.35)')}>
                   {showApiKey ? t.hide : t.show}
                 </button>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label className="form-label">{t.settings_systemPrompt}</label>
+              <textarea
+                className="form-input"
+                value={providerForm.system_prompt || ''}
+                onChange={e => setProviderForm(f => ({ ...f, system_prompt: e.target.value }))}
+                placeholder={t.settings_systemPromptHint}
+                rows={2}
+                style={{ resize: 'vertical', minHeight: '50px' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-field">
+                <label className="form-label">{t.settings_temperature}</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={providerForm.temperature ?? 0.7}
+                  onChange={e => setProviderForm(f => ({ ...f, temperature: parseFloat(e.target.value) || 0.7 }))}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">{t.settings_maxTokens}</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="1"
+                  max="32000"
+                  value={providerForm.max_tokens ?? 2048}
+                  onChange={e => setProviderForm(f => ({ ...f, max_tokens: parseInt(e.target.value) || 2048 }))}
+                />
               </div>
             </div>
 

@@ -65,6 +65,9 @@ export interface AIProvider {
   base_url: string
   model: string
   api_key?: string
+  system_prompt?: string
+  temperature?: number
+  max_tokens?: number
   is_active: number
   created_at: string
 }

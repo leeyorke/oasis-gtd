@@ -76,6 +76,9 @@ function createTables(): void {
       base_url TEXT NOT NULL,
       model TEXT NOT NULL,
       api_key TEXT,
+      system_prompt TEXT DEFAULT '',
+      temperature REAL DEFAULT 0.7,
+      max_tokens INTEGER DEFAULT 2048,
       is_active INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
@@ -102,6 +105,17 @@ function createTables(): void {
       value TEXT NOT NULL
     );
   `)
+
+  // Migration: Add new columns to ai_providers if they don't exist
+  try {
+    db.exec(`ALTER TABLE ai_providers ADD COLUMN system_prompt TEXT DEFAULT ''`)
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE ai_providers ADD COLUMN temperature REAL DEFAULT 0.7`)
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE ai_providers ADD COLUMN max_tokens INTEGER DEFAULT 2048`)
+  } catch { /* column already exists */ }
 
   // Ensure default settings exist
   const defaultSettings: Record<string, string> = {
@@ -190,10 +204,10 @@ function seedIfEmpty(): void {
 
   // Seed AI provider (Ollama as default local option)
   const insertProvider = db.prepare(`
-    INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, is_active, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, system_prompt, temperature, max_tokens, is_active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  insertProvider.run(uuidv4(), 'Ollama (Local)', 'ollama', 'http://localhost:11434', 'llama3', null, 1, now)
+  insertProvider.run(uuidv4(), 'Ollama (Local)', 'ollama', 'http://localhost:11434', 'llama3', null, '', 0.7, 2048, 1, now)
 }
 
 // ─── Task Queries ─────────────────────────────────────────────────────────────
@@ -343,12 +357,18 @@ export const aiQueries = {
               base_url = @base_url,
               model = @model,
               api_key = @api_key,
+              system_prompt = @system_prompt,
+              temperature = @temperature,
+              max_tokens = @max_tokens,
               is_active = @is_active
           WHERE id = @id
         `).run({
           ...provider,
           id,
           api_key: provider.api_key || null,
+          system_prompt: provider.system_prompt || '',
+          temperature: provider.temperature ?? 0.7,
+          max_tokens: provider.max_tokens ?? 2048,
           is_active: provider.is_active ?? 0,
         })
 
@@ -364,12 +384,15 @@ export const aiQueries = {
     // Create new provider
     id = uuidv4()
     db.prepare(`
-      INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, is_active, created_at)
-      VALUES (@id, @name, @provider_type, @base_url, @model, @api_key, @is_active, @created_at)
+      INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, system_prompt, temperature, max_tokens, is_active, created_at)
+      VALUES (@id, @name, @provider_type, @base_url, @model, @api_key, @system_prompt, @temperature, @max_tokens, @is_active, @created_at)
     `).run({
       ...provider,
       id,
       created_at: now,
+      system_prompt: provider.system_prompt || '',
+      temperature: provider.temperature ?? 0.7,
+      max_tokens: provider.max_tokens ?? 2048,
       is_active: provider.is_active ?? 0
     })
 

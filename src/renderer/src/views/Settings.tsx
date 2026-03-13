@@ -50,7 +50,7 @@ export default function Settings() {
 
   // ─── Provider form ────────────────────────────────────────────────────────
   const EMPTY_PROVIDER_FORM: Partial<AIProvider & { provider_type: string }> = {
-    name: 'Custom OpenAI-Compatible', provider_type: 'custom', base_url: '', model: '', api_key: '', is_active: 1,
+    name: 'Custom OpenAI-Compatible', provider_type: 'custom', base_url: '', model: '', api_key: '', system_prompt: '', temperature: 0.7, max_tokens: 2048, is_active: 1,
   }
   const [providerForm, setProviderForm] = useState<Partial<AIProvider & { provider_type: string }>>(EMPTY_PROVIDER_FORM)
   const [showProviderForm, setShowProviderForm] = useState(false)
@@ -66,6 +66,9 @@ export default function Settings() {
       base_url: providerForm.base_url!,
       model: providerForm.model!,
       api_key: providerForm.api_key || undefined,
+      system_prompt: providerForm.system_prompt || '',
+      temperature: providerForm.temperature ?? 0.7,
+      max_tokens: providerForm.max_tokens ?? 2048,
       is_active: editingProviderId ? (providerForm.is_active ?? 0) : 0,
     })
     setShowProviderForm(false)
@@ -76,7 +79,7 @@ export default function Settings() {
   }
 
   const handleEditProvider = (p: AIProvider) => {
-    setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', is_active: p.is_active })
+    setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', system_prompt: p.system_prompt || '', temperature: p.temperature ?? 0.7, max_tokens: p.max_tokens ?? 2048, is_active: p.is_active })
     setEditingProviderId(p.id)
     setShowApiKey(false)
     setShowProviderForm(true)
@@ -427,6 +430,46 @@ export default function Settings() {
                       >
                         {showApiKey ? t.hide : t.show}
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label className="form-label">{t.settings_systemPrompt}</label>
+                    <textarea
+                      className="form-input"
+                      value={providerForm.system_prompt || ''}
+                      onChange={e => setProviderForm(f => ({ ...f, system_prompt: e.target.value }))}
+                      placeholder={t.settings_systemPromptHint}
+                      rows={3}
+                      style={{ resize: 'vertical', minHeight: '60px' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-field">
+                      <label className="form-label">{t.settings_temperature}</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        value={providerForm.temperature ?? 0.7}
+                        onChange={e => setProviderForm(f => ({ ...f, temperature: parseFloat(e.target.value) || 0.7 }))}
+                      />
+                      <FieldHint>{t.settings_temperatureHint}</FieldHint>
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">{t.settings_maxTokens}</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="1"
+                        max="32000"
+                        value={providerForm.max_tokens ?? 2048}
+                        onChange={e => setProviderForm(f => ({ ...f, max_tokens: parseInt(e.target.value) || 2048 }))}
+                      />
+                      <FieldHint>{t.settings_maxTokensHint}</FieldHint>
                     </div>
                   </div>
 

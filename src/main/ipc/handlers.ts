@@ -74,14 +74,14 @@ async function* parseNDJSON(stream: ReadableStream<Uint8Array>): AsyncGenerator<
 
 async function streamOpenAICompatible(
   webContents: WebContents,
-  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string; system_prompt?: string; temperature?: number; max_tokens?: number},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
   isTitleCall: boolean,
   signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/v1/chat/completions`
-  const maxTokens = isTitleCall ? 30 : 2048
+  const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
 
   const response = await fetch(url, {
     method: 'POST',
@@ -93,6 +93,8 @@ async function streamOpenAICompatible(
       model: provider.model,
       messages,
       max_tokens: maxTokens,
+      temperature: provider.temperature ?? 0.7,
+      system: provider.system_prompt || undefined,
       stream: true,
     }),
     signal,
@@ -128,14 +130,14 @@ async function streamOpenAICompatible(
 
 async function streamAnthropic(
   webContents: WebContents,
-  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string; system_prompt?: string; temperature?: number; max_tokens?: number},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
   isTitleCall: boolean,
   signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/v1/messages`
-  const maxTokens = isTitleCall ? 30 : 2048
+  const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
 
   const response = await fetch(url, {
     method: 'POST',
@@ -147,8 +149,9 @@ async function streamAnthropic(
     body: JSON.stringify({
       model: provider.model,
       max_tokens: maxTokens,
+      temperature: provider.temperature ?? 0.7,
+      system: provider.system_prompt || messages.find(m => m.role === 'system')?.content,
       messages: messages.filter(m => m.role !== 'system'),
-      system: messages.find(m => m.role === 'system')?.content,
       stream: true,
     }),
     signal,
@@ -186,7 +189,7 @@ async function streamAnthropic(
 
 async function streamOllama(
   webContents: WebContents,
-  provider: {provider_type: string; base_url: string; model: string; api_key?: string},
+  provider: {provider_type: string; base_url: string; model: string; api_key?: string; system_prompt?: string},
   messages: Array<{role: string; content: string}>,
   conversationId: string,
   isTitleCall: boolean,
@@ -194,10 +197,15 @@ async function streamOllama(
 ): Promise<string> {
   const url = `${provider.base_url}/api/chat`
 
+  // Ollama: prepend system prompt as first message if set
+  const ollamaMessages = provider.system_prompt
+    ? [{ role: 'system' as const, content: provider.system_prompt }, ...messages]
+    : messages
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: provider.model, messages, stream: true }),
+    body: JSON.stringify({ model: provider.model, messages: ollamaMessages, stream: true }),
     signal,
   })
 
@@ -286,7 +294,7 @@ export function registerHandlers(): void {
   )
 
   // ─── AI Send Message (Non-streaming for backwards compatibility & title generation) ───────────────────
-  ipcMain.handle('ai:sendMessage', async (_, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string}) => {
+  ipcMain.handle('ai:sendMessage', async (_, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string; system_prompt?: string; temperature?: number; max_tokens?: number}) => {
     const isTitleCall = conversationId === '__title__'
 
     if (!isTitleCall) {
@@ -304,7 +312,7 @@ export function registerHandlers(): void {
       }
 
       let responseText = ''
-      const maxTokens = isTitleCall ? 30 : 2048
+      const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
 
       if (provider.provider_type === 'anthropic') {
         const url = `${provider.base_url}/v1/messages`
@@ -319,8 +327,9 @@ export function registerHandlers(): void {
           body: JSON.stringify({
             model: provider.model,
             max_tokens: maxTokens,
+            temperature: provider.temperature ?? 0.7,
+            system: provider.system_prompt || messages.find(m => m.role === 'system')?.content,
             messages: messages.filter(m => m.role !== 'system'),
-            system: messages.find(m => m.role === 'system')?.content,
           }),
         })
         if (!response.ok) {
@@ -334,10 +343,13 @@ export function registerHandlers(): void {
       } else if (provider.provider_type === 'ollama') {
         const url = `${provider.base_url}/api/chat`
         if (!isTitleCall) console.log('[AI] -> Ollama:', url)
+        const ollamaMessages = provider.system_prompt
+          ? [{ role: 'system' as const, content: provider.system_prompt }, ...messages]
+          : messages
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: provider.model, messages, stream: false }),
+          body: JSON.stringify({ model: provider.model, messages: ollamaMessages, stream: false }),
         })
         if (!response.ok) {
           const body = await response.text()
@@ -357,7 +369,13 @@ export function registerHandlers(): void {
             'Content-Type': 'application/json',
             ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
           },
-          body: JSON.stringify({ model: provider.model, messages, max_tokens: maxTokens }),
+          body: JSON.stringify({
+            model: provider.model,
+            messages,
+            max_tokens: maxTokens,
+            temperature: provider.temperature ?? 0.7,
+            system: provider.system_prompt || undefined,
+          }),
         })
         if (!response.ok) {
           const body = await response.text()
@@ -385,7 +403,7 @@ export function registerHandlers(): void {
   })
 
   // ─── AI Send Message Streaming ──────────────────────────────────────────────
-  ipcMain.on('ai:sendMessageStream', async (event, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string}) => {
+  ipcMain.on('ai:sendMessageStream', async (event, conversationId: string, messages: Array<{role: string; content: string}>, provider: {provider_type: string; base_url: string; model: string; api_key?: string; system_prompt?: string; temperature?: number; max_tokens?: number}) => {
     const webContents = event.sender
     const isTitleCall = conversationId === '__title__'
 
