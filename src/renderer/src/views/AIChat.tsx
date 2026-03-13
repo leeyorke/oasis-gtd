@@ -266,7 +266,7 @@ export default function AIChat() {
   // Scroll state
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
-  const [buttonPosition, setButtonPosition] = useState<{ right: number; bottom: number }>({ right: 0, bottom: 0 })
+  const [buttonPosition, setButtonPosition] = useState<{ left: number; bottom: number }>({ left: 0, bottom: 0 })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
@@ -296,13 +296,13 @@ export default function AIChat() {
     const container = wrapperRef.current
     if (!container) return
 
-    // Update button position based on wrapper
+    // Update button position based on wrapper - use fixed positioning
     const updateButtonPosition = () => {
       const rect = container.getBoundingClientRect()
-      setButtonPosition({
-        right: window.innerWidth - rect.right + 16, // 1rem from right edge of wrapper
-        bottom: rect.height - 400, // 40px from bottom of wrapper (above input area)
-      })
+      // Position at bottom center of wrapper
+      const buttonLeft = rect.left + rect.width / 2 - 18 // 18 = half button width
+      const buttonBottom = window.innerHeight - rect.bottom + 16
+      setButtonPosition({ left: buttonLeft, bottom: buttonBottom })
     }
 
     const handleScroll = () => {
@@ -348,13 +348,12 @@ export default function AIChat() {
 
   // Update button position when messages change
   useEffect(() => {
-    const wrapper = wrapperRef.current
-    if (!wrapper || !showScrollButton) return
-    const rect = wrapper.getBoundingClientRect()
-    setButtonPosition({
-      right: window.innerWidth - rect.right + 16, // 1rem from right edge of wrapper
-      bottom: rect.height - 80, // 80px from bottom of wrapper (above input area)
-    })
+    if (!wrapperRef.current || !showScrollButton) return
+    const container = wrapperRef.current
+    const rect = container.getBoundingClientRect()
+    const buttonLeft = rect.left + rect.width / 2 - 18
+    const buttonBottom = window.innerHeight - rect.bottom + 16
+    setButtonPosition({ left: buttonLeft, bottom: buttonBottom })
   }, [displayMessages, showScrollButton])
 
   const handleSend = async () => {
@@ -615,15 +614,15 @@ export default function AIChat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
-        {/* Scroll to bottom button - shown when content overflows and user scrolled up */}
+        {/* Scroll to bottom button - fixed position at bottom center */}
         {showScrollButton && (
           <button
             className="chat-scroll-to-bottom-btn"
             onClick={handleScrollToBottom}
             style={{
               position: 'fixed',
-              right: '16px',
-              bottom: '16px',
+              left: buttonPosition.left,
+              bottom: buttonPosition.bottom,
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

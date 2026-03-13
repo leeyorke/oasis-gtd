@@ -792,7 +792,7 @@ body {
   position: relative;
 }
 
-/* Scroll to bottom button - fixed position at bottom right of wrapper */
+/* Scroll to bottom button - fixed position */
 .chat-scroll-to-bottom-btn {
   position: fixed;
   width: 36px;
