@@ -10,9 +10,20 @@ const translations = {
     nav_weeklyReview:   'Weekly Review',
     nav_aiChat:         'AI Assistant',
     nav_settings:       'Settings',
+    nav_dashboard:      'Dashboard',
     nav_meta_actions:   'Actions',
     nav_meta_projects:  'Projects',
     nav_meta_waiting:   'Waiting',
+
+    // ─── Dashboard
+    db_colInbox:        'Inbox',
+    db_colNextActions:  'Next Actions',
+    db_colProjects:     'Projects',
+    db_colWaiting:      'Waiting',
+    db_colSomeday:      'Someday',
+    db_colDone:         'Done',
+    db_empty:           'No items',
+    db_collapsed:       'Collapsed',
 
     // ─── Common ───────────────────────────────────────────────────────────────
     cancel:             'Cancel',
@@ -271,9 +282,20 @@ const translations = {
     nav_weeklyReview:   '每周回顾',
     nav_aiChat:         'AI 助手',
     nav_settings:       '设置',
+    nav_dashboard:      '看板',
     nav_meta_actions:   '行动',
     nav_meta_projects:  '项目',
     nav_meta_waiting:   '等待',
+
+    // ─── Dashboard
+    db_colInbox:        '收件箱',
+    db_colNextActions:  '下一步行动',
+    db_colProjects:     '项目',
+    db_colWaiting:      '等待中',
+    db_colSomeday:      '将来也许',
+    db_colDone:         '已完成',
+    db_empty:           '无项目',
+    db_collapsed:       '已折叠',
 
     // ─── Common ───────────────────────────────────────────────────────────────
     cancel:             '取消',

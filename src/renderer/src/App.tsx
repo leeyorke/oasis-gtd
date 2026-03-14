@@ -8,12 +8,13 @@ import Someday from './views/Someday'
 import WeeklyReview from './views/WeeklyReview'
 import AIChat from './views/AIChat'
 import Settings from './views/Settings'
+import Dashboard from './views/Dashboard'
 
 export default function App() {
   const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadReview, loadProviders, loadConversations, loadSettings } = useStore()
 
   useEffect(() => {
-    loadTasks('next')
+    loadTasks()  // Load all tasks for dashboard view
     loadProjects()
     loadWaiting()
     loadSomeday()
@@ -32,6 +33,7 @@ export default function App() {
       case 'weekly-review': return <WeeklyReview />
       case 'ai-chat':       return <AIChat />
       case 'settings':      return <Settings />
+      case 'dashboard':     return <Dashboard />
       default:              return <NextActions />
     }
   }

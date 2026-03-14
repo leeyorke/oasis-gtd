@@ -228,7 +228,17 @@ export const taskQueries = {
     db.prepare(`
       INSERT INTO tasks (id, title, notes, context, due_date, project_id, status, created_at, updated_at)
       VALUES (@id, @title, @notes, @context, @due_date, @project_id, @status, @created_at, @updated_at)
-    `).run({ ...task, id, created_at: now, updated_at: now })
+    `).run({
+      id,
+      title: task.title,
+      notes: task.notes ?? null,
+      context: task.context ?? null,
+      due_date: task.due_date ?? null,
+      project_id: task.project_id ?? null,
+      status: task.status,
+      created_at: now,
+      updated_at: now,
+    })
     return id
   },
 

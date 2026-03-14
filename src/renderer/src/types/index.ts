@@ -1,4 +1,4 @@
-export type ViewType = 'next-actions' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings'
+export type ViewType = 'next-actions' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'dashboard'
 
 export interface AppSettings {
   app_name: string
