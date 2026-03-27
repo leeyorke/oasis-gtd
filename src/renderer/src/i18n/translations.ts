@@ -3,6 +3,7 @@ export type Language = 'en' | 'zh'
 const translations = {
   en: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
+    nav_start:          'Start',
     nav_nextActions:    'Next Actions',
     nav_projects:       'Projects',
     nav_waiting:        'Waiting For',
@@ -10,7 +11,6 @@ const translations = {
     nav_weeklyReview:   'Weekly Review',
     nav_aiChat:         'AI Assistant',
     nav_settings:       'Settings',
-    nav_dashboard:      'Dashboard',
     nav_meta_actions:   'Actions',
     nav_meta_projects:  'Projects',
     nav_meta_waiting:   'Waiting',
@@ -24,6 +24,16 @@ const translations = {
     db_colDone:         'Done',
     db_empty:           'No items',
     db_collapsed:       'Collapsed',
+
+    // ─── Projects Board
+    pb_title:           'Projects Board',
+    pb_noProjects:      'No active projects',
+    pb_colBacklog:      'Backlog',
+    pb_colInProgress:   'In Progress',
+    pb_colReview:       'Review',
+    pb_colDone:         'Done',
+    pb_completed:       'Completed',
+    pb_empty:           'No items',
 
     // ─── Common ───────────────────────────────────────────────────────────────
     cancel:             'Cancel',
@@ -65,6 +75,22 @@ const translations = {
     na_footerCtxs:      'Contexts',
     na_addAction:       '+ Add Action',
     na_count:           (n: number) => `${n} Next Actions`,
+
+    // ─── Schedule ─────────────────────────────────────────────────────────────
+    nav_schedule:       'Schedule',
+    schedule_empty:     'No scheduled items.',
+
+    // ─── Habit ────────────────────────────────────────────────────────────────
+    nav_habit:          'Habit',
+    habit_empty:        'No habits defined.',
+
+    // ─── Resource ─────────────────────────────────────────────────────────────
+    nav_resource:       'Resource',
+    resource_empty:     'No resources saved.',
+
+    // ─── Archive ──────────────────────────────────────────────────────────────
+    nav_archive:        'Archive',
+    archive_empty:      'No archived items.',
 
     // ─── Add Task Modal ───────────────────────────────────────────────────────
     modal_newAction:    'New Action',
@@ -275,6 +301,7 @@ const translations = {
 
   zh: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
+    nav_start:          '开始',
     nav_nextActions:    '下一步行动',
     nav_projects:       '项目',
     nav_waiting:        '等待中',
@@ -282,7 +309,6 @@ const translations = {
     nav_weeklyReview:   '每周回顾',
     nav_aiChat:         'AI 助手',
     nav_settings:       '设置',
-    nav_dashboard:      '看板',
     nav_meta_actions:   '行动',
     nav_meta_projects:  '项目',
     nav_meta_waiting:   '等待',
@@ -296,6 +322,16 @@ const translations = {
     db_colDone:         '已完成',
     db_empty:           '无项目',
     db_collapsed:       '已折叠',
+
+    // ─── Projects Board
+    pb_title:           '项目看板',
+    pb_noProjects:      '暂无活跃项目',
+    pb_colBacklog:      '待办',
+    pb_colInProgress:   '进行中',
+    pb_colReview:       '审核',
+    pb_colDone:         '已完成',
+    pb_completed:       '已完成',
+    pb_empty:           '无项目',
 
     // ─── Common ───────────────────────────────────────────────────────────────
     cancel:             '取消',
@@ -337,6 +373,22 @@ const translations = {
     na_footerCtxs:      '情境',
     na_addAction:       '+ 添加行动',
     na_count:           (n: number) => `${n} 个下一步行动`,
+
+    // ─── Schedule ─────────────────────────────────────────────────────────────
+    nav_schedule:       '日程',
+    schedule_empty:     '暂无安排项目。',
+
+    // ─── Habit ────────────────────────────────────────────────────────────────
+    nav_habit:          '习惯',
+    habit_empty:        '暂无习惯设定。',
+
+    // ─── Resource ─────────────────────────────────────────────────────────────
+    nav_resource:       '资源',
+    resource_empty:     '暂无保存资源。',
+
+    // ─── Archive ──────────────────────────────────────────────────────────────
+    nav_archive:        '归档',
+    archive_empty:      '暂无归档项目。',
 
     // ─── Add Task Modal ───────────────────────────────────────────────────────
     modal_newAction:    '新行动',

@@ -271,7 +271,7 @@ export const projectQueries = {
     db.prepare(`
       INSERT INTO projects (id, title, description, outcome, status, created_at, updated_at)
       VALUES (@id, @title, @description, @outcome, @status, @created_at, @updated_at)
-    `).run({ ...project, id, created_at: now, updated_at: now })
+    `).run({ ...project, id, description: project.description ?? null, outcome: project.outcome ?? null, status: project.status ?? 'active', created_at: now, updated_at: now })
     return id
   },
 

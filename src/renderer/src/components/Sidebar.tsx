@@ -11,8 +11,12 @@ export default function Sidebar() {
   const dateStr = now.toLocaleDateString(lang, { weekday: 'long', month: 'short', day: 'numeric' })
 
   const NAV_ITEMS: { id: ViewType; label: string }[] = [
-    { id: 'dashboard',     label: t.nav_dashboard },
+    { id: 'start',         label: t.nav_start },
     { id: 'next-actions',  label: t.nav_nextActions },
+    { id: 'schedule',      label: t.nav_schedule },
+    { id: 'habit',         label: t.nav_habit },
+    { id: 'resource',      label: t.nav_resource },
+    { id: 'archive',       label: t.nav_archive },
     { id: 'projects',      label: t.nav_projects },
     { id: 'waiting',       label: t.nav_waiting },
     { id: 'someday',       label: t.nav_someday },
