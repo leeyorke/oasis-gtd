@@ -115,24 +115,84 @@ AI 提供者接口设计为可扩展。要添加新应用（例如，不同的 A
 
 ## 发布脚本
 
-项目包含一个发布脚本，可以自动处理版本更新、构建和打包：
+项目包含一个自动化发布脚本，一站式完成版本更新、Git提交打标签、跨平台构建安装包整个发布流程：
 
+### 基础用法
 ```bash
-# 运行交互式发布向导
+# 运行交互式版本选择向导（推荐）
 npm run release
 
-# 或直接指定版本
-node scripts/release.js 1.0.0
-
-# 模拟运行（不实际更改文件）
-node scripts/release.js --dry-run 1.0.0
+# 或直接指定版本号
+node scripts/release.js [选项] 1.0.0
 ```
 
-该脚本会：
-1. 更新 package.json 版本号
-2. 创建 git 提交和标签
-3. 自动检测平台并构建相应安装包
-4. 输出构建摘要
+### 命令选项
+| 选项 | 作用 |
+|------|------|
+| `--help, -h` | 显示完整帮助信息 |
+| `--skip-build` | 跳过构建步骤，只更新版本和执行Git操作 |
+| `--skip-git` | 跳过Git提交和打标签步骤 |
+| `--dry-run` | **试运行模式**，只显示要执行的操作，不实际修改任何文件或执行命令 |
+
+### 版本号格式
+支持标准 [SemVer](https://semver.org/) 格式：
+- 正式版：`X.Y.Z` （如 `1.0.0`、`2.1.3`）
+- 预发布版：`X.Y.Z-<标记>` （如 `1.0.0-alpha`、`1.0.0-beta.1`）
+
+### 交互式用法
+如果运行时不直接指定版本号，脚本会进入**交互式版本选择界面**，自动为你推荐升级选项：
+```
+Current version:
+  0.0.7
+
+Suggested versions:
+  1. 0.0.8            (Patch bump - 小版本修复)
+  2. 0.1.0            (Minor bump - 新功能版本)
+  3. 1.0.0            (Major bump - 重大更新版本)
+  4. 0.0.8-alpha      (Alpha prerelease - 内部测试版)
+  5. 0.0.8-beta       (Beta prerelease - 公开测试版)
+  0. Enter custom version
+
+Select option (0-5) or enter version:
+```
+可以直接输入数字选择推荐版本，或输入0自定义版本号。
+
+### 执行流程
+脚本默认分4步完成发布：
+1. **🔄 更新版本**：自动修改 `package.json` 中的version字段
+2. **📝 Git操作**：提交版本变更，创建Git标签 `vX.X.X`
+3. **🏗️ 构建安装包**：自动识别当前操作系统，执行对应构建命令：
+   - Windows：执行 `npm run build:win` 生成 `.exe` 安装包
+   - macOS：执行 `npm run build:mac` 生成 `.dmg` 安装包
+   - Linux：执行 `npm run build:linux` 生成Linux平台安装包
+4. **✅ 发布完成**：输出发布摘要，包含新版本号、安装包路径和Git推送提示。
+
+### 常用示例
+```bash
+# 交互式选择版本发布
+npm run release
+
+# 直接发布正式版
+node scripts/release.js 1.0.0
+
+# 发布beta测试版
+node scripts/release.js 1.0.0-beta.1
+
+# 试运行（仅显示操作，不实际修改）
+node scripts/release.js --dry-run 1.0.0
+
+# 跳过构建，只更新版本和Git标签
+node scripts/release.js --skip-build 1.0.0
+
+# 跳过Git提交，只做版本更新和构建
+node scripts/release.js --skip-git 1.0.0
+```
+
+### 注意事项
+1. 运行脚本前请确保工作区干净，没有未提交的修改
+2. 构建产物默认输出在 `dist/` 目录下
+3. 如果开启了Git操作，发布完成后需要手动执行 `git push && git push --tags` 推送到远程仓库
+4. 脚本支持Windows/macOS/Linux跨平台自动适配构建命令
 
 ## 路线图
 
