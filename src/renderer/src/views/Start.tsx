@@ -1,238 +1,199 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
+import { X, Calendar, Flag, Zap, ArrowRight, Calendar as CalendarIcon, Folder, Hourglass, Repeat, Inbox, FileText } from 'lucide-react'
 
-type Bucket = 'next' | 'next-actions' | 'inbox' | 'project' | 'schedule' | 'wait' | 'habit' | 'someday' | 'resource' | 'archive'
-
-const BUCKET_LABELS: Record<Bucket, { en: string; zh: string }> = {
-  next: { en: 'Do It Now', zh: '立即做' },
-  'next-actions': { en: 'Next Actions', zh: '下一步行动' },
-  inbox: { en: 'Inbox', zh: '收件箱' },
-  project: { en: 'Project', zh: '项目' },
-  schedule: { en: 'Schedule', zh: '日程' },
-  wait: { en: 'Wait', zh: '等待' },
-  habit: { en: 'Habit', zh: '习惯' },
-  someday: { en: 'Someday', zh: '将来做' },
-  resource: { en: 'Resource', zh: '资源' },
-  archive: { en: 'Archive', zh: '归档' },
-}
+// Mock tasks data - will be replaced with real data from store
+const mockTasks = [
+  {
+    id: 1,
+    title: '完善 Oasis 设计系统的排版细节',
+    project: 'Branding',
+    due: 'Due Today',
+    completed: false
+  },
+  {
+    id: 2,
+    title: '发送 Q3 进度报告给投资人',
+    project: 'Strategy',
+    due: '2:00 PM',
+    completed: false
+  },
+  {
+    id: 3,
+    title: '预定周五晚上的餐厅',
+    project: 'Personal',
+    due: 'Priority 2',
+    completed: false
+  },
+  {
+    id: 4,
+    title: '整理摄影集素材',
+    project: 'Creative',
+    due: 'Evening',
+    completed: false
+  }
+]
 
 export default function Start() {
-  const [text, setText] = useState('')
-  const [bucket, setBucket] = useState<Bucket>('inbox')
-  const [isHovering, setIsHovering] = useState(false)
-  const [shake, setShake] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const cardRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { addTask, settings } = useStore()
+  const { tasks, settings, addTask } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+  // Add Task Modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskNotes, setTaskNotes] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('next')
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!cardRef.current) return
-    const rect = cardRef.current.getBoundingClientRect()
-    const xAxis = (window.innerWidth / 2 - e.pageX) / 45
-    const yAxis = (window.innerHeight / 2 - e.pageY) / 45
-    setMousePos({ x: xAxis, y: yAxis })
+  // Get high priority tasks (status: 'next')
+  const priorityTasks = tasks.filter(task => task.status === 'next')
+  const displayTasks = priorityTasks.length > 0 ? priorityTasks : mockTasks
+
+  const categories = [
+    { id: 'next', label: isZh ? '立即做' : 'Priority Focus', icon: Zap },
+    { id: 'next-actions', label: isZh ? '下一步行动' : 'Next Actions', icon: ArrowRight },
+    { id: 'schedule', label: isZh ? '日程' : 'Schedule', icon: CalendarIcon },
+    { id: 'projects', label: isZh ? '项目' : 'Projects', icon: Folder },
+    { id: 'waiting', label: isZh ? '等待' : 'Waiting', icon: Hourglass },
+    { id: 'habit', label: isZh ? '习惯' : 'Habit', icon: Repeat },
+    { id: 'someday', label: isZh ? '将来做' : 'Someday', icon: Inbox },
+    { id: 'resource', label: isZh ? '资源' : 'Resource', icon: FileText },
+  ]
+
+  const handleSaveTask = async () => {
+    if (!taskTitle.trim()) return
+    await addTask({
+      title: taskTitle.trim(),
+      description: taskNotes.trim(),
+      status: selectedCategory as any
+    })
+    // Reset form
+    setTaskTitle('')
+    setTaskNotes('')
+    setSelectedCategory('next')
+    setShowAddModal(false)
   }
-
-  const handleMouseLeave = () => {
-    setMousePos({ x: 0, y: 0 })
-  }
-
-  const handleCapture = async () => {
-    if (!text.trim()) {
-      setErrorMessage('输入不能为空')
-      setShake(true)
-      setTimeout(() => setShake(false), 500)
-      return
-    }
-    if (bucket === 'inbox') {
-      setErrorMessage('请选择标签')
-      setShake(true)
-      setTimeout(() => setShake(false), 500)
-      return
-    }
-    setErrorMessage('')
-    await addTask({ title: text.trim(), status: bucket as any })
-    setText('')
-    setBucket('inbox')
-    textareaRef.current?.focus()
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCapture()
-  }
-
-  const buckets: Bucket[] = ['next', 'next-actions', 'project', 'schedule', 'wait', 'habit', 'someday', 'resource']
 
   return (
-    <div
-      className="flex-1 flex items-center justify-center relative perspective-container"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Noise overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-          opacity: 0.05,
-          mixBlendMode: 'multiply',
-        }}
-      />
+    <main className="main-content">
+      <div className="page-header">
+        <h1 className="page-title">{isZh ? '立即做' : 'Priority Focus'}</h1>
+        <div className="page-subtitle">{isZh ? '高优先级任务' : 'High Priority Focus'}</div>
+      </div>
 
-      <div
-        ref={cardRef}
-        className={`w-[520px] h-[680px] relative flex flex-col ${shake ? 'animate-shake' : ''}`}
-        style={{
-          background: '#EBE7E0',
-          boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.15), 0 10px 20px -5px rgba(0, 0, 0, 0.1)',
-          borderRadius: '2px',
-          transform: shake ? undefined : `rotateY(${mousePos.x}deg) rotateX(${mousePos.y}deg)`,
-          transition: 'transform 0.1s ease-out',
-        }}
-      >
-        {/* Paper noise */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            opacity: 0.03,
-            borderRadius: 'inherit',
-          }}
-        />
-
-        {/* Embossed text on right */}
-        <div className="absolute right-6 top-0 bottom-0 flex items-center justify-center pointer-events-none select-none z-0">
-          <span
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '110px',
-              fontStyle: 'italic',
-              fontWeight: 300,
-              letterSpacing: '0.1em',
-              writingMode: 'vertical-rl',
-              transform: 'rotate(180deg)',
-              color: '#E8E6E1',
-              textShadow: '1px 1px 0px rgba(255, 255, 255, 0.8), -1px -1px 0px rgba(0, 0, 0, 0.03)',
-              opacity: 0.7,
-            }}
-          >
-            capture
-          </span>
-        </div>
-
-        {/* Paperclip SVG */}
-        <svg className="paperclip" viewBox="0 0 32 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'rotate(-4deg)' }}>
-          <path d="M16 94C10.4772 94 6 89.5228 6 84V26C6 18.268 12.268 12 20 12C27.732 12 34 18.268 34 26V78C34 81.3137 31.3137 84 28 84C24.6863 84 22 81.3137 22 78V30C22 28.8954 21.1046 28 20 28C18.8954 28 18 28.8954 18 30V78C18 83.5228 22.4772 88 28 88C33.5228 88 38 83.5228 38 78V26C38 16.0589 29.9411 8 20 8C10.0589 8 2 16.0589 2 26V84C2 91.732 8.268 98 16 98C23.732 98 30 91.732 30 84V30" stroke="#1A1C20" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col h-full p-16 pt-20">
-          <header className="mb-10">
-            <h2
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '32px',
-                color: '#2A2927',
-                fontWeight: 500,
-                lineHeight: 1,
-              }}
-            >
-              {t.capture_title}
-            </h2>
-          </header>
-
-          <div
-            className="flex-1 flex flex-col relative group"
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
-          >
-            <textarea
-              ref={textareaRef}
-              className="w-full flex-1 bg-transparent resize-none outline-none capture-input"
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '16px',
-                color: '#2A2927',
-                lineHeight: 1.4,
-                zIndex: 10,
-              }}
-              placeholder={t.capture_placeholder}
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value)
-                setErrorMessage('')
-              }}
-              onKeyDown={handleKeyDown}
-            />
-            {errorMessage && (
-              <div className="text-xs mt-2" style={{ color: '#a83232', fontWeight: 500 }}>
-                {errorMessage}
+      <div className="task-list">
+        {displayTasks.map(task => (
+          <div key={task.id} className="task-card" data-media-type="banani-button">
+            <div className="task-checkbox"></div>
+            <div className="task-content">
+              <div className="task-title">{task.title}</div>
+              <div className="task-meta">
+                <span>{task.project || 'Project'}</span>
+                <span className="meta-dot"></span>
+                <span>{task.due || 'No due date'}</span>
               </div>
-            )}
-            <div
-              className="absolute bottom-4 left-0 right-12 h-[1px] bg-[#D6D2CB]/50 origin-left"
-              style={{
-                transform: isHovering ? 'scaleX(1)' : 'scaleX(0)',
-                transition: 'transform 0.5s ease-out',
-              }}
-            />
+            </div>
           </div>
+        ))}
+      </div>
 
-          <footer className="mt-8 pt-6 border-t border-[#D6D2CB] flex flex-col gap-6">
-            <div className="flex flex-wrap gap-2 max-w-[360px]">
-              {buckets.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => {
-                    setBucket(b)
-                    setErrorMessage('')
-                  }}
-                  style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '10px',
-                    padding: '4px 8px',
-                    border: '1px solid transparent',
-                    borderRadius: '0px',
-                    color: bucket === b ? '#F4F3EF' : '#5C5954',
-                    background: bucket === b ? '#2A2927' : 'transparent',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {BUCKET_LABELS[b][isZh ? 'zh' : 'en']}
-                </button>
-              ))}
+      {/* FAB Button */}
+      <button
+        className="fab-button"
+        data-media-type="banani-button"
+        onClick={() => setShowAddModal(true)}
+      >
+        <div style={{ width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </div>
+      </button>
+
+      {/* Add Task Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="add-task-modal" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="modal-header">
+              <div className="header-label">{isZh ? '添加待办' : 'Add Task'}</div>
+              <div
+                className="close-btn"
+                data-media-type="banani-button"
+                onClick={() => setShowAddModal(false)}
+              >
+                <X size={16} />
+              </div>
             </div>
 
-            <div className="flex">
+            {/* Content */}
+            <div className="modal-content">
+              <input
+                type="text"
+                className="task-title-input"
+                placeholder={isZh ? '准备做什么？' : 'What needs to be done?'}
+                value={taskTitle}
+                onChange={e => setTaskTitle(e.target.value)}
+                autoFocus
+              />
+              <textarea
+                className="task-notes-input"
+                placeholder={isZh ? '添加备注或详细描述...' : 'Add notes or detailed description...'}
+                value={taskNotes}
+                onChange={e => setTaskNotes(e.target.value)}
+              />
+
+              <div className="quick-actions">
+                <div className="action-btn" data-media-type="banani-button">
+                  <Calendar size={14} />
+                  {isZh ? '设置日期' : 'Set Date'}
+                </div>
+                <div className="action-btn" data-media-type="banani-button">
+                  <Flag size={14} />
+                  {isZh ? '优先级' : 'Priority'}
+                </div>
+              </div>
+
+              <div className="divider"></div>
+
+              <div className="section-title">{isZh ? '分类' : 'Category'}</div>
+              <div className="chips-container">
+                {categories.map(category => (
+                  <div
+                    key={category.id}
+                    className={`chip ${selectedCategory === category.id ? 'active' : ''}`}
+                    data-media-type="banani-button"
+                    onClick={() => setSelectedCategory(category.id)}
+                  >
+                    <category.icon size={14} />
+                    {category.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer">
               <button
-                onClick={handleCapture}
-                style={{
-                  background: '#2A2927',
-                  color: '#F4F3EF',
-                  padding: '16px 32px',
-                  borderRadius: '0px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                }}
+                className="btn btn-ghost"
+                data-media-type="banani-button"
+                onClick={() => setShowAddModal(false)}
               >
-                保存
+                {isZh ? '取消' : 'Cancel'}
+              </button>
+              <button
+                className="btn btn-primary"
+                data-media-type="banani-button"
+                onClick={handleSaveTask}
+              >
+                {isZh ? '保存任务' : 'Save Task'}
               </button>
             </div>
-          </footer>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </main>
   )
 }

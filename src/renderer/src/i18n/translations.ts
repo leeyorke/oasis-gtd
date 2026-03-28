@@ -3,7 +3,7 @@ export type Language = 'en' | 'zh'
 const translations = {
   en: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
-    nav_start:          'Start',
+    nav_start:          'Priority Focus',
     nav_nextActions:    'Next Actions',
     nav_projects:       'Projects',
     nav_waiting:        'Waiting For',
@@ -301,7 +301,7 @@ const translations = {
 
   zh: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
-    nav_start:          '开始',
+    nav_start:          '立即做',
     nav_nextActions:    '下一步行动',
     nav_projects:       '项目',
     nav_waiting:        '等待中',
