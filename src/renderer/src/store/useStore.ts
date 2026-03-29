@@ -88,7 +88,7 @@ interface AppStore {
 
 export const useStore = create<AppStore>((set, get) => ({
   // ─── Navigation ────────────────────────────────────────────────────────────
-  currentView: 'next-actions',
+  currentView: 'start',
   previousView: 'next-actions',
   setView: (view) => set(state => ({ previousView: state.currentView, currentView: view })),
   goBack: () => set(state => ({ currentView: state.previousView })),
@@ -101,7 +101,7 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   addTask: async (task) => {
     await window.api.createTask(task)
-    await get().loadTasks(task.status)
+    await get().loadTasks()
   },
   updateTask: async (id, updates) => {
     await window.api.updateTask(id, updates)

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
-import { Pencil, Trash2, RefreshCw, Plus } from 'lucide-react'
+import { Pencil, Trash2, RefreshCw, Plus, Check } from 'lucide-react'
 import QuickAddTaskModal from '../components/QuickAddTaskModal'
 import TaskEditSidebar from '../components/TaskEditSidebar'
 
@@ -16,13 +16,21 @@ export default function Start() {
   const [editingSidebarVisible, setEditingSidebarVisible] = useState(false)
   const [selectedEditingTask, setSelectedEditingTask] = useState<any>(null)
 
-  // Get high priority tasks (status: 'next')
-  const displayTasks = tasks.filter(task => task.status === 'next')
-
+  // Get priority focus tasks (status: 'priority')
+  const displayTasks = tasks.filter(task => task.status === 'priority')
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
   const handleEditTask = (task: any) => {
     setSelectedEditingTask(task)
     setEditingSidebarVisible(true)
+  }
+
+  const handleComplete = async (id: string) => {
+    setCompletingTaskId(id)
+    setTimeout(async () => {
+      await window.api.updateTask(id, { status: 'archive' })
+      await loadTasks()
+    }, 100)
   }
 
   const handleDeleteTask = async (taskId: string) => {
@@ -54,7 +62,15 @@ export default function Start() {
         {displayTasks.map(task => (
           <div key={task.id} className="task-card" data-media-type="banani-button">
             <div className="task-main">
-              <div className="task-checkbox"></div>
+              <div
+                  className={`task-checkbox ${completingTaskId === task.id ? 'checked' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleComplete(task.id)
+                  }}
+                >
+                  <Check size={12} style={{ opacity: completingTaskId === task.id ? 1 : 0 }} />
+                </div>
               <div className="task-content">
                 <div className="task-title">{task.title}</div>
                 <div className="task-meta">
@@ -103,7 +119,7 @@ export default function Start() {
           onClose={() => {
             setShowAddModal(false)
           }}
-          defaultCategory="next"
+          defaultCategory="priority"
         />
       )}
 

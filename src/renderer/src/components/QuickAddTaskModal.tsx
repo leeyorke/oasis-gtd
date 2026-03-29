@@ -19,8 +19,8 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
   const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategory)
 
   const categories = [
-    { id: 'next', label: isZh ? '立即做' : 'Priority Focus', icon: Zap },
-    { id: 'next-actions', label: isZh ? '下一步行动' : 'Next Actions', icon: ArrowRight },
+    { id: 'priority', label: isZh ? '立即做' : 'Priority Focus', icon: Zap },
+    { id: 'next', label: isZh ? '下一步行动' : 'Next Actions', icon: ArrowRight },
     { id: 'schedule', label: isZh ? '日程' : 'Schedule', icon: CalendarIcon },
     { id: 'projects', label: isZh ? '项目' : 'Projects', icon: Folder },
     { id: 'waiting', label: isZh ? '等待' : 'Waiting', icon: Hourglass },

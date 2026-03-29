@@ -15,6 +15,7 @@ export default function NextActions() {
   const [selectedEditingTask, setSelectedEditingTask] = useState<any>(null)
 
   const nextTasks = tasks.filter(tk => tk.status === 'next')
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
 
   const formatDate = (date?: string) => {
@@ -47,8 +48,11 @@ export default function NextActions() {
   }
 
   const handleComplete = async (id: string) => {
-    await window.api.updateTask(id, { status: 'done' })
-    await loadTasks('next')
+    setCompletingTaskId(id)
+    setTimeout(async () => {
+      await window.api.updateTask(id, { status: 'archive' })
+      await loadTasks()
+    }, 100)
   }
 
   const handleEditTask = (task: any) => {
@@ -83,13 +87,13 @@ export default function NextActions() {
             <div key={task.id} className="task-card" data-media-type="banani-button">
               <div className="task-main">
                 <div
-                  className="task-checkbox"
+                  className={`task-checkbox ${completingTaskId === task.id ? 'checked' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     handleComplete(task.id)
                   }}
                 >
-                  <Check size={12} style={{ opacity: 0 }} />
+                  <Check size={12} style={{ opacity: completingTaskId === task.id ? 1 : 0 }} />
                 </div>
                 <div className="task-content">
                   <div className="task-title">{task.title}</div>
@@ -147,7 +151,7 @@ export default function NextActions() {
           onClose={() => {
             setShowAddModal(false)
           }}
-          defaultCategory="next-actions"
+          defaultCategory="next"
         />
       )}
 

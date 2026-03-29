@@ -12,6 +12,7 @@
   --ink-light: #F4F3EF;
   --nav-text: rgba(20, 28, 58, 0.45);
   --nav-text-active: #141C3A;
+  --nav-sidebar-radius: 0px;
 
   --font-display: 'Microsoft YaHei', '微软雅黑', sans-serif;
   --font-sans: 'Microsoft YaHei', '微软雅黑', sans-serif;
@@ -161,13 +162,18 @@ body {
 }
 
 .nav-sidebar.collapsed .nav-link.active {
-  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: var(--nav-sidebar-radius);
 }
 
 .nav-link:hover,
 .nav-link.active {
   color: var(--nav-text-active);
   font-weight: 600;
+}
+
+.nav-link.active {
+  border-radius: var(--nav-sidebar-radius);
+  width: 120px;
 }
 
 .nav-meta {
@@ -1673,6 +1679,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.task-checkbox:hover {
+  border-color: var(--foreground);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.task-checkbox:hover svg {
+  opacity: 1 !important;
 }
 
 .task-content {
