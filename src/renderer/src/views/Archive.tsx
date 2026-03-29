@@ -1,92 +1,194 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { useParallax } from '../hooks/useParallax'
 import { useT } from '../i18n/useT'
-import QuickCapture from '../components/QuickCapture'
-import AddTaskModal from '../components/AddTaskModal'
+import { Trash2 } from 'lucide-react'
 
 export default function Archive() {
   const { tasks, removeTask, loadTasks, settings } = useStore()
-  const mouse = useParallax()
   const t = useT()
-  const [showAddModal, setShowAddModal] = useState(false)
+  const isZh = settings.language === 'zh'
 
   // Filter tasks with status 'archive'
   const archiveTasks = tasks.filter(tk => tk.status === 'archive')
-  const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
 
-  const formatDate = (date?: string) => {
-    if (!date) return '—'
-    return new Date(date).toLocaleDateString(lang, { month: 'short', day: 'numeric' })
+  const formatArchiveDate = (date?: string) => {
+    if (!date) return ''
+    const d = new Date(date)
+    return `Archived ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
   }
 
-  const handleComplete = async (id: string) => {
-    await window.api.updateTask(id, { status: 'done' })
-    await loadTasks('archive')
+  const handleDeleteTask = async (taskId: string) => {
+    await removeTask(taskId)
+  }
+
+  const styles = {
+    main: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      padding: '72px 80px',
+      overflowY: 'auto' as const,
+      position: 'relative' as const,
+    },
+    header: {
+      marginBottom: '48px',
+    },
+    title: {
+      fontFamily: '"Songti SC", "Noto Serif CJK SC", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+      fontSize: '44px',
+      fontWeight: 400,
+      color: '#1c1b1a',
+      marginBottom: '12px',
+      letterSpacing: '2px',
+    },
+    subtitle: {
+      fontSize: '11px',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '2px',
+      color: '#96948f',
+      fontWeight: 600,
+    },
+    list: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '16px',
+      maxWidth: '800px',
+      paddingRight: '40px',
+    },
+    card: {
+      backgroundColor: '#fcfbf9',
+      border: '1px solid #e6e4df',
+      borderRadius: '12px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+      padding: '24px 32px',
+      display: 'flex',
+      alignItems: 'center' as const,
+      gap: '24px',
+      cursor: 'pointer',
+      opacity: 0.85,
+    },
+    checkbox: {
+      width: '24px',
+      height: '24px',
+      border: '1px solid #96948f',
+      borderRadius: '50%',
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      backgroundColor: '#96948f',
+      color: '#fcfbf9',
+    },
+    content: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '6px',
+      minWidth: 0,
+      flex: 1,
+    },
+    taskTitle: {
+      fontSize: '16px',
+      fontWeight: 500,
+      color: '#96948f',
+      textDecoration: 'line-through' as const,
+      letterSpacing: '0.3px',
+      lineHeight: 1.4,
+    },
+    meta: {
+      fontSize: '11px',
+      textTransform: 'uppercase' as const,
+      color: '#96948f',
+      letterSpacing: '1px',
+      fontWeight: 600,
+      display: 'flex',
+      alignItems: 'center' as const,
+      gap: '10px',
+    },
+    metaDot: {
+      width: '4px',
+      height: '4px',
+      backgroundColor: '#e6e4df',
+      borderRadius: '50%',
+    },
+    actions: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexShrink: 0,
+      opacity: 0,
+      transition: 'opacity 0.2s ease',
+    },
+    actionBtn: {
+      width: '28px',
+      height: '28px',
+      border: '1px solid #e6e4df',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#96948f',
+      background: '#f0ede8',
+      cursor: 'pointer',
+    },
   }
 
   return (
-    <div className="composition">
-      <main className="sheet-main" style={{ transform: `translate(${mouse.x * 5}px, ${mouse.y * 5}px)` }}>
-        <div className="list-container">
-          <div className="list-header">
-            <div>{t.na_colAction}</div>
-            <div>{t.na_colContext}</div>
-            <div>{t.na_colDue}</div>
-          </div>
-
-          <div className="task-list">
-            {archiveTasks.length === 0 ? (
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--ink-secondary)', fontStyle: 'italic', paddingTop: '1.5rem' }}>
-                {t.na_empty}
-              </div>
-            ) : (
-              archiveTasks.map((task, i) => (
-                <div key={task.id} className="task-row fade-in" style={{ animationDelay: `${i * 0.05}s` }} title={task.notes || ''}>
-                  <div className="task-title">{task.title}</div>
-                  <div className="task-meta">{task.context && <span className="task-tag">{task.context}</span>}</div>
-                  <div className="task-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{formatDate(task.due_date)}</span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); handleComplete(task.id) }} title="Mark done" style={{ fontSize: '0.7rem' }}>✓</button>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); removeTask(task.id) }} title="Delete" style={{ fontSize: '0.7rem' }}>×</button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <footer className="sheet-footer">
-          <div className="footer-logo">{t.na_footerLogo}</div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerStatus}</div>
-            <div className="footer-text">{t.na_count(archiveTasks.length)}</div>
-            <div className="footer-text">
-              <button className="btn-text" onClick={() => setShowAddModal(true)} style={{ color: 'var(--ink-secondary)', paddingLeft: 0 }}>
-                {t.na_addAction}
-              </button>
-            </div>
-          </div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerCtxs}</div>
-            {Array.from(new Set(archiveTasks.map(tk => tk.context).filter(Boolean))).slice(0, 3).map(ctx => (
-              <div key={ctx} className="footer-text">{ctx}</div>
-            ))}
-          </div>
-        </footer>
-      </main>
-
-      <div className="sheet-blue" style={{ transform: `translate(${mouse.x * -10}px, ${mouse.y * -10}px)` }}>
-        <div style={{ position: 'relative', zIndex: 3, width: '100%', height: '100%', backgroundImage: `url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2070&auto=format&fit=crop')`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6, mixBlendMode: 'multiply', filter: 'grayscale(100%) contrast(1.2)', transition: 'transform 2s var(--ease-out), opacity 0.8s ease' }} />
-        <div style={{ position: 'absolute', bottom: '1.5rem', left: '2rem', color: 'rgba(244,243,239,0.5)', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.2em', zIndex: 4 }}>
-          {t.nav_archive} — {archiveTasks.length} items
-        </div>
+    <main style={styles.main}>
+      <div style={styles.header}>
+        <h1 style={styles.title}>{isZh ? '归档' : 'Archive'}</h1>
+        <div style={styles.subtitle}>{isZh ? '已完成的任务' : 'Past & Completed'}</div>
       </div>
 
-      <QuickCapture style={{ transform: `rotate(-2deg) translate(${mouse.x * 15}px, ${mouse.y * 15}px)` }} />
-      {showAddModal && <AddTaskModal onClose={() => setShowAddModal(false)} />}
-    </div>
+      <div style={styles.list}>
+        {archiveTasks.length === 0 ? (
+          <div style={{ fontFamily: 'ui-serif, Georgia, serif', fontSize: '1.2rem', color: '#96948f', fontStyle: 'italic', paddingTop: '2rem', textAlign: 'center' }}>
+            {isZh ? '暂无归档任务' : 'No archived tasks'}
+          </div>
+        ) : (
+          archiveTasks.map((task, i) => (
+            <div
+              key={task.id}
+              className="archive-task-card"
+              style={styles.card}
+              onMouseEnter={(e) => {
+                const actions = e.currentTarget.querySelector('.archive-task-actions') as HTMLElement
+                if (actions) actions.style.opacity = '1'
+              }}
+              onMouseLeave={(e) => {
+                const actions = e.currentTarget.querySelector('.archive-task-actions') as HTMLElement
+                if (actions) actions.style.opacity = '0'
+              }}
+            >
+              <div style={styles.checkbox}>
+                <span style={{ fontSize: '14px' }}>✓</span>
+              </div>
+              <div style={styles.content}>
+                <div style={styles.taskTitle}>{task.title}</div>
+                <div style={styles.meta}>
+                  {task.context && (
+                    <>
+                      <span>{task.context}</span>
+                      <span style={styles.metaDot}></span>
+                    </>
+                  )}
+                  <span>{formatArchiveDate(task.updated_at)}</span>
+                </div>
+              </div>
+              <div className="archive-task-actions" style={styles.actions}>
+                <button
+                  style={styles.actionBtn}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteTask(task.id)
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </main>
   )
 }

@@ -29,6 +29,7 @@ function createTables(): void {
       project_id TEXT,
       status TEXT NOT NULL DEFAULT 'inbox',
       waiting_for TEXT,
+      priority TEXT DEFAULT 'medium',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -115,6 +116,11 @@ function createTables(): void {
   } catch { /* column already exists */ }
   try {
     db.exec(`ALTER TABLE ai_providers ADD COLUMN max_tokens INTEGER DEFAULT 2048`)
+  } catch { /* column already exists */ }
+
+  // Migration: Add priority column to tasks if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium'`)
   } catch { /* column already exists */ }
 
   // Ensure default settings exist

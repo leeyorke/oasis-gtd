@@ -17,6 +17,7 @@ export interface Task {
   project_id?: string
   status: 'inbox' | 'next' | 'waiting' | 'someday' | 'done'
   waiting_for?: string
+  priority?: 'high' | 'medium' | 'low'
   created_at: string
   updated_at: string
 }
