@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import { X, Calendar, Flag, Zap, ArrowRight, Calendar as CalendarIcon, Folder, Hourglass, Repeat, Inbox, FileText } from 'lucide-react'
+import SetDateModal from './SetDateModal'
 
 interface QuickAddTaskModalProps {
   onClose: () => void
@@ -17,6 +18,8 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
   const [taskTitle, setTaskTitle] = useState('')
   const [taskNotes, setTaskNotes] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategory)
+  const [dueDate, setDueDate] = useState<string>('')
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   const categories = [
     { id: 'priority', label: isZh ? '立即做' : 'Priority Focus', icon: Zap },
@@ -34,10 +37,13 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
       setTaskTitle(editingTask.title)
       setTaskNotes(editingTask.notes || '')
       setSelectedCategory(editingTask.status || defaultCategory)
+      setDueDate(editingTask.due_date || '')
     } else {
       setTaskTitle('')
       setTaskNotes('')
       setSelectedCategory(defaultCategory)
+      setDueDate('')
+      setShowDatePicker(false)
     }
   }, [editingTask, defaultCategory])
 
@@ -47,13 +53,15 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
       await updateTask(editingTask.id, {
         title: taskTitle.trim(),
         notes: taskNotes.trim(),
-        status: selectedCategory as any
+        status: selectedCategory as any,
+        due_date: dueDate || null
       })
     } else {
       await addTask({
         title: taskTitle.trim(),
         notes: taskNotes.trim(),
-        status: selectedCategory as any
+        status: selectedCategory as any,
+        due_date: dueDate || null
       })
     }
     onClose()
@@ -109,9 +117,16 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
           </div>
 
           <div className="quick-actions" style={{ marginTop: '20px' }}>
-            <div className="action-btn" data-media-type="banani-button">
+            <div
+              className="action-btn"
+              data-media-type="banani-button"
+              onClick={() => setShowDatePicker(true)}
+            >
               <Calendar size={14} />
-              {isZh ? '设置日期' : 'Set Date'}
+              {dueDate
+                ? new Date(dueDate).toLocaleDateString(isZh ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })
+                : (isZh ? '设置日期' : 'Set Date')
+              }
             </div>
             <div className="action-btn" data-media-type="banani-button">
               <Flag size={14} />
@@ -138,6 +153,18 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
           </button>
         </div>
       </div>
+
+      {/* Set Date Modal */}
+      {showDatePicker && (
+        <SetDateModal
+          initialDate={dueDate}
+          onClose={() => setShowDatePicker(false)}
+          onSave={(date) => {
+            setDueDate(date)
+            setShowDatePicker(false)
+          }}
+        />
+      )}
     </div>
   )
 }
