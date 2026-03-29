@@ -1601,7 +1601,7 @@ body {
 :root {
   --background: #f0ede8;
   --sidebar-bg: #f0ede8;
-  --card: #f8f6f2;
+  --card: #f8f6f24d;
   --foreground: #2d2c2a;
   --muted-foreground: #8a8886;
   --border: #e3dfd8;
@@ -1629,7 +1629,7 @@ body {
 }
 
 .page-title {
-  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-family: ui-serif;
   font-size: 20px;
   font-weight: 300;
   color: var(--foreground);
@@ -1650,11 +1650,13 @@ body {
   flex-direction: column;
   gap: 8px;
   max-width: 800px;
+  padding-right: 40px;
 }
 
 .task-card {
   background-color: var(--card);
   border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(30, 27, 24, 0.04);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -1704,6 +1706,26 @@ body {
   opacity: 0.5;
 }
 
+/* Priority Dots */
+.priority-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.priority-dot.priority-high {
+  background-color: #e53935;
+}
+
+.priority-dot.priority-medium {
+  background-color: #ff9800;
+}
+
+.priority-dot.priority-low {
+  background-color: #43a047;
+}
+
 .fab-button {
   position: absolute;
   bottom: 24px;
@@ -1719,11 +1741,268 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   border: none;
+  transition: transform 0.2s ease;
+}
+
+.fab-button:hover {
+  transform: translateY(-2px);
+}
+
+.fab-button-secondary {
+  position: absolute;
+  right: 35px;
+  width: 36px;
+  height: 36px;
+  background-color: var(--muted);
+  color: var(--foreground);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: none;
+  transition: transform 0.2s ease;
+}
+
+.fab-button-secondary:hover {
+  transform: translateY(-2px);
 }
 
 .fab-button svg {
   width: 14px;
   height: 14px;
+}
+
+.task-card { justify-content: space-between; }
+.task-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.task-content { min-width: 0; }
+.task-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 0; transition: opacity 0.2s ease; position: relative; z-index: 10; }
+.task-card:hover .task-actions { opacity: 1; }
+.task-action-button { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--muted-foreground); background: var(--background); cursor: pointer; transition: all 0.2s ease; }
+.task-action-button:hover { background: var(--border); color: var(--foreground); }
+.task-action-button.delete { color: var(--ink-secondary, var(--muted-foreground)); background: var(--destructive, var(--background)); border-color: transparent; }
+.task-action-button.delete:hover { color: #a83232; background: rgba(168, 50, 50, 0.1); }
+
+/* Task Detail Sidebar - Aura Tactile Design */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(57, 56, 45, 0.12);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+}
+
+.task-detail-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: #e9e6e2;
+  border-left: 1px solid #c4c1bc;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s var(--ease-out) forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Panel Header */
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #c4c1bc;
+}
+
+.detail-header-label {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4a4744;
+}
+
+.detail-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e1b18;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background 0.15s ease;
+}
+
+.detail-close-btn:hover {
+  background: rgba(30, 27, 24, 0.08);
+}
+
+/* Panel Content */
+.detail-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Priority Badge & Timestamp Row */
+.detail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Meta Separator */
+.meta-separator {
+  color: rgba(20, 28, 58, 0.45);
+  font-size: 0.75rem;
+}
+
+/* Priority Select */
+.priority-select {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: #1a2c24;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.priority-select:focus {
+  outline: none;
+}
+
+/* Priority Badge */
+.priority-badge {
+  display: inline-block;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1a2c24;
+  background: #1a2c24;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Timestamp */
+.task-timestamp {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.75rem;
+  color: rgba(20, 28, 58, 0.45);
+}
+
+/* Task Title - 黑体 (Microsoft YaHei) */
+.detail-task-title-input {
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1e1b18;
+  margin-bottom: 24px;
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  resize: none;
+}
+
+.detail-task-title-input::placeholder {
+  color: #1e1b18;
+  opacity: 0.4;
+}
+
+/* Detail Section */
+.detail-section {
+  flex: 1;
+  margin-bottom: 16px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-section-title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(20, 28, 58, 0.45);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+/* Description - 微软雅黑 */
+.detail-description-input {
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  letter-spacing: 0.05em;
+  color: #141C3A;
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  resize: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-description-input::placeholder {
+  color: rgba(20, 28, 58, 0.45);
+  opacity: 0.4;
+}
+
+/* Update Button - 固定在右下角 */
+.detail-action-btn {
+  background: #1a2c24;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(26, 44, 36, 0.2);
+  margin-top: auto;
+  align-self: flex-end;
+}
+
+.detail-action-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(26, 44, 36, 0.24);
+}
+
+.detail-action-btn:active {
+  transform: translateY(0);
 }
 
 /* Add Task Modal Styles */
@@ -1738,8 +2017,8 @@ body {
 }
 
 .add-task-modal {
-  width: 400px;
-  background-color: var(--card);
+  width: 520px;
+  background-color: var(--sheet-main);
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
@@ -1776,7 +2055,7 @@ body {
 }
 
 .modal-content {
-  padding: 0 16px 16px 16px;
+  padding: 8px 20px 20px 20px;
   display: flex;
   flex-direction: column;
 }
@@ -1803,7 +2082,7 @@ body {
   color: var(--foreground);
   line-height: 1.6;
   margin-bottom: 12px;
-  min-height: 24px;
+  min-height: 80px;
   border: none;
   background: transparent;
   outline: none;

@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { useParallax } from '../hooks/useParallax'
 import { useT } from '../i18n/useT'
-import QuickCapture from '../components/QuickCapture'
-import AddTaskModal from '../components/AddTaskModal'
+import { Plus, Pencil, Trash2, Check, RefreshCw } from 'lucide-react'
+import QuickAddTaskModal from '../components/QuickAddTaskModal'
+import TaskEditSidebar from '../components/TaskEditSidebar'
 
 export default function Schedule() {
   const { tasks, removeTask, loadTasks, settings } = useStore()
-  const mouse = useParallax()
   const t = useT()
+  const isZh = settings.language === 'zh'
   const [showAddModal, setShowAddModal] = useState(false)
+  // Edit Task Sidebar state
+  const [editingSidebarVisible, setEditingSidebarVisible] = useState(false)
+  const [selectedEditingTask, setSelectedEditingTask] = useState<any>(null)
 
   // Filter tasks with status 'schedule'
   const scheduleTasks = tasks.filter(tk => tk.status === 'schedule')
@@ -25,68 +28,103 @@ export default function Schedule() {
     await loadTasks('schedule')
   }
 
+  const handleEditTask = (task: any) => {
+    setSelectedEditingTask(task)
+    setEditingSidebarVisible(true)
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    await removeTask(taskId)
+  }
+
   return (
-    <div className="composition">
-      <main className="sheet-main" style={{ transform: `translate(${mouse.x * 5}px, ${mouse.y * 5}px)` }}>
-        <div className="list-container">
-          <div className="list-header">
-            <div>{t.na_colAction}</div>
-            <div>{t.na_colContext}</div>
-            <div>{t.na_colDue}</div>
-          </div>
-
-          <div className="task-list">
-            {scheduleTasks.length === 0 ? (
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--ink-secondary)', fontStyle: 'italic', paddingTop: '1.5rem' }}>
-                {t.na_empty}
-              </div>
-            ) : (
-              scheduleTasks.map((task, i) => (
-                <div key={task.id} className="task-row fade-in" style={{ animationDelay: `${i * 0.05}s` }} title={task.notes || ''}>
-                  <div className="task-title">{task.title}</div>
-                  <div className="task-meta">{task.context && <span className="task-tag">{task.context}</span>}</div>
-                  <div className="task-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{formatDate(task.due_date)}</span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); handleComplete(task.id) }} title="Mark done" style={{ fontSize: '0.7rem' }}>✓</button>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); removeTask(task.id) }} title="Delete" style={{ fontSize: '0.7rem' }}>×</button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <footer className="sheet-footer">
-          <div className="footer-logo">{t.na_footerLogo}</div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerStatus}</div>
-            <div className="footer-text">{t.na_count(scheduleTasks.length)}</div>
-            <div className="footer-text">
-              <button className="btn-text" onClick={() => setShowAddModal(true)} style={{ color: 'var(--ink-secondary)', paddingLeft: 0 }}>
-                {t.na_addAction}
-              </button>
-            </div>
-          </div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerCtxs}</div>
-            {Array.from(new Set(scheduleTasks.map(tk => tk.context).filter(Boolean))).slice(0, 3).map(ctx => (
-              <div key={ctx} className="footer-text">{ctx}</div>
-            ))}
-          </div>
-        </footer>
-      </main>
-
-      <div className="sheet-blue" style={{ transform: `translate(${mouse.x * -10}px, ${mouse.y * -10}px)` }}>
-        <div style={{ position: 'relative', zIndex: 3, width: '100%', height: '100%', backgroundImage: `url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2070&auto=format&fit=crop')`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6, mixBlendMode: 'multiply', filter: 'grayscale(100%) contrast(1.2)', transition: 'transform 2s var(--ease-out), opacity 0.8s ease' }} />
-        <div style={{ position: 'absolute', bottom: '1.5rem', left: '2rem', color: 'rgba(244,243,239,0.5)', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.2em', zIndex: 4 }}>
-          {t.nav_schedule} — {scheduleTasks.length} items
-        </div>
+    <main className="main-content">
+      <div className="page-header">
+        <h1 className="page-title">{isZh ? '日程' : 'Schedule'}</h1>
+        <div className="page-subtitle">{isZh ? '计划中的任务' : 'Scheduled Tasks'}</div>
       </div>
 
-      <QuickCapture style={{ transform: `rotate(-2deg) translate(${mouse.x * 15}px, ${mouse.y * 15}px)` }} />
-      {showAddModal && <AddTaskModal onClose={() => setShowAddModal(false)} />}
-    </div>
+      <div className="task-list">
+        {scheduleTasks.length === 0 ? (
+          <div style={{ fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', fontSize: '1.2rem', color: 'var(--muted-foreground)', fontStyle: 'italic', paddingTop: '2rem', textAlign: 'center' }}>
+            {isZh ? '暂无日程任务' : 'No scheduled tasks yet'}
+          </div>
+        ) : (
+          scheduleTasks.map(task => (
+            <div key={task.id} className="task-card" data-media-type="banani-button">
+              <div className="task-main">
+                <div
+                  className="task-checkbox"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleComplete(task.id)
+                  }}
+                >
+                  <Check size={12} style={{ opacity: 0 }} />
+                </div>
+                <div className="task-content">
+                  <div className="task-title">{task.title}</div>
+                  <div className="task-meta">
+                    {task.context && <span>{task.context}</span>}
+                    {task.context && task.due_date && <span className="meta-dot"></span>}
+                    {task.due_date && <span>{formatDate(task.due_date)}</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="task-actions">
+                <button
+                  className="task-action-button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleEditTask(task)
+                  }}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  className="task-action-button delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteTask(task.id)
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Add FAB Button */}
+      <button
+        className="fab-button"
+        data-media-type="banani-button"
+        onClick={() => setShowAddModal(true)}
+      >
+        <Plus size={14} />
+      </button>
+
+      {/* Add Task Modal */}
+      {showAddModal && (
+        <QuickAddTaskModal
+          onClose={() => {
+            setShowAddModal(false)
+          }}
+          defaultCategory="schedule"
+        />
+      )}
+
+      {/* Edit Task Sidebar */}
+      {editingSidebarVisible && selectedEditingTask && (
+        <TaskEditSidebar
+          task={selectedEditingTask}
+          onClose={() => {
+            setEditingSidebarVisible(false)
+            setSelectedEditingTask(null)
+          }}
+        />
+      )}
+    </main>
   )
 }
