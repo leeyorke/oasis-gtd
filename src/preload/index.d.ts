@@ -28,6 +28,12 @@ declare global {
       createNote: (note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) => Promise<string>
       updateNote: (id: string, updates: Partial<Note>) => Promise<void>
       deleteNote: (id: string) => Promise<void>
+      // Resources
+      getResources: () => Promise<Resource[]>
+      getResourceById: (id: string) => Promise<Resource | null>
+      createResource: (resource: Omit<Resource, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>
+      updateResource: (id: string, updates: Partial<Resource>) => Promise<void>
+      deleteResource: (id: string) => Promise<void>
       getHabits: () => Promise<Habit[]>
       getHabitById: (id: string) => Promise<HabitDetail | null>
       createHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'weekRecords'>) => Promise<string>

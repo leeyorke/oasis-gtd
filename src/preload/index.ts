@@ -44,6 +44,13 @@ const api = {
   updateNote: (id: string, updates: unknown) => ipcRenderer.invoke('notes:update', id, updates),
   deleteNote: (id: string) => ipcRenderer.invoke('notes:delete', id),
 
+  // Resources
+  getResources: () => ipcRenderer.invoke('resources:getAll'),
+  getResourceById: (id: string) => ipcRenderer.invoke('resources:getById', id),
+  createResource: (resource: unknown) => ipcRenderer.invoke('resources:create', resource),
+  updateResource: (id: string, updates: unknown) => ipcRenderer.invoke('resources:update', id, updates),
+  deleteResource: (id: string) => ipcRenderer.invoke('resources:delete', id),
+
   // Habits
   getHabits: () => ipcRenderer.invoke('habits:getAll'),
   getHabitById: (id: string) => ipcRenderer.invoke('habits:getById', id),

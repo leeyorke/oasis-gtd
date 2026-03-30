@@ -160,6 +160,21 @@ function createTables(): void {
     db.exec(`ALTER TABLE someday_items ADD COLUMN category TEXT DEFAULT ''`)
   } catch { /* column already exists */ }
 
+  // Create resources table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resources (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'document',
+      description TEXT,
+      file_size TEXT,
+      url TEXT,
+      tags TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `)
+
   // Ensure default settings exist
   const defaultSettings: Record<string, string> = {
     app_name: 'Oasis',
@@ -686,4 +701,54 @@ export const habitRecordQueries = {
 
   delete: (id: string) =>
     db.prepare('DELETE FROM habit_records WHERE id = ?').run(id),
+}
+
+// ─── Resource Queries ────────────────────────────────────────────────────────
+export const resourceQueries = {
+  getAll: () =>
+    db.prepare('SELECT * FROM resources ORDER BY updated_at DESC').all(),
+
+  getById: (id: string) =>
+    db.prepare('SELECT * FROM resources WHERE id = ?').get(id),
+
+  create: (resource: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const id = uuidv4()
+    db.prepare(`
+      INSERT INTO resources (id, title, type, description, file_size, url, tags, created_at, updated_at)
+      VALUES (@id, @title, @type, @description, @file_size, @url, @tags, @created_at, @updated_at)
+    `).run({
+      id,
+      title: resource.title,
+      type: resource.type ?? 'document',
+      description: resource.description ?? null,
+      file_size: resource.fileSize ?? null,
+      url: resource.url ?? null,
+      tags: resource.tags ? JSON.stringify(resource.tags) : null,
+      created_at: now,
+      updated_at: now,
+    })
+    return id
+  },
+
+  update: (id: string, updates: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+
+    const params: Record<string, unknown> = { ...updates, id, updated_at: now }
+    if (updates.tags) {
+      params.tags = JSON.stringify(updates.tags)
+    }
+    // Map camelCase to snake_case for DB
+    if (updates.fileSize) {
+      params.file_size = updates.fileSize
+      delete params.fileSize
+    }
+
+    db.prepare(`UPDATE resources SET ${fields}, updated_at = @updated_at WHERE id = @id`)
+      .run(params)
+  },
+
+  delete: (id: string) =>
+    db.prepare('DELETE FROM resources WHERE id = ?').run(id),
 }

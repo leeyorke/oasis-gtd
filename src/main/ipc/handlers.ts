@@ -13,6 +13,7 @@ import {
   noteQueries,
   habitQueries,
   habitRecordQueries,
+  resourceQueries,
 } from '../db/database'
 
 // Global store for AbortControllers per conversation
@@ -297,6 +298,32 @@ export function registerHandlers(): void {
   ipcMain.handle('notes:create', (_, note) => noteQueries.create(note))
   ipcMain.handle('notes:update', (_, id: string, updates) => noteQueries.update(id, updates))
   ipcMain.handle('notes:delete', (_, id: string) => noteQueries.delete(id))
+
+  // ─── Resources ───────────────────────────────────────────────────────────────
+  ipcMain.handle('resources:getAll', () => {
+    const resources = resourceQueries.getAll() as Array<Record<string, unknown>>
+    return resources.map(r => ({
+      ...r,
+      tags: r.tags ? JSON.parse(r.tags as string) : [],
+      fileSize: r.file_size,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }))
+  })
+  ipcMain.handle('resources:getById', (_, id: string) => {
+    const resource = resourceQueries.getById(id) as Record<string, unknown> | undefined
+    if (!resource) return null
+    return {
+      ...resource,
+      tags: resource.tags ? JSON.parse(resource.tags as string) : [],
+      fileSize: resource.file_size,
+      createdAt: resource.created_at,
+      updatedAt: resource.updated_at,
+    }
+  })
+  ipcMain.handle('resources:create', (_, resource) => resourceQueries.create(resource))
+  ipcMain.handle('resources:update', (_, id: string, updates) => resourceQueries.update(id, updates))
+  ipcMain.handle('resources:delete', (_, id: string) => resourceQueries.delete(id))
 
   // ─── Habits ─────────────────────────────────────────────────────────────────
   ipcMain.handle('habits:getAll', () => {

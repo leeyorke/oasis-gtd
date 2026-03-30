@@ -122,3 +122,15 @@ export interface HabitDetail extends Habit {
   completionRate: number // 完成率百分比
   allRecords: Record<string, boolean> // 12个月所有打卡记录
 }
+
+export interface Resource {
+  id: string
+  title: string
+  type: 'document' | 'link' | 'spreadsheet' | 'image' | 'collection'
+  description?: string
+  fileSize?: string
+  url?: string
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}

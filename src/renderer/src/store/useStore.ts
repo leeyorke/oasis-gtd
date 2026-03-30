@@ -13,6 +13,7 @@ import type {
   Note,
   Habit,
   HabitDetail,
+  Resource,
 } from '../types'
 
 interface AppStore {
@@ -58,6 +59,13 @@ interface AppStore {
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>
   removeNote: (id: string) => Promise<void>
   searchNotes: (keyword: string) => Promise<void>
+
+  // ─── Resources ─────────────────────────────────────────────────────────────
+  resources: Resource[]
+  loadResources: () => Promise<void>
+  addResource: (resource: Omit<Resource, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  updateResource: (id: string, updates: Partial<Resource>) => Promise<void>
+  removeResource: (id: string) => Promise<void>
 
   // ─── Habits ────────────────────────────────────────────────────────────────
   habits: Habit[]
@@ -218,6 +226,26 @@ export const useStore = create<AppStore>((set, get) => ({
   searchNotes: async (keyword) => {
     const notes = await window.api.searchNotes(keyword)
     set({ notes })
+  },
+
+  // ─── Resources ─────────────────────────────────────────────────────────────
+  resources: [],
+  loadResources: async () => {
+    const resources = await window.api.getResources()
+    set({ resources })
+  },
+  addResource: async (resource) => {
+    await window.api.createResource(resource)
+    await get().loadResources()
+  },
+  updateResource: async (id, updates) => {
+    await window.api.updateResource(id, updates)
+    await get().loadResources()
+  },
+  removeResource: async (id) => {
+    await window.api.deleteResource(id)
+    const resources = get().resources.filter(r => r.id !== id)
+    set({ resources })
   },
 
   // ─── Habits ────────────────────────────────────────────────────────────────
