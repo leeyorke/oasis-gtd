@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Settings,
   Menu,
-  Feather
+  Feather,
+  Kanban
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -34,6 +35,7 @@ export default function Sidebar() {
     { id: 'next-actions',  label: t.nav_nextActions,    icon: ArrowRight },
     { id: 'schedule',      label: t.nav_schedule,       icon: Calendar },
     { id: 'projects',      label: t.nav_projects,       icon: Folder },
+    { id: 'kanban',        label: t.nav_kanban,         icon: Kanban },
     { id: 'waiting',       label: t.nav_waiting,        icon: Hourglass },
     { id: 'habit',         label: t.nav_habit,          icon: Repeat },
     { id: 'someday',       label: t.nav_someday,        icon: Inbox },

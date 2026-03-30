@@ -15,6 +15,7 @@ import AIChat from './views/AIChat'
 import Settings from './views/Settings'
 import Start from './views/Start'
 import Thoughts from './views/Thoughts'
+import Kanban from './views/Kanban'
 
 export default function App() {
   const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadNotes, loadHabits, loadReview, loadProviders, loadConversations, loadSettings } = useStore()
@@ -37,6 +38,7 @@ export default function App() {
       case 'start':         return <Start />
       case 'next-actions':  return <NextActions />
       case 'projects':      return <Projects />
+      case 'kanban':        return <Kanban />
       case 'schedule':      return <Schedule />
       case 'habit':         return <Habit />
       case 'habit-detail':  return <HabitDetail />
