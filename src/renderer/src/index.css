@@ -171,7 +171,7 @@ body {
   font-weight: 600;
 }
 
-.nav-link.active {
+.nav-link.active:has(span) {
   border-radius: var(--nav-sidebar-radius);
   width: 120px;
 }
