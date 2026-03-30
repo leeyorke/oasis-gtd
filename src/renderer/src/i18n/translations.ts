@@ -4,6 +4,7 @@ const translations = {
   en: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
     nav_start:          'Priority Focus',
+    nav_thoughts:       'Thoughts',
     nav_nextActions:    'Next Actions',
     nav_projects:       'Projects',
     nav_waiting:        'Waiting For',
@@ -170,6 +171,7 @@ const translations = {
     some_footerHorizons:'Horizons',
     some_ideasCaptured: (n: number) => `${n} ideas captured`,
     some_addIdea:       '+ Add Idea',
+    some_cat_placeholder: 'Add category',
     some_cardTitle:     'Capture Dream',
     some_cardSub:       'Horizon',
     some_newIdea:       '+ New Idea',
@@ -302,6 +304,7 @@ const translations = {
   zh: {
     // ─── Nav ──────────────────────────────────────────────────────────────────
     nav_start:          '立即做',
+    nav_thoughts:       '随想',
     nav_nextActions:    '下一步行动',
     nav_projects:       '项目',
     nav_waiting:        '等待中',
@@ -468,6 +471,7 @@ const translations = {
     some_footerHorizons:'时间跨度',
     some_ideasCaptured: (n: number) => `已捕捉 ${n} 个想法`,
     some_addIdea:       '+ 添加想法',
+    some_cat_placeholder: '添加分类',
     some_cardTitle:     '捕捉梦想',
     some_cardSub:       '时间跨度',
     some_newIdea:       '+ 新想法',

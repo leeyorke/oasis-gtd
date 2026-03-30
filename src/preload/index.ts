@@ -33,7 +33,25 @@ const api = {
   // Someday
   getSomeday: () => ipcRenderer.invoke('someday:getAll'),
   createSomeday: (item: unknown) => ipcRenderer.invoke('someday:create', item),
+  updateSomeday: (id: string, updates: unknown) => ipcRenderer.invoke('someday:update', id, updates),
   deleteSomeday: (id: string) => ipcRenderer.invoke('someday:delete', id),
+
+  // Notes
+  getNotes: () => ipcRenderer.invoke('notes:getAll'),
+  getNoteById: (id: string) => ipcRenderer.invoke('notes:getById', id),
+  searchNotes: (keyword: string) => ipcRenderer.invoke('notes:search', keyword),
+  createNote: (note: unknown) => ipcRenderer.invoke('notes:create', note),
+  updateNote: (id: string, updates: unknown) => ipcRenderer.invoke('notes:update', id, updates),
+  deleteNote: (id: string) => ipcRenderer.invoke('notes:delete', id),
+
+  // Habits
+  getHabits: () => ipcRenderer.invoke('habits:getAll'),
+  getHabitById: (id: string) => ipcRenderer.invoke('habits:getById', id),
+  createHabit: (habit: unknown) => ipcRenderer.invoke('habits:create', habit),
+  updateHabit: (id: string, updates: unknown) => ipcRenderer.invoke('habits:update', id, updates),
+  deleteHabit: (id: string) => ipcRenderer.invoke('habits:delete', id),
+  toggleHabitComplete: (habitId: string, date: string, completed: boolean) =>
+    ipcRenderer.invoke('habits:toggleComplete', habitId, date, completed),
 
   // Review
   getReview: () => ipcRenderer.invoke('review:getAll'),

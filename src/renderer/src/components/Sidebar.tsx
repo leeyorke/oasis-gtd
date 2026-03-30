@@ -15,7 +15,8 @@ import {
   RefreshCw,
   MessageSquare,
   Settings,
-  Menu
+  Menu,
+  Feather
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -28,6 +29,7 @@ export default function Sidebar() {
   const dateStr = now.toLocaleDateString(lang, { weekday: 'long', month: 'short', day: 'numeric' })
 
   const NAV_ITEMS: { id: ViewType; label: string; icon: React.ElementType }[] = [
+    { id: 'thoughts',      label: t.nav_thoughts,       icon: Feather },
     { id: 'start',         label: t.nav_start,          icon: Zap },
     { id: 'next-actions',  label: t.nav_nextActions,    icon: ArrowRight },
     { id: 'schedule',      label: t.nav_schedule,       icon: Calendar },

@@ -10,6 +10,9 @@ import type {
   ChatConversation,
   ChatMessage,
   AppSettings,
+  Note,
+  Habit,
+  HabitDetail,
 } from '../types'
 
 interface AppStore {
@@ -45,7 +48,27 @@ interface AppStore {
   somedayItems: SomedayItem[]
   loadSomeday: () => Promise<void>
   addSomeday: (item: Omit<SomedayItem, 'id' | 'created_at'>) => Promise<void>
+  updateSomeday: (id: string, updates: Partial<SomedayItem>) => Promise<void>
   removeSomeday: (id: string) => Promise<void>
+
+  // ─── Notes ─────────────────────────────────────────────────────────────────
+  notes: Note[]
+  loadNotes: () => Promise<void>
+  addNote: (note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  updateNote: (id: string, updates: Partial<Note>) => Promise<void>
+  removeNote: (id: string) => Promise<void>
+  searchNotes: (keyword: string) => Promise<void>
+
+  // ─── Habits ────────────────────────────────────────────────────────────────
+  habits: Habit[]
+  loadHabits: () => Promise<void>
+  selectedHabitId: string | null
+  selectedHabit: HabitDetail | null
+  loadHabitById: (id: string) => Promise<void>
+  addHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'weekRecords'>) => Promise<void>
+  updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
+  removeHabit: (id: string) => Promise<void>
+  toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<void>
 
   // ─── Review ────────────────────────────────────────────────────────────────
   reviewItems: ReviewItem[]
@@ -163,10 +186,68 @@ export const useStore = create<AppStore>((set, get) => ({
     await window.api.createSomeday(item)
     await get().loadSomeday()
   },
+  updateSomeday: async (id, updates) => {
+    await window.api.updateSomeday(id, updates)
+    await get().loadSomeday()
+  },
   removeSomeday: async (id) => {
     await window.api.deleteSomeday(id)
     const somedayItems = get().somedayItems.filter(s => s.id !== id)
     set({ somedayItems })
+  },
+
+  // ─── Notes ─────────────────────────────────────────────────────────────────
+  notes: [],
+  loadNotes: async () => {
+    const notes = await window.api.getNotes()
+    set({ notes })
+  },
+  addNote: async (note) => {
+    await window.api.createNote(note)
+    await get().loadNotes()
+  },
+  updateNote: async (id, updates) => {
+    await window.api.updateNote(id, updates)
+    await get().loadNotes()
+  },
+  removeNote: async (id) => {
+    await window.api.deleteNote(id)
+    const notes = get().notes.filter(n => n.id !== id)
+    set({ notes })
+  },
+  searchNotes: async (keyword) => {
+    const notes = await window.api.searchNotes(keyword)
+    set({ notes })
+  },
+
+  // ─── Habits ────────────────────────────────────────────────────────────────
+  habits: [],
+  selectedHabitId: null,
+  selectedHabit: null,
+  loadHabits: async () => {
+    const habits = await window.api.getHabits()
+    set({ habits })
+  },
+  loadHabitById: async (id) => {
+    const habit = await window.api.getHabitById(id)
+    set({ selectedHabit: habit, selectedHabitId: id })
+  },
+  addHabit: async (habit) => {
+    await window.api.createHabit(habit)
+    await get().loadHabits()
+  },
+  updateHabit: async (id, updates) => {
+    await window.api.updateHabit(id, updates)
+    await get().loadHabits()
+  },
+  removeHabit: async (id) => {
+    await window.api.deleteHabit(id)
+    const habits = get().habits.filter(h => h.id !== id)
+    set({ habits })
+  },
+  toggleHabitComplete: async (habitId, date, completed) => {
+    await window.api.toggleHabitComplete(habitId, date, completed)
+    await get().loadHabits()
   },
 
   // ─── Review ────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings'
+export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts'
 
 export interface AppSettings {
   app_name: string
@@ -48,8 +48,11 @@ export interface SomedayItem {
   title: string
   notes?: string
   horizon: 'soon' | '1month' | '3months' | '1year' | 'someday'
+  category: string
   created_at: string
 }
+
+export type SomedayCategory = string
 
 export interface ReviewItem {
   id: string
@@ -87,4 +90,35 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   created_at?: string
+}
+
+export interface Note {
+  id: string
+  content: string
+  tags?: string[]
+  weather?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Habit {
+  id: string
+  title: string
+  description?: string
+  frequency: 'daily' | 'weekly'
+  time_of_day?: string
+  color?: string
+  created_at: string
+  updated_at: string
+  is_archived: number
+  streak: number // 连续打卡天数
+  completedToday: boolean // 今日是否已打卡
+  weekRecords: Record<string, boolean> // 本周打卡记录，key为日期字符串，value为是否完成
+}
+
+export interface HabitDetail extends Habit {
+  longestStreak: number // 最长连续打卡天数
+  totalSessions: number // 总打卡次数
+  completionRate: number // 完成率百分比
+  allRecords: Record<string, boolean> // 12个月所有打卡记录
 }

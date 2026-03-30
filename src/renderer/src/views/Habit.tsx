@@ -1,92 +1,208 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { useParallax } from '../hooks/useParallax'
 import { useT } from '../i18n/useT'
-import QuickCapture from '../components/QuickCapture'
-import AddTaskModal from '../components/AddTaskModal'
+import { Check, Plus } from 'lucide-react'
+
+const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
+const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function Habit() {
-  const { tasks, removeTask, loadTasks, settings } = useStore()
-  const mouse = useParallax()
+  const { habits, toggleHabitComplete, addHabit, settings, setView, loadHabitById } = useStore()
   const t = useT()
+  const isZh = settings.language === 'zh'
+
   const [showAddModal, setShowAddModal] = useState(false)
+  const [newHabitTitle, setNewHabitTitle] = useState('')
+  const [newHabitDescription, setNewHabitDescription] = useState('')
+  const [newHabitTime, setNewHabitTime] = useState('')
 
-  // Filter tasks with status 'habit'
-  const habitTasks = tasks.filter(tk => tk.status === 'habit')
-  const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
+  const today = new Date().toISOString().split('T')[0]
+  const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 // 周一为0
 
-  const formatDate = (date?: string) => {
-    if (!date) return '—'
-    return new Date(date).toLocaleDateString(lang, { month: 'short', day: 'numeric' })
+  // 处理打卡切换
+  const handleToggleComplete = async (habitId: string, completed: boolean) => {
+    await toggleHabitComplete(habitId, today, !completed)
   }
 
-  const handleComplete = async (id: string) => {
-    await window.api.updateTask(id, { status: 'done' })
-    await loadTasks('habit')
+  // 处理新建习惯
+  const handleAddHabit = async () => {
+    if (!newHabitTitle.trim()) return
+
+    await addHabit({
+      title: newHabitTitle.trim(),
+      description: newHabitDescription.trim() || undefined,
+      time_of_day: newHabitTime.trim() || undefined,
+      frequency: 'daily'
+    })
+
+    setShowAddModal(false)
+    setNewHabitTitle('')
+    setNewHabitDescription('')
+    setNewHabitTime('')
+  }
+
+  // 获取周几的显示文本
+  const getWeekDayText = (index: number) => {
+    return isZh ? WEEK_DAYS[index] : WEEK_DAYS_EN[index]
+  }
+
+  // 检查指定日期是否已打卡
+  const isDayCompleted = (habit: any, dayIndex: number) => {
+    const now = new Date()
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 本周一
+    const date = new Date(startOfWeek)
+    date.setDate(startOfWeek.getDate() + dayIndex)
+    const dateStr = date.toISOString().split('T')[0]
+    return habit.weekRecords[dateStr] || false
+  }
+
+  // 处理点击标题进入详情页
+  const handleHabitClick = async (habitId: string) => {
+    await loadHabitById(habitId)
+    setView('habit-detail')
   }
 
   return (
-    <div className="composition">
-      <main className="sheet-main" style={{ transform: `translate(${mouse.x * 5}px, ${mouse.y * 5}px)` }}>
-        <div className="list-container">
-          <div className="list-header">
-            <div>{t.na_colAction}</div>
-            <div>{t.na_colContext}</div>
-            <div>{t.na_colDue}</div>
-          </div>
-
-          <div className="task-list">
-            {habitTasks.length === 0 ? (
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--ink-secondary)', fontStyle: 'italic', paddingTop: '1.5rem' }}>
-                {t.na_empty}
-              </div>
-            ) : (
-              habitTasks.map((task, i) => (
-                <div key={task.id} className="task-row fade-in" style={{ animationDelay: `${i * 0.05}s` }} title={task.notes || ''}>
-                  <div className="task-title">{task.title}</div>
-                  <div className="task-meta">{task.context && <span className="task-tag">{task.context}</span>}</div>
-                  <div className="task-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{formatDate(task.due_date)}</span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); handleComplete(task.id) }} title="Mark done" style={{ fontSize: '0.7rem' }}>✓</button>
-                      <button className="btn-text" onClick={e => { e.stopPropagation(); removeTask(task.id) }} title="Delete" style={{ fontSize: '0.7rem' }}>×</button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <footer className="sheet-footer">
-          <div className="footer-logo">{t.na_footerLogo}</div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerStatus}</div>
-            <div className="footer-text">{t.na_count(habitTasks.length)}</div>
-            <div className="footer-text">
-              <button className="btn-text" onClick={() => setShowAddModal(true)} style={{ color: 'var(--ink-secondary)', paddingLeft: 0 }}>
-                {t.na_addAction}
-              </button>
-            </div>
-          </div>
-          <div className="footer-block">
-            <div className="footer-title">{t.na_footerCtxs}</div>
-            {Array.from(new Set(habitTasks.map(tk => tk.context).filter(Boolean))).slice(0, 3).map(ctx => (
-              <div key={ctx} className="footer-text">{ctx}</div>
-            ))}
-          </div>
-        </footer>
-      </main>
-
-      <div className="sheet-blue" style={{ transform: `translate(${mouse.x * -10}px, ${mouse.y * -10}px)` }}>
-        <div style={{ position: 'relative', zIndex: 3, width: '100%', height: '100%', backgroundImage: `url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2070&auto=format&fit=crop')`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6, mixBlendMode: 'multiply', filter: 'grayscale(100%) contrast(1.2)', transition: 'transform 2s var(--ease-out), opacity 0.8s ease' }} />
-        <div style={{ position: 'absolute', bottom: '1.5rem', left: '2rem', color: 'rgba(244,243,239,0.5)', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.2em', zIndex: 4 }}>
-          {t.nav_habit} — {habitTasks.length} items
+    <main className="main-content">
+      {/* 页面标题 */}
+      <div className="page-header">
+        <h1 className="page-title">
+          {isZh ? '习惯' : 'Habits'}
+        </h1>
+        <div className="page-subtitle">
+          {isZh ? '日常习惯与连续打卡' : 'Daily Routines & Streaks'}
         </div>
       </div>
 
-      <QuickCapture style={{ transform: `rotate(-2deg) translate(${mouse.x * 15}px, ${mouse.y * 15}px)` }} />
-      {showAddModal && <AddTaskModal onClose={() => setShowAddModal(false)} />}
-    </div>
+      {/* 习惯列表 */}
+      <div className="habit-list">
+        {habits.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '6rem 2rem',
+            color: 'var(--muted-foreground)',
+            fontStyle: 'italic',
+            fontSize: '1.1rem'
+          }}>
+            {isZh ? '还没有添加任何习惯，点击右下角按钮开始建立好习惯吧' : 'No habits yet. Click the button below to start building good habits.'}
+          </div>
+        ) : (
+          habits.map(habit => (
+            <div key={habit.id} className="habit-card">
+              <div
+                className={`habit-checkbox ${habit.completedToday ? 'checked' : ''}`}
+                onClick={() => handleToggleComplete(habit.id, habit.completedToday)}
+              >
+                {habit.completedToday && <Check size={14} />}
+              </div>
+              <div className="habit-content">
+                <button
+                  className="habit-title-link"
+                  onClick={() => handleHabitClick(habit.id)}
+                >
+                  {habit.title}
+                </button>
+                <div className="habit-meta">
+                  <span>{isZh ? `连续: ${habit.streak} 天` : `Streak: ${habit.streak} Days`}</span>
+                  <span className="habit-meta-dot"></span>
+                  <span>
+                    {habit.frequency === 'daily' ? (isZh ? '每天' : 'Daily') : (isZh ? '每周' : 'Weekly')}
+                    {habit.time_of_day && `, ${habit.time_of_day}`}
+                  </span>
+                </div>
+              </div>
+              <div className="habit-progress">
+                {WEEK_DAYS.map((_, index) => {
+                  const completed = isDayCompleted(habit, index)
+                  const isCurrent = index === currentDayIndex
+                  return (
+                    <div
+                      key={index}
+                      className={`habit-day ${completed ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
+                    >
+                      {getWeekDayText(index)}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 悬浮添加按钮 */}
+      <button
+        className="fab-button"
+        onClick={() => setShowAddModal(true)}
+      >
+        <Plus size={20} />
+      </button>
+
+      {/* 新建习惯弹窗 */}
+      {showAddModal && (
+        <div className="habit-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="habit-modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="habit-modal-title">
+              {isZh ? '新建习惯' : 'New Habit'}
+            </h3>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '习惯名称' : 'Habit Name'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '例如：晨间冥想 15 分钟' : 'e.g. Morning Meditation 15min'}
+                value={newHabitTitle}
+                onChange={e => setNewHabitTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '描述（可选）' : 'Description (Optional)'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '简单描述这个习惯' : 'Brief description of the habit'}
+                value={newHabitDescription}
+                onChange={e => setNewHabitDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '时间（可选）' : 'Time (Optional)'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '例如：早上 / 晚上' : 'e.g. Morning / Evening'}
+                value={newHabitTime}
+                onChange={e => setNewHabitTime(e.target.value)}
+              />
+            </div>
+
+            <div className="habit-modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => setShowAddModal(false)}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleAddHabit}
+              >
+                {t.create}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   )
 }

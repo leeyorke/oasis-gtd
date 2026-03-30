@@ -10,6 +10,9 @@ import {
   aiQueries,
   settingsQueries,
   dataQueries,
+  noteQueries,
+  habitQueries,
+  habitRecordQueries,
 } from '../db/database'
 
 // Global store for AbortControllers per conversation
@@ -265,7 +268,183 @@ export function registerHandlers(): void {
   // ─── Someday ────────────────────────────────────────────────────────────────
   ipcMain.handle('someday:getAll', () => somedayQueries.getAll())
   ipcMain.handle('someday:create', (_, item) => somedayQueries.create(item))
+  ipcMain.handle('someday:update', (_, id: string, updates) => somedayQueries.update(id, updates))
   ipcMain.handle('someday:delete', (_, id: string) => somedayQueries.delete(id))
+
+  // ─── Notes ──────────────────────────────────────────────────────────────────
+  ipcMain.handle('notes:getAll', () => {
+    const notes = noteQueries.getAll() as Array<Record<string, unknown>>
+    return notes.map(note => ({
+      ...note,
+      tags: note.tags ? JSON.parse(note.tags as string) : [],
+    }))
+  })
+  ipcMain.handle('notes:getById', (_, id: string) => {
+    const note = noteQueries.getById(id) as Record<string, unknown> | undefined
+    if (!note) return null
+    return {
+      ...note,
+      tags: note.tags ? JSON.parse(note.tags as string) : [],
+    }
+  })
+  ipcMain.handle('notes:search', (_, keyword: string) => {
+    const notes = noteQueries.search(keyword) as Array<Record<string, unknown>>
+    return notes.map(note => ({
+      ...note,
+      tags: note.tags ? JSON.parse(note.tags as string) : [],
+    }))
+  })
+  ipcMain.handle('notes:create', (_, note) => noteQueries.create(note))
+  ipcMain.handle('notes:update', (_, id: string, updates) => noteQueries.update(id, updates))
+  ipcMain.handle('notes:delete', (_, id: string) => noteQueries.delete(id))
+
+  // ─── Habits ─────────────────────────────────────────────────────────────────
+  ipcMain.handle('habits:getAll', () => {
+    const habits = habitQueries.getAll() as Array<Record<string, unknown>>
+    const today = new Date().toISOString().split('T')[0]
+
+    // 计算每个习惯的连续打卡天数和本周打卡情况
+    return habits.map(habit => {
+      const records = habitRecordQueries.getByHabitId(habit.id as string) as Array<Record<string, unknown>>
+
+      // 计算连续打卡天数
+      let streak = 0
+      let currentDate = new Date()
+      while (true) {
+        const dateStr = currentDate.toISOString().split('T')[0]
+        const hasRecord = records.some(r => r.record_date === dateStr && r.completed === 1)
+        if (hasRecord) {
+          streak++
+          currentDate.setDate(currentDate.getDate() - 1)
+        } else {
+          break
+        }
+      }
+
+      // 检查今日是否已打卡
+      const todayRecord = records.find(r => r.record_date === today)
+      const completedToday = !!todayRecord && todayRecord.completed === 1
+
+      // 获取本周打卡记录（周一到周日）
+      const now = new Date()
+      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 周一
+      const weekRecords: Record<string, boolean> = {}
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek)
+        date.setDate(startOfWeek.getDate() + i)
+        const dateStr = date.toISOString().split('T')[0]
+        const record = records.find(r => r.record_date === dateStr)
+        weekRecords[dateStr] = !!record && record.completed === 1
+      }
+
+      return {
+        ...habit,
+        streak,
+        completedToday,
+        weekRecords,
+      }
+    })
+  })
+  ipcMain.handle('habits:create', (_, habit) => habitQueries.create(habit))
+  ipcMain.handle('habits:update', (_, id: string, updates) => habitQueries.update(id, updates))
+  ipcMain.handle('habits:delete', (_, id: string) => habitQueries.delete(id))
+  ipcMain.handle('habits:toggleComplete', (_, habitId: string, date: string, completed: boolean) => {
+    return habitRecordQueries.createOrUpdate(habitId, date, completed)
+  })
+  ipcMain.handle('habits:getById', (_, habitId: string) => {
+    const habit = habitQueries.getById(habitId) as Record<string, unknown> | undefined
+    if (!habit) return null
+
+    const records = habitRecordQueries.getByHabitId(habitId) as Array<Record<string, unknown>>
+    const today = new Date().toISOString().split('T')[0]
+
+    // 计算当前连续打卡天数
+    let streak = 0
+    let currentDate = new Date()
+    while (true) {
+      const dateStr = currentDate.toISOString().split('T')[0]
+      const hasRecord = records.some(r => r.record_date === dateStr && r.completed === 1)
+      if (hasRecord) {
+        streak++
+        currentDate.setDate(currentDate.getDate() - 1)
+      } else {
+        break
+      }
+    }
+
+    // 计算最长连续打卡天数
+    let longestStreak = 0
+    let tempStreak = 0
+    const sortedRecords = [...records]
+      .filter(r => r.completed === 1)
+      .sort((a, b) => (a.record_date as string).localeCompare(b.record_date as string))
+
+    for (let i = 0; i < sortedRecords.length; i++) {
+      if (i === 0) {
+        tempStreak = 1
+      } else {
+        const prevDate = new Date(sortedRecords[i - 1].record_date as string)
+        const currDate = new Date(sortedRecords[i].record_date as string)
+        const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+        if (diffDays === 1) {
+          tempStreak++
+        } else {
+          tempStreak = 1
+        }
+      }
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak
+      }
+    }
+
+    // 总打卡次数
+    const totalSessions = records.filter(r => r.completed === 1).length
+
+    // 完成率：总完成天数 / 自创建以来总天数
+    const createdAt = new Date(habit.created_at as string)
+    const now = new Date()
+    const diffMs = now.getTime() - createdAt.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const totalDays = Math.max(1, diffDays + 1)
+    const completionRate = Math.round((totalSessions / totalDays) * 100)
+
+    // 检查今日是否已打卡
+    const todayRecord = records.find(r => r.record_date === today)
+    const completedToday = !!todayRecord && todayRecord.completed === 1
+
+    // 获取本周打卡记录（周一到周日）
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1))
+    const weekRecords: Record<string, boolean> = {}
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + i)
+      const dateStr = date.toISOString().split('T')[0]
+      const record = records.find(r => r.record_date === dateStr)
+      weekRecords[dateStr] = !!record && record.completed === 1
+    }
+
+    // 获取近12个月所有打卡记录用于日历
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    const allRecords: Record<string, boolean> = {}
+    records.forEach(r => {
+      const recordDate = new Date(r.record_date as string)
+      if (recordDate >= twelveMonthsAgo) {
+        allRecords[r.record_date as string] = r.completed === 1
+      }
+    })
+
+    return {
+      ...habit,
+      streak,
+      longestStreak,
+      totalSessions,
+      completionRate,
+      completedToday,
+      weekRecords,
+      allRecords,
+    }
+  })
 
   // ─── Weekly Review ──────────────────────────────────────────────────────────
   ipcMain.handle('review:getAll', () => reviewQueries.getAll())

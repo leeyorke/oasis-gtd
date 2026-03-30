@@ -105,6 +105,38 @@ function createTables(): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      tags TEXT,
+      weather TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS habits (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      time_of_day TEXT,
+      color TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      is_archived INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS habit_records (
+      id TEXT PRIMARY KEY,
+      habit_id TEXT NOT NULL,
+      record_date TEXT NOT NULL,
+      completed INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
+      UNIQUE(habit_id, record_date)
+    );
   `)
 
   // Migration: Add new columns to ai_providers if they don't exist
@@ -121,6 +153,11 @@ function createTables(): void {
   // Migration: Add priority column to tasks if it doesn't exist
   try {
     db.exec(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium'`)
+  } catch { /* column already exists */ }
+
+  // Migration: Add category column to someday_items if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE someday_items ADD COLUMN category TEXT DEFAULT ''`)
   } catch { /* column already exists */ }
 
   // Ensure default settings exist
@@ -172,16 +209,6 @@ function seedIfEmpty(): void {
   insertWaiting.run(uuidv4(), 'Photography licensing approval', 'Legal Team', '2024-10-02', projectId1, null, now)
   insertWaiting.run(uuidv4(), 'Client feedback on mockups', 'Sarah Chen', '2024-10-05', projectId1, 'Sent v2 mockups via email', now)
   insertWaiting.run(uuidv4(), 'Budget approval for print run', 'Finance Dept.', '2024-10-08', null, null, now)
-
-  // Seed someday items
-  const insertSomeday = db.prepare(`
-    INSERT INTO someday_items (id, title, notes, horizon, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `)
-  insertSomeday.run(uuidv4(), 'Learn letterpress printing', 'Explore traditional print techniques', '3months', now)
-  insertSomeday.run(uuidv4(), 'Write essay on brutalism in digital design', null, '1month', now)
-  insertSomeday.run(uuidv4(), 'Visit the Bauhaus archive in Berlin', null, '1year', now)
-  insertSomeday.run(uuidv4(), 'Build a physical zine', 'Self-published, limited edition', 'someday', now)
 
   // Seed review checklist
   const insertReview = db.prepare(`
@@ -322,10 +349,17 @@ export const somedayQueries = {
     const now = new Date().toISOString()
     const id = uuidv4()
     db.prepare(`
-      INSERT INTO someday_items (id, title, notes, horizon, created_at)
-      VALUES (@id, @title, @notes, @horizon, @created_at)
-    `).run({ ...item, id, created_at: now })
+      INSERT INTO someday_items (id, title, notes, horizon, category, created_at)
+      VALUES (@id, @title, @notes, @horizon, @category, @created_at)
+    `).run({ ...item, id, category: item.category ?? '', created_at: now })
     return id
+  },
+
+  update: (id: string, updates: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    db.prepare(`UPDATE someday_items SET ${fields}, created_at = @created_at WHERE id = @id`)
+      .run({ ...updates, id, created_at: now })
   },
 
   delete: (id: string) =>
@@ -515,4 +549,141 @@ export const dataQueries = {
     someday:      db.prepare('SELECT * FROM someday_items').all(),
     settings:     db.prepare('SELECT * FROM app_settings').all(),
   }),
+}
+
+// ─── Note Queries ─────────────────────────────────────────────────────────────
+export const noteQueries = {
+  getAll: () =>
+    db.prepare('SELECT * FROM notes ORDER BY created_at DESC').all(),
+
+  getById: (id: string) =>
+    db.prepare('SELECT * FROM notes WHERE id = ?').get(id),
+
+  search: (keyword: string) =>
+    db.prepare('SELECT * FROM notes WHERE content LIKE ? OR tags LIKE ? ORDER BY created_at DESC')
+      .all(`%${keyword}%`, `%${keyword}%`),
+
+  create: (note: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const id = uuidv4()
+    db.prepare(`
+      INSERT INTO notes (id, content, tags, weather, created_at, updated_at)
+      VALUES (@id, @content, @tags, @weather, @created_at, @updated_at)
+    `).run({
+      id,
+      content: note.content,
+      tags: note.tags ? JSON.stringify(note.tags) : null,
+      weather: note.weather ?? null,
+      created_at: now,
+      updated_at: now,
+    })
+    return id
+  },
+
+  update: (id: string, updates: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+
+    const params: Record<string, unknown> = { ...updates, id, updated_at: now }
+    if (updates.tags) {
+      params.tags = JSON.stringify(updates.tags)
+    }
+
+    db.prepare(`UPDATE notes SET ${fields}, updated_at = @updated_at WHERE id = @id`)
+      .run(params)
+  },
+
+  delete: (id: string) =>
+    db.prepare('DELETE FROM notes WHERE id = ?').run(id),
+}
+
+// ─── Habit Queries ─────────────────────────────────────────────────────────────
+export const habitQueries = {
+  getAll: () =>
+    db.prepare('SELECT * FROM habits WHERE is_archived = 0 ORDER BY created_at ASC').all(),
+
+  getById: (id: string) =>
+    db.prepare('SELECT * FROM habits WHERE id = ?').get(id),
+
+  create: (habit: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const id = uuidv4()
+    db.prepare(`
+      INSERT INTO habits (id, title, description, frequency, time_of_day, color, created_at, updated_at, is_archived)
+      VALUES (@id, @title, @description, @frequency, @time_of_day, @color, @created_at, @updated_at, @is_archived)
+    `).run({
+      id,
+      title: habit.title,
+      description: habit.description ?? null,
+      frequency: habit.frequency ?? 'daily',
+      time_of_day: habit.time_of_day ?? null,
+      color: habit.color ?? null,
+      created_at: now,
+      updated_at: now,
+      is_archived: 0,
+    })
+    return id
+  },
+
+  update: (id: string, updates: Record<string, unknown>) => {
+    const now = new Date().toISOString()
+    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    db.prepare(`UPDATE habits SET ${fields}, updated_at = @updated_at WHERE id = @id`)
+      .run({ ...updates, id, updated_at: now })
+  },
+
+  delete: (id: string) =>
+    db.prepare('DELETE FROM habits WHERE id = ?').run(id),
+}
+
+// ─── Habit Record Queries ─────────────────────────────────────────────────────
+export const habitRecordQueries = {
+  getByHabitId: (habitId: string) =>
+    db.prepare('SELECT * FROM habit_records WHERE habit_id = ? ORDER BY record_date DESC').all(habitId),
+
+  getByHabitAndDate: (habitId: string, recordDate: string) =>
+    db.prepare('SELECT * FROM habit_records WHERE habit_id = ? AND record_date = ?').get(habitId, recordDate),
+
+  getWeekRecords: (habitId: string, startOfWeek: string, endOfWeek: string) =>
+    db.prepare('SELECT * FROM habit_records WHERE habit_id = ? AND record_date BETWEEN ? AND ?')
+      .all(habitId, startOfWeek, endOfWeek),
+
+  createOrUpdate: (habitId: string, recordDate: string, completed: boolean, notes?: string) => {
+    const now = new Date().toISOString()
+    const existing = habitRecordQueries.getByHabitAndDate(habitId, recordDate)
+
+    if (existing) {
+      // 更新现有记录
+      db.prepare(`
+        UPDATE habit_records
+        SET completed = @completed, notes = @notes, created_at = @updated_at
+        WHERE habit_id = @habitId AND record_date = @recordDate
+      `).run({
+        habitId,
+        recordDate,
+        completed: completed ? 1 : 0,
+        notes: notes ?? null,
+        updated_at: now
+      })
+      return existing.id
+    } else {
+      // 创建新记录
+      const id = uuidv4()
+      db.prepare(`
+        INSERT INTO habit_records (id, habit_id, record_date, completed, notes, created_at)
+        VALUES (@id, @habitId, @recordDate, @completed, @notes, @created_at)
+      `).run({
+        id,
+        habitId,
+        recordDate,
+        completed: completed ? 1 : 0,
+        notes: notes ?? null,
+        created_at: now
+      })
+      return id
+    }
+  },
+
+  delete: (id: string) =>
+    db.prepare('DELETE FROM habit_records WHERE id = ?').run(id),
 }
