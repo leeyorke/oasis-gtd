@@ -21,6 +21,17 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
   const [dueDate, setDueDate] = useState<string>('')
   const [showDatePicker, setShowDatePicker] = useState(false)
 
+  const categoryColors: Record<string, string> = {
+    priority: '#dc2626',
+    next: '#1976d2',
+    schedule: '#7c3aed',
+    projects: '#1976d2',
+    waiting: '#43a047',
+    habit: '#9c27b0',
+    someday: '#ff9800',
+    resource: '#795548',
+  }
+
   const categories = [
     { id: 'priority', label: isZh ? '立即做' : 'Priority Focus', icon: Zap },
     { id: 'next', label: isZh ? '下一步行动' : 'Next Actions', icon: ArrowRight },
@@ -107,30 +118,39 @@ export default function QuickAddTaskModal({ onClose, editingTask, defaultCategor
               <div
                 key={category.id}
                 className={`chip ${selectedCategory === category.id ? 'active' : ''}`}
+                data-category={category.id}
                 data-media-type="banani-button"
                 onClick={() => setSelectedCategory(category.id)}
               >
+                <div
+                  className="chip-dot"
+                  style={{ backgroundColor: selectedCategory === category.id ? '#fff' : categoryColors[category.id] }}
+                />
                 <category.icon size={14} />
-                {category.label}
+                <span>{category.label}</span>
               </div>
             ))}
           </div>
 
-          <div className="quick-actions" style={{ marginTop: '20px' }}>
+          <div className="quick-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <div
-              className="action-btn"
+              className="chip dashed"
               data-media-type="banani-button"
               onClick={() => setShowDatePicker(true)}
             >
               <Calendar size={14} />
-              {dueDate
+              <span>{dueDate
                 ? new Date(dueDate).toLocaleDateString(isZh ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })
                 : (isZh ? '设置日期' : 'Set Date')
-              }
+              }</span>
             </div>
-            <div className="action-btn" data-media-type="banani-button">
+            <div
+              className="chip dashed"
+              data-media-type="banani-button"
+              style={{ color: 'var(--muted-foreground)' }}
+            >
               <Flag size={14} />
-              {isZh ? '优先级' : 'Priority'}
+              <span>{isZh ? '优先级' : 'Priority'}</span>
             </div>
           </div>
         </div>

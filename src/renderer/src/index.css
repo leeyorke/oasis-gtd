@@ -2292,6 +2292,25 @@ body {
   background: var(--card);
   cursor: pointer;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.chip > * {
+  flex-shrink: 0;
+}
+
+.chip span {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip.dashed {
+  border-style: dashed;
+  border-color: #333;
 }
 
 .chip.active {
@@ -2299,6 +2318,32 @@ body {
   color: var(--primary-foreground);
   border-color: var(--foreground);
 }
+
+/* Category-specific chip colors when active */
+.chip.active[data-category="priority"] { background: #dc2626; border-color: #dc2626; }
+.chip.active[data-category="next"] { background: #1976d2; border-color: #1976d2; }
+.chip.active[data-category="schedule"] { background: #7c3aed; border-color: #7c3aed; }
+.chip.active[data-category="projects"] { background: #1976d2; border-color: #1976d2; }
+.chip.active[data-category="waiting"] { background: #43a047; border-color: #43a047; }
+.chip.active[data-category="habit"] { background: #9c27b0; border-color: #9c27b0; }
+.chip.active[data-category="someday"] { background: #ff9800; border-color: #ff9800; }
+.chip.active[data-category="resource"] { background: #795548; border-color: #795548; }
+
+/* Category dot indicator in chips */
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chip.active[data-category="priority"] .chip-dot { background: #fff; }
+.chip.active[data-category="next"] .chip-dot { background: #fff; }
+.chip.active[data-category="schedule"] .chip-dot { background: #fff; }
+.chip.active[data-category="projects"] .chip-dot { background: #fff; }
+.chip.active[data-category="waiting"] .chip-dot { background: #fff; }
+.chip.active[data-category="habit"] .chip-dot { background: #fff; }
+.chip.active[data-category="someday"] .chip-dot { background: #fff; }
+.chip.active[data-category="resource"] .chip-dot { background: #fff; }
 
 .modal-footer {
   display: flex;
@@ -4551,5 +4596,178 @@ body {
   background-color: var(--foreground);
   color: var(--primary-foreground);
   border-color: var(--foreground);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Kanban Board Styles (独立命名空间，不影响其他页面)
+   ───────────────────────────────────────────────────────────────────────────── */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 24px;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+  min-height: 0;
+  max-width: 1400px;
+}
+
+.kanban-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 20px rgba(30, 27, 24, 0.04);
+  min-height: 280px;
+}
+
+.kanban-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.kanban-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: ui-serif;
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.kanban-card-count {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  background-color: var(--background);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.kanban-card-subtitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.kanban-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: 180px;
+  padding-right: 4px;
+}
+
+.kanban-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.kanban-task-item:last-child {
+  border-bottom: none;
+}
+
+.kanban-task-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.kanban-task-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--muted-foreground);
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-top: 2px;
+  transition: all 0.2s ease;
+}
+
+.kanban-task-checkbox.checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.kanban-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.kanban-task-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.kanban-task-title {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--foreground);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.kanban-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kanban-task-context {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.kanban-card-footer {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.kanban-view-all {
+  background: none;
+  border: none;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.kanban-view-all:hover {
+  color: var(--foreground);
 }
 
