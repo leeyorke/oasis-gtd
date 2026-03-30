@@ -11,11 +11,16 @@ export function initDatabase(): void {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   createTables()
+  migrateProjects()
   seedIfEmpty()
 }
 
 export function getDb(): Database.Database {
   return db
+}
+
+function migrateProjects(): void {
+  db.prepare("UPDATE projects SET status = 'active' WHERE status IN ('completed', 'someday')").run()
 }
 
 function createTables(): void {
@@ -193,36 +198,21 @@ function seedIfEmpty(): void {
   if (taskCount > 0) return
 
   const now = new Date().toISOString()
-  const projectId1 = uuidv4()
-  const projectId2 = uuidv4()
 
-  // Seed projects
-  const insertProject = db.prepare(`
-    INSERT INTO projects (id, title, description, outcome, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `)
-  insertProject.run(projectId1, 'Portfolio Redesign', 'Complete overhaul of personal portfolio site', 'A live, polished portfolio attracting new clients', 'active', now, now)
-  insertProject.run(projectId2, 'Quarterly Report', 'Compile and present Q4 findings to stakeholders', 'Board-approved Q4 report delivered by month end', 'active', now, now)
-
-  // Seed tasks
+  // Seed tasks (standalone tasks, not linked to projects)
   const insertTask = db.prepare(`
     INSERT INTO tasks (id, title, notes, context, due_date, project_id, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  insertTask.run(uuidv4(), 'Draft portfolio case studies', null, '@Deep Work', '2024-10-18', projectId1, 'next', now, now)
-  insertTask.run(uuidv4(), 'Select typography for new catalog', null, '@Design', '2024-10-20', projectId1, 'next', now, now)
   insertTask.run(uuidv4(), 'Review final proofs for editorial spread', null, '@Deep Work', '2024-10-14', null, 'next', now, now)
   insertTask.run(uuidv4(), 'Follow up with curator regarding the archive', null, '@Email', null, null, 'next', now, now)
   insertTask.run(uuidv4(), 'Process physical inbox notes', null, '@Admin', null, null, 'next', now, now)
-  insertTask.run(uuidv4(), 'Compile Q4 data spreadsheet', null, '@Office', '2024-10-25', projectId2, 'next', now, now)
 
-  // Seed waiting items
+  // Seed waiting items (standalone items, not linked to projects)
   const insertWaiting = db.prepare(`
     INSERT INTO waiting_items (id, title, waiting_for, since, project_id, notes, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
-  insertWaiting.run(uuidv4(), 'Photography licensing approval', 'Legal Team', '2024-10-02', projectId1, null, now)
-  insertWaiting.run(uuidv4(), 'Client feedback on mockups', 'Sarah Chen', '2024-10-05', projectId1, 'Sent v2 mockups via email', now)
   insertWaiting.run(uuidv4(), 'Budget approval for print run', 'Finance Dept.', '2024-10-08', null, null, now)
 
   // Seed review checklist

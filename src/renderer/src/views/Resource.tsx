@@ -333,7 +333,7 @@ export default function Resource() {
         className="fab-button"
         onClick={() => setShowAddModal(true)}
       >
-        <Plus size={20} />
+        <Plus size={14} />
       </button>
 
       {/* Add Resource Modal */}

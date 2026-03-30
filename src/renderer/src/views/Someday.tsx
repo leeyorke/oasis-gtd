@@ -106,11 +106,10 @@ export default function Someday() {
 
   return (
     <div className="main-content">
-      <div className="someday-page-container">
-        <div className="someday-page-header">
-          <div className="someday-page-title">将来做 / Someday</div>
-          <div className="someday-page-subtitle">{t.some_ideasCaptured(somedayItems.length)}</div>
-        </div>
+      <div className="page-header">
+        <h1 className="page-title">将来做 / Someday</h1>
+        <div className="page-subtitle">{t.some_ideasCaptured(somedayItems.length)}</div>
+      </div>
 
         {somedayItems.length === 0 ? (
           <div className="someday-page-empty">
@@ -262,7 +261,6 @@ export default function Someday() {
             </div>
           </div>
         )}
-      </div>
     </div>
   )
 }

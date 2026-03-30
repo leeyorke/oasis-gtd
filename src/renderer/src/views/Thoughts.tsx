@@ -180,7 +180,7 @@ export default function Thoughts() {
         className="fab-button"
         onClick={() => setShowAddModal(true)}
       >
-        <Plus size={20} />
+        <Plus size={14} />
       </button>
 
       {/* 添加随想弹窗 */}

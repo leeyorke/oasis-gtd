@@ -1641,7 +1641,6 @@ body {
   flex-direction: column;
   padding: 32px 40px;
   position: relative;
-  overflow-y: auto;
   min-height: 0;
 }
 
@@ -1672,6 +1671,9 @@ body {
   gap: 8px;
   max-width: 800px;
   padding-right: 40px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .task-card {
@@ -2815,6 +2817,9 @@ body {
   flex-direction: column;
   gap: 16px;
   max-width: 800px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .habit-card {
@@ -3207,6 +3212,9 @@ body {
   max-width: 800px;
   padding-bottom: 120px;
   padding-right: 40px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .someday-page-card {
@@ -3533,6 +3541,9 @@ body {
 .resource-list-section {
   max-width: 1040px;
   padding-bottom: 120px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .resource-list-header {
@@ -3811,6 +3822,733 @@ body {
 
 .resource-type-chip.active {
   background: var(--foreground);
+  color: var(--primary-foreground);
+  border-color: var(--foreground);
+}
+
+/* ==============================================
+   Waiting Page Styles (独立命名空间，不影响其他页面)
+   ============================================== */
+.waiting-page-card:nth-child(1) { animation-delay: 0s; }
+.waiting-page-card:nth-child(2) { animation-delay: 0.05s; }
+.waiting-page-card:nth-child(3) { animation-delay: 0.1s; }
+.waiting-page-card:nth-child(4) { animation-delay: 0.15s; }
+.waiting-page-card:nth-child(5) { animation-delay: 0.2s; }
+.waiting-page-card:nth-child(6) { animation-delay: 0.25s; }
+.waiting-page-card:nth-child(7) { animation-delay: 0.3s; }
+.waiting-page-card:nth-child(8) { animation-delay: 0.35s; }
+.waiting-page-card:nth-child(9) { animation-delay: 0.4s; }
+.waiting-page-card:nth-child(10) { animation-delay: 0.45s; }
+
+.waiting-page-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 40px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.waiting-page-header {
+  margin-bottom: 24px;
+}
+
+.waiting-page-title {
+  font-family: ui-serif;
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--foreground);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.waiting-page-subtitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.waiting-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 800px;
+  padding-bottom: 120px;
+  padding-right: 40px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.waiting-page-card {
+  background-color: var(--card);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(30, 27, 24, 0.04);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+  position: relative;
+}
+
+.waiting-page-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+.waiting-page-card:hover .waiting-page-card-actions {
+  opacity: 1;
+}
+
+.waiting-page-card-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.waiting-page-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.waiting-page-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waiting-page-card-meta {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waiting-page-meta-dot {
+  width: 2px;
+  height: 2px;
+  background-color: var(--muted-foreground);
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.waiting-page-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.waiting-page-action-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  background: var(--background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.waiting-page-action-btn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.waiting-page-action-btn.resolve:hover {
+  background: rgba(67, 160, 71, 0.1);
+  color: #43a047;
+  border-color: rgba(67, 160, 71, 0.3);
+}
+
+.waiting-page-action-btn.delete:hover {
+  color: #a83232;
+  background: rgba(168, 50, 50, 0.1);
+}
+
+.waiting-page-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 32px;
+  width: 42px;
+  height: 42px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border: none;
+  transition: transform 0.2s ease;
+  z-index: 100;
+}
+
+.waiting-page-fab:hover {
+  transform: translateY(-2px);
+}
+
+.waiting-page-fab svg {
+  width: 14px;
+  height: 14px;
+}
+
+.waiting-page-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  gap: 1rem;
+  color: var(--muted-foreground);
+}
+
+.waiting-page-empty-text {
+  font-family: ui-serif;
+  font-size: 1.4rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+/* Waiting Page Modal Styles */
+.waiting-page-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(28, 27, 26, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.waiting-page-modal {
+  width: 520px;
+  background-color: var(--sheet-main);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.waiting-page-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px 8px 16px;
+}
+
+.waiting-page-modal-content {
+  padding: 8px 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.waiting-page-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: var(--sidebar-bg);
+  border-top: 1px solid var(--border);
+  gap: 8px;
+}
+
+.waiting-page-form-group {
+  margin-bottom: 1.2rem;
+}
+
+.waiting-page-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.waiting-page-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  outline: none;
+}
+
+.waiting-page-input:focus {
+  border-color: var(--foreground);
+}
+
+.waiting-page-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  min-height: 80px;
+}
+
+.waiting-page-textarea:focus {
+  border-color: var(--foreground);
+}
+
+/* ─── Projects Page ─────────────────────────────────────────────────────── */
+
+.projects-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 56px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.projects-header {
+  margin-bottom: 40px;
+}
+
+.projects-title {
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: 44px;
+  font-weight: 400;
+  color: var(--foreground);
+  margin-bottom: 12px;
+  letter-spacing: 2px;
+}
+
+.projects-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 900px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.project-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.project-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.project-card .project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.project-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+}
+
+.project-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 100px;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.project-status.active {
+  background-color: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.project-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.project-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--foreground);
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.project-desc {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.project-footer {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed var(--border);
+}
+
+.project-meta {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.project-progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.project-progress-bar {
+  width: 64px;
+  height: 4px;
+  background-color: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.project-progress-fill {
+  height: 100%;
+  background-color: var(--foreground);
+  border-radius: 2px;
+}
+
+/* ─── Project Detail Page ───────────────────────────────────────────────── */
+
+.project-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 56px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.project-detail-header {
+  margin-bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.project-detail-top {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.project-detail-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+}
+
+.project-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-detail-title {
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: 36px;
+  font-weight: 400;
+  color: var(--foreground);
+  letter-spacing: 1px;
+  line-height: 1.1;
+}
+
+.project-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.project-detail-date {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.project-detail-desc {
+  font-size: 15px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  max-width: 640px;
+}
+
+.project-progress-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 480px;
+  padding-top: 8px;
+}
+
+.project-progress-section .project-progress-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.project-progress-section .project-progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.project-progress-section .project-progress-fill {
+  height: 100%;
+  background-color: var(--foreground);
+  border-radius: 3px;
+}
+
+.project-progress-section .project-progress-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+/* ─── Tasks Section ────────────────────────────────────────────────────── */
+
+.tasks-section {
+  max-width: 800px;
+}
+
+.task-group {
+  margin-bottom: 40px;
+}
+
+.task-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-group-count {
+  background-color: var(--border);
+  color: var(--foreground);
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.tasks-section .task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 0;
+  max-width: none;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.tasks-section .task-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.tasks-section .task-item.completed .task-title {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+.tasks-section .task-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  flex-shrink: 0;
+}
+
+.tasks-section .task-item.completed .task-checkbox {
+  background-color: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.tasks-section .task-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--foreground);
+  flex: 1;
+}
+
+.tasks-section .task-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tasks-section .task-tag {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.tasks-section .task-date {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+/* ─── Shared Components ─────────────────────────────────────────────────── */
+
+.breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 32px;
+  width: max-content;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb:hover {
+  color: var(--foreground);
+}
+
+.page-actions {
+  position: absolute;
+  top: 48px;
+  right: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--card);
+  cursor: pointer;
+  color: var(--foreground);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.action-btn:hover {
+  background-color: var(--foreground);
   color: var(--primary-foreground);
   border-color: var(--foreground);
 }

@@ -163,6 +163,10 @@ const translations = {
     proj_outcomePlaceholder: 'Desired outcome...',
     proj_emboss:        'plan',
     proj_open:          'open',
+    proj_detail_title:  'Project Detail',
+    proj_breadcrumb_back: 'Back to Projects',
+    proj_tasks_todo:    'To Do',
+    proj_tasks_completed: 'Completed',
 
     // ─── Waiting For ──────────────────────────────────────────────────────────
     wait_colWaiting:    'Waiting For',
@@ -491,6 +495,10 @@ const translations = {
     proj_outcomePlaceholder: '期望结果...',
     proj_emboss:        '计划',
     proj_open:          '个开放',
+    proj_detail_title:  '项目详情',
+    proj_breadcrumb_back: '返回项目列表',
+    proj_tasks_todo:    '待完成',
+    proj_tasks_completed: '已完成',
 
     // ─── Waiting For ──────────────────────────────────────────────────────────
     wait_colWaiting:    '等待中',

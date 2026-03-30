@@ -27,7 +27,7 @@ export interface Project {
   title: string
   description?: string
   outcome?: string
-  status: 'active' | 'on-hold' | 'completed' | 'someday'
+  status: 'active' | 'on-hold'
   taskCount?: number
   created_at: string
   updated_at: string

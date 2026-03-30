@@ -135,7 +135,7 @@ export default function Habit() {
         className="fab-button"
         onClick={() => setShowAddModal(true)}
       >
-        <Plus size={20} />
+        <Plus size={14} />
       </button>
 
       {/* 新建习惯弹窗 */}
