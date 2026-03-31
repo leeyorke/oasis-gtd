@@ -54,7 +54,7 @@ export default function Projects() {
 
       <div className="projects-grid">
         {projects.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--muted-foreground)', fontStyle: 'italic', padding: '2rem 0' }}>
+          <div className="project-empty-state">
             {t.proj_empty}
           </div>
         ) : (
@@ -113,43 +113,26 @@ export default function Projects() {
       </button>
 
       {showNewProject && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-        }} onClick={() => setShowNewProject(false)}>
-          <div style={{
-            background: 'var(--card)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '2rem',
-            width: '100%',
-            maxWidth: '480px',
-            boxShadow: 'var(--shadow-float)',
-          }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--foreground)' }}>
+        <div className="project-modal-overlay" onClick={() => setShowNewProject(false)}>
+          <div className="project-modal-content" onClick={e => e.stopPropagation()}>
+            <h2 className="project-modal-title">
               {t.proj_newProject}
             </h2>
             <input
-              className="waiting-page-input"
+              className="waiting-page-input project-modal-input-title"
               placeholder={t.proj_titlePlaceholder}
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
-              style={{ marginBottom: '1rem', fontSize: '1.1rem' }}
               onKeyDown={e => e.key === 'Enter' && handleCreateProject()}
               autoFocus
             />
             <input
-              className="waiting-page-input"
+              className="waiting-page-input project-modal-input-outcome"
               placeholder={t.proj_outcomePlaceholder}
               value={newOutcome}
               onChange={e => setNewOutcome(e.target.value)}
-              style={{ marginBottom: '1.5rem' }}
             />
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            <div className="project-modal-actions">
               <button
                 className="btn-text"
                 onClick={() => setShowNewProject(false)}
@@ -157,9 +140,8 @@ export default function Projects() {
                 {t.cancel}
               </button>
               <button
-                className="btn-text"
+                className="project-modal-create-btn"
                 onClick={handleCreateProject}
-                style={{ background: 'var(--foreground)', color: 'var(--primary-foreground)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)' }}
               >
                 {t.create}
               </button>
@@ -231,7 +213,7 @@ export default function Projects() {
           )}
 
           {selectedProject.outcome && (
-            <div className="project-detail-desc" style={{ fontStyle: 'italic' }}>
+            <div className="project-detail-outcome">
               {selectedProject.outcome}
             </div>
           )}
@@ -317,7 +299,7 @@ export default function Projects() {
           )}
 
           {projectTasks.length === 0 && (
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--muted-foreground)', fontStyle: 'italic', padding: '2rem 0' }}>
+            <div className="project-detail-empty-state">
               {t.proj_noActions}
             </div>
           )}

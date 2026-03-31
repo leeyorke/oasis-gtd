@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import type { AIProvider } from '../types'
 import { useT } from '../i18n/useT'
+import { Check, Pencil, Trash2 } from 'lucide-react'
 
 type Section = 'general' | 'contexts' | 'ai-providers' | 'data'
 
@@ -344,31 +345,40 @@ export default function Settings() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                           <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.78rem', color: 'var(--ink-primary)', fontWeight: 500 }}>{p.name}</span>
                           {p.is_active ? (
-                            <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--sheet-blue)', border: '1px solid var(--sheet-blue)', padding: '0.1rem 0.4rem', borderRadius: '20px' }}>Active</span>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
                           ) : null}
                         </div>
                         <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'var(--ink-secondary)', marginTop: '0.2rem' }}>
                           {p.model} · {p.base_url}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.6rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
                         {!p.is_active && (
-                          <button className="btn-text" onClick={() => setActiveProvider(p.id)}>{t.settings_setActive}</button>
+                          <button
+                            className="action-btn"
+                            onClick={() => setActiveProvider(p.id)}
+                            title={t.settings_setActive}
+                          >
+                            <Check size={14} />
+                          </button>
                         )}
                         <button
-                          className="btn-text"
+                          className="action-btn"
                           onClick={() => editingProviderId === p.id ? (setEditingProviderId(null), setShowProviderForm(false)) : handleEditProvider(p)}
-                          style={{ color: editingProviderId === p.id ? 'var(--ink-primary)' : 'var(--ink-secondary)' }}
+                          title={editingProviderId === p.id ? t.settings_cancel : t.edit}
                         >
-                          {editingProviderId === p.id ? t.settings_cancel : t.edit}
+                          <Pencil size={14} />
                         </button>
                         <button
-                          className="btn-text"
+                          className="action-btn"
                           onClick={() => deleteProvider(p.id)}
+                          title={t.settings_remove}
                           style={{ color: 'rgba(168,50,50,0.6)' }}
                           onMouseEnter={e => (e.currentTarget.style.color = '#a83232')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'rgba(168,50,50,0.6)')}
-                        >{t.settings_remove}</button>
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -441,7 +451,7 @@ export default function Settings() {
                       onChange={e => setProviderForm(f => ({ ...f, system_prompt: e.target.value }))}
                       placeholder={t.settings_systemPromptHint}
                       rows={3}
-                      style={{ resize: 'vertical', minHeight: '60px' }}
+                      style={{ resize: 'none', minHeight: '60px', overflowY: 'auto' }}
                     />
                   </div>
 

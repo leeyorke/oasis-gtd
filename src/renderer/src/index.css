@@ -155,8 +155,8 @@ body {
 }
 
 .nav-sidebar.collapsed .nav-link {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   justify-content: center;
   padding: 0;
 }
@@ -2790,15 +2790,15 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(28, 27, 26, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .thought-modal-content {
-  background: var(--card);
+  background: var(--sheet-main);
   border-radius: var(--radius-lg);
   padding: 2rem;
   width: 90%;
@@ -3009,15 +3009,15 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(28, 27, 26, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .habit-modal-content {
-  background: var(--card);
+  background: var(--sheet-main);
   border-radius: var(--radius-lg);
   padding: 2rem;
   width: 90%;
@@ -4438,6 +4438,78 @@ body {
   font-weight: 600;
   color: var(--foreground);
   white-space: nowrap;
+}
+
+/* ─── Project Modal Styles ─────────────────────────────────────────────── */
+.project-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 27, 26, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.project-modal-content {
+  background: var(--sheet-main);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-float);
+}
+
+.project-modal-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+}
+
+.project-modal-input-title {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.project-modal-input-outcome {
+  margin-bottom: 1.5rem;
+}
+
+.project-modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.project-modal-create-btn {
+  background: var(--foreground);
+  color: var(--primary-foreground);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+}
+
+.project-empty-state {
+  grid-column: 1 / -1;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+  padding: 2rem 0;
+}
+
+.project-detail-outcome {
+  font-style: italic;
+}
+
+.project-detail-empty-state {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+  padding: 2rem 0;
 }
 
 /* ─── Tasks Section ────────────────────────────────────────────────────── */
