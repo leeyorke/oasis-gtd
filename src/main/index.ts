@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './db/database'
@@ -19,11 +19,24 @@ if (process.platform === 'win32') {
 }
 
 function createWindow(): void {
+  // Get the display where the cursor is currently located
+  const cursorPoint = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursorPoint)
+  const { x: screenX, y: screenY, width: screenWidth, height: screenHeight } = display.workArea
+
+  // Center the window on the screen where the cursor is
+  const windowWidth = 1100
+  const windowHeight = 700
+  const x = Math.round(screenX + (screenWidth - windowWidth) / 2)
+  const y = Math.round(screenY + (screenHeight - windowHeight) / 2)
+
   const mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: windowWidth,
+    height: windowHeight,
     minWidth: 1100,
     minHeight: 700,
+    x,
+    y,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
