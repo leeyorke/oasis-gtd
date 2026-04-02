@@ -2704,7 +2704,7 @@ body {
   cursor: pointer;
   transition: all 0.2s var(--ease-out);
   height: fit-content;
-  max-height: 400px;
+  max-height: 600px;
   break-inside: avoid;
   margin-bottom: 24px;
 }
