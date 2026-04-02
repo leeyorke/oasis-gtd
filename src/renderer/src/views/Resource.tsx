@@ -20,6 +20,17 @@ const TYPE_LABELS: Record<string, string> = {
   collection: 'List',
 }
 
+const TAG_COLORS = [
+  { name: 'gray', bg: '#cccccc', text: '#333333', border: '#cccccc' },
+  { name: 'red', bg: '#cc3333', text: '#ffffff', border: '#cc3333' },
+  { name: 'orange', bg: '#ff6600', text: '#ffffff', border: '#ff6600' },
+  { name: 'yellow', bg: '#ffff00', text: '#333333', border: '#ffff00' },
+  { name: 'green', bg: '#669933', text: '#ffffff', border: '#669933' },
+  { name: 'blue', bg: '#3399cc', text: '#ffffff', border: '#3399cc' },
+  { name: 'purple', bg: '#9966cc', text: '#ffffff', border: '#9966cc' },
+  { name: 'pink', bg: '#ff99cc', text: '#333333', border: '#ff99cc' },
+]
+
 export default function Resource() {
   const { resources, loadResources, addResource, updateResource, removeResource, settings } = useStore()
   const t = useT()
@@ -35,25 +46,46 @@ export default function Resource() {
   const [newType, setNewType] = useState<'document' | 'link' | 'spreadsheet' | 'image' | 'collection'>('document')
   const [newDescription, setNewDescription] = useState('')
   const [newUrl, setNewUrl] = useState('')
-  const [newTags, setNewTags] = useState('')
+  const [newTags, setNewTags] = useState<{ name: string; color: string }[]>([])
+  const [newTagInput, setNewTagInput] = useState('')
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0].name)
+  const [showNewTagColorPicker, setShowNewTagColorPicker] = useState(false)
+  const [showNewTagDropdown, setShowNewTagDropdown] = useState(false)
 
   // Edit resource form state
   const [editTitle, setEditTitle] = useState('')
   const [editType, setEditType] = useState<'document' | 'link' | 'spreadsheet' | 'image' | 'collection'>('document')
   const [editDescription, setEditDescription] = useState('')
   const [editUrl, setEditUrl] = useState('')
-  const [editTags, setEditTags] = useState('')
+  const [editTags, setEditTags] = useState<{ name: string; color: string }[]>([])
+  const [editTagInput, setEditTagInput] = useState('')
+  const [editTagColor, setEditTagColor] = useState(TAG_COLORS[0].name)
+  const [showEditTagColorPicker, setShowEditTagColorPicker] = useState(false)
+  const [showEditTagDropdown, setShowEditTagDropdown] = useState(false)
 
   // Load resources on mount
   useState(() => {
     loadResources()
   })
 
+  // Parse tag name (remove color suffix)
+  const parseTagName = (tag: string) => tag.split('|')[0]
+
+  // Get tag color
+  const getTagColor = (tag: string) => {
+    const parts = tag.split('|')
+    if (parts.length === 2) {
+      return TAG_COLORS.find(c => c.name === parts[1]) || TAG_COLORS[0]
+    }
+    const hash = tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return TAG_COLORS[hash % TAG_COLORS.length]
+  }
+
   // Extract all unique tags from resources
   const availableTags = useMemo(() => {
     const tagSet = new Set<string>()
     resources.forEach(resource => {
-      resource.tags?.forEach(tag => tagSet.add(tag))
+      resource.tags?.forEach(tag => tagSet.add(parseTagName(tag)))
     })
     return Array.from(tagSet)
   }, [resources])
@@ -103,7 +135,7 @@ export default function Resource() {
     // Tag filter
     if (activeTag !== 'all') {
       // Check if resource has the tag OR if the tag matches the predefined filter
-      const hasTag = resource.tags?.includes(activeTag)
+      const hasTag = resource.tags?.some(tag => parseTagName(tag) === activeTag)
       const isTypeMatch = resource.type === activeTag
       if (!hasTag && !isTypeMatch) return false
     }
@@ -112,7 +144,7 @@ export default function Resource() {
       const keyword = searchKeyword.toLowerCase()
       const matchesTitle = resource.title.toLowerCase().includes(keyword)
       const matchesDesc = resource.description?.toLowerCase().includes(keyword)
-      const matchesTags = resource.tags?.some(tag => tag.toLowerCase().includes(keyword))
+      const matchesTags = resource.tags?.some(tag => parseTagName(tag).toLowerCase().includes(keyword))
       if (!matchesTitle && !matchesDesc && !matchesTags) return false
     }
     return true
@@ -121,17 +153,15 @@ export default function Resource() {
   const handleAddResource = async () => {
     if (!newTitle.trim()) return
 
-    const tags = newTags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0)
+    // Convert display format to stored format
+    const storedTags = newTags.map(t => t.color !== 'gray' ? `${t.name}|${t.color}` : t.name)
 
     await addResource({
       title: newTitle.trim(),
       type: newType,
       description: newDescription.trim() || undefined,
       url: newUrl.trim() || undefined,
-      tags,
+      tags: storedTags,
     })
 
     // Reset form
@@ -139,33 +169,42 @@ export default function Resource() {
     setNewType('document')
     setNewDescription('')
     setNewUrl('')
-    setNewTags('')
+    setNewTags([])
+    setNewTagInput('')
     setShowAddModal(false)
   }
 
   const handleEditResource = (resource: Resource) => {
+    // Convert stored tags to display format with colors
+    const displayTags = (resource.tags || []).map(tag => {
+      const parts = tag.split('|')
+      return {
+        name: parts[0],
+        color: parts[1] || 'gray'
+      }
+    })
     setEditingResource(resource)
     setEditTitle(resource.title)
     setEditType(resource.type)
     setEditDescription(resource.description || '')
     setEditUrl(resource.url || '')
-    setEditTags(resource.tags?.join(', ') || '')
+    setEditTags(displayTags)
+    setEditTagInput('')
+    setEditTagColor(TAG_COLORS[0].name)
   }
 
   const handleUpdateResource = async () => {
     if (!editingResource || !editTitle.trim()) return
 
-    const tags = editTags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0)
+    // Convert display format to stored format
+    const storedTags = editTags.map(t => t.color !== 'gray' ? `${t.name}|${t.color}` : t.name)
 
     await updateResource(editingResource.id, {
       title: editTitle.trim(),
       type: editType,
       description: editDescription.trim() || undefined,
       url: editUrl.trim() || undefined,
-      tags,
+      tags: storedTags,
     })
 
     setEditingResource(null)
@@ -220,24 +259,12 @@ export default function Resource() {
             }}
           />
         </div>
-        <div className="resource-tag-filter-row">
-          {tagOptions.map(tag => (
-            <div
-              key={tag.key}
-              className={`resource-tag-chip ${activeTag === tag.key ? 'active' : ''}`}
-              onClick={() => setActiveTag(tag.key)}
-            >
-              {tag.label}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* List Header */}
       <section className="resource-list-section">
         <div className="resource-list-header">
           <div>{isZh ? '资源' : t.resource_colName}</div>
-          <div>{isZh ? '标签' : t.resource_colTags}</div>
           <div>{isZh ? '更新时间' : t.resource_colDate}</div>
           <div></div>
         </div>
@@ -271,6 +298,34 @@ export default function Resource() {
                           <ExternalLink size={14} style={{ marginLeft: '8px', opacity: 0.5 }} />
                         )}
                       </div>
+                      <div className="resource-tags" style={{ marginTop: '4px' }}>
+                        {resource.tags?.map(tag => {
+                          const tagName = parseTagName(tag)
+                          const color = getTagColor(tag)
+                          return (
+                            <span
+                              key={tag}
+                              className="resource-tag"
+                              style={{
+                                backgroundColor: color.bg,
+                                borderColor: color.border,
+                                color: color.text,
+                                borderRadius: '20px',
+                                padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                                border: `1px solid ${color.border}`,
+                                fontSize: '0.65rem',
+                                fontFamily: 'var(--font-sans)',
+                                letterSpacing: '0.04em',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                              }}
+                            >
+                              {tagName}
+                            </span>
+                          )
+                        })}
+                      </div>
                       <div className="resource-meta">
                         <span>{TYPE_LABELS[resource.type]}</span>
                         {resource.description && (
@@ -283,13 +338,6 @@ export default function Resource() {
                         )}
                       </div>
                     </div>
-                  </div>
-                  <div className="resource-tags">
-                    {resource.tags?.map(tag => (
-                      <span key={tag} className="resource-tag">
-                        {tag}
-                      </span>
-                    ))}
                   </div>
                   <div className="resource-date">
                     {formatDate(resource.updatedAt)}
@@ -422,13 +470,126 @@ export default function Resource() {
 
               {/* Tags */}
               <div className="resource-form-group">
-                <input
-                  type="text"
-                  className="resource-form-input"
-                  placeholder={isZh ? '多个标签用逗号分隔' : t.resource_tagsPlaceholder}
-                  value={newTags}
-                  onChange={e => setNewTags(e.target.value)}
-                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  {newTags.map(tag => {
+                    const color = TAG_COLORS.find(c => c.name === tag.color) || TAG_COLORS[0]
+                    return (
+                      <div
+                        key={tag.name}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                          backgroundColor: color.bg,
+                          border: `1px solid ${color.border}`,
+                          padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                          borderRadius: '20px',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: color.text, letterSpacing: '0.04em' }}>{tag.name}</span>
+                        <button
+                          onClick={() => setNewTags(newTags.filter(t => t.name !== tag.name))}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: color.text, fontSize: '0.75rem', lineHeight: 1, padding: '0 0.1rem', transition: 'color 0.2s', opacity: 0.6 }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+                        >×</button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="resource-form-input"
+                    placeholder={isZh ? '输入标签后按回车添加' : 'Type a tag and press Enter to add'}
+                    value={newTagInput}
+                    onChange={e => setNewTagInput(e.target.value)}
+                    onFocus={() => setShowNewTagDropdown(true)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && newTagInput.trim()) {
+                        e.preventDefault()
+                        if (!newTags.some(t => t.name === newTagInput.trim())) {
+                          setNewTags([...newTags, { name: newTagInput.trim(), color: newTagColor }])
+                        }
+                        setNewTagInput('')
+                      }
+                    }}
+                  />
+                  {showNewTagDropdown && (
+                    <>
+                      {availableTags.filter(tag => !newTags.some(t => t.name === tag) && tag.includes(newTagInput)).length > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.4rem',
+                          padding: '0.5rem',
+                          background: 'var(--card)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          zIndex: 10,
+                          marginTop: '0.5rem',
+                          maxHeight: '120px',
+                          overflowY: 'auto'
+                        }}>
+                          {availableTags.filter(tag => !newTags.some(t => t.name === tag) && tag.includes(newTagInput)).map(tag => {
+                            const color = getTagColor(tag)
+                            return (
+                              <div
+                                key={tag}
+                                onClick={() => {
+                                  setNewTags([...newTags, { name: tag, color: color.border === '#cccccc' ? 'gray' : color.name }])
+                                  setNewTagInput('')
+                                  setShowNewTagDropdown(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  backgroundColor: color.bg,
+                                  border: `1px solid ${color.border}`,
+                                  padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                                  borderRadius: '20px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: color.text, letterSpacing: '0.04em' }}>{tag}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    padding: '0.5rem',
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 10,
+                    marginTop: '0.5rem'
+                  }}>
+                    {TAG_COLORS.map(color => (
+                      <div
+                        key={color.name}
+                        onClick={() => {
+                          setNewTagColor(color.name)
+                        }}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: color.bg,
+                          border: `2px solid ${color.border}`,
+                          cursor: 'pointer',
+                          outline: newTagColor === color.name ? `2px solid ${color.text}` : 'none',
+                          outlineOffset: '2px'
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="resource-modal-footer">
@@ -554,13 +715,126 @@ export default function Resource() {
 
               {/* Tags */}
               <div className="resource-form-group">
-                <input
-                  type="text"
-                  className="resource-form-input"
-                  placeholder={isZh ? '多个标签用逗号分隔' : t.resource_tagsPlaceholder}
-                  value={editTags}
-                  onChange={e => setEditTags(e.target.value)}
-                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  {editTags.map(tag => {
+                    const color = TAG_COLORS.find(c => c.name === tag.color) || TAG_COLORS[0]
+                    return (
+                      <div
+                        key={tag.name}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                          backgroundColor: color.bg,
+                          border: `1px solid ${color.border}`,
+                          padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                          borderRadius: '20px',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: color.text, letterSpacing: '0.04em' }}>{tag.name}</span>
+                        <button
+                          onClick={() => setEditTags(editTags.filter(t => t.name !== tag.name))}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: color.text, fontSize: '0.75rem', lineHeight: 1, padding: '0 0.1rem', transition: 'color 0.2s', opacity: 0.6 }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+                        >×</button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="resource-form-input"
+                    placeholder={isZh ? '输入标签后按回车添加' : 'Type a tag and press Enter to add'}
+                    value={editTagInput}
+                    onChange={e => setEditTagInput(e.target.value)}
+                    onFocus={() => setShowEditTagDropdown(true)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && editTagInput.trim()) {
+                        e.preventDefault()
+                        if (!editTags.some(t => t.name === editTagInput.trim())) {
+                          setEditTags([...editTags, { name: editTagInput.trim(), color: editTagColor }])
+                        }
+                        setEditTagInput('')
+                      }
+                    }}
+                  />
+                  {showEditTagDropdown && (
+                    <>
+                      {availableTags.filter(tag => !editTags.some(t => t.name === tag) && tag.includes(editTagInput)).length > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.4rem',
+                          padding: '0.5rem',
+                          background: 'var(--card)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          zIndex: 10,
+                          marginTop: '0.5rem',
+                          maxHeight: '120px',
+                          overflowY: 'auto'
+                        }}>
+                          {availableTags.filter(tag => !editTags.some(t => t.name === tag) && tag.includes(editTagInput)).map(tag => {
+                            const color = getTagColor(tag)
+                            return (
+                              <div
+                                key={tag}
+                                onClick={() => {
+                                  setEditTags([...editTags, { name: tag, color: color.border === '#cccccc' ? 'gray' : color.name }])
+                                  setEditTagInput('')
+                                  setShowEditTagDropdown(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  backgroundColor: color.bg,
+                                  border: `1px solid ${color.border}`,
+                                  padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                                  borderRadius: '20px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: color.text, letterSpacing: '0.04em' }}>{tag}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    padding: '0.5rem',
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 10,
+                    marginTop: '0.5rem'
+                  }}>
+                    {TAG_COLORS.map(color => (
+                      <div
+                        key={color.name}
+                        onClick={() => {
+                          setEditTagColor(color.name)
+                        }}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: color.bg,
+                          border: `2px solid ${color.border}`,
+                          cursor: 'pointer',
+                          outline: editTagColor === color.name ? `2px solid ${color.text}` : 'none',
+                          outlineOffset: '2px'
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="resource-modal-footer">

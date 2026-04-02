@@ -2678,6 +2678,8 @@ body {
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  grid-auto-rows: minmax(100px, auto);
+  align-items: start;
 }
 
 .thoughts-grid::-webkit-scrollbar {
@@ -2702,8 +2704,9 @@ body {
   flex-direction: column;
   gap: 16px;
   cursor: pointer;
-  min-height: 200px;
   transition: all 0.2s var(--ease-out);
+  height: fit-content;
+  max-height: 400px;
 }
 
 .thought-card:hover {
@@ -2763,9 +2766,10 @@ body {
   line-height: 1.6;
   color: var(--foreground);
   font-weight: 400;
-  max-height: 200px;
-  overflow-y: auto;
+  white-space: pre-wrap;
   flex: 1;
+  word-break: break-word;
+  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -2802,11 +2806,10 @@ body {
 .thought-tag {
   font-size: 12px;
   font-weight: 500;
-  color: var(--secondary-foreground);
-  background: var(--secondary);
   padding: 4px 10px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
 .thought-weather {
@@ -3774,13 +3777,12 @@ body {
   height: 28px;
   padding: 0 10px;
   border-radius: var(--radius-xl);
-  background: var(--secondary);
-  color: var(--secondary-foreground);
   display: inline-flex;
   align-items: center;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
 .resource-date {
