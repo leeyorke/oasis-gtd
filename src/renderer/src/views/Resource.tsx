@@ -259,18 +259,25 @@ export default function Resource() {
             }}
           />
         </div>
+
+        {/* Tag Filter Row */}
+        <div className="resource-tag-filter-row">
+          {tagOptions.map(tag => (
+            <div
+              key={tag.key}
+              className={`resource-tag-chip ${activeTag === tag.key ? 'active' : ''}`}
+              onClick={() => setActiveTag(tag.key)}
+            >
+              {tag.label}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* List Header */}
-      <section className="resource-list-section">
-        <div className="resource-list-header">
-          <div>{isZh ? '资源' : t.resource_colName}</div>
-          <div>{isZh ? '更新时间' : t.resource_colDate}</div>
-          <div></div>
-        </div>
-
-        {/* Resource List */}
-        <div className="resource-list">
+      {/* Resource Grid */}
+      <section className="resource-grid-section">
+        {/* Resource Cards */}
+        <div className="resource-grid">
           {filteredResources.length === 0 ? (
             <div className="resource-empty">
               <div className="resource-empty-text">
@@ -283,82 +290,81 @@ export default function Resource() {
               return (
                 <div
                   key={resource.id}
-                  className="resource-item"
+                  className="resource-card"
                   data-type={resource.type}
                   onClick={() => handleResourceClick(resource)}
                   style={{ cursor: resource.type === 'link' ? 'pointer' : 'default' }}
                 >
-                  <div className="resource-main">
-                    <div className="resource-icon">
+                  {/* Card Header */}
+                  <div className="resource-card-header">
+                    <span>{formatDate(resource.updatedAt)}</span>
+                    <div className="resource-card-actions">
+                      <button
+                        className="resource-action-btn"
+                        onClick={e => { e.stopPropagation(); handleEditResource(resource) }}
+                        title={isZh ? '编辑' : 'Edit'}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="resource-action-btn delete"
+                        onClick={e => handleDeleteResource(e, resource.id)}
+                        title={isZh ? '删除' : 'Delete'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="resource-card-body">
+                    <div className="resource-card-icon-wrapper">
                       <IconComponent size={20} />
                     </div>
-                    <div className="resource-text">
-                      <div className="resource-name">
-                        {resource.title}
-                        {resource.type === 'link' && resource.url && (
-                          <ExternalLink size={14} style={{ marginLeft: '8px', opacity: 0.5 }} />
-                        )}
-                      </div>
-                      <div className="resource-tags" style={{ marginTop: '4px' }}>
-                        {resource.tags?.map(tag => {
-                          const tagName = parseTagName(tag)
-                          const color = getTagColor(tag)
-                          return (
-                            <span
-                              key={tag}
-                              className="resource-tag"
-                              style={{
-                                backgroundColor: color.bg,
-                                borderColor: color.border,
-                                color: color.text,
-                                borderRadius: '20px',
-                                padding: '0.2rem 0.5rem 0.2rem 0.6rem',
-                                border: `1px solid ${color.border}`,
-                                fontSize: '0.65rem',
-                                fontFamily: 'var(--font-sans)',
-                                letterSpacing: '0.04em',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                              }}
-                            >
-                              {tagName}
-                            </span>
-                          )
-                        })}
-                      </div>
-                      <div className="resource-meta">
-                        <span>{TYPE_LABELS[resource.type]}</span>
-                        {resource.description && (
-                          <>
-                            <span className="resource-meta-dot"></span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                              {resource.description}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                    <div
+                      className="resource-card-title"
+                      data-type={resource.type === 'link' ? 'link' : ''}
+                    >
+                      {resource.title}
+                      {resource.type === 'link' && resource.url && (
+                        <ExternalLink size={14} style={{ opacity: 0.5 }} />
+                      )}
                     </div>
+                    {resource.description && (
+                      <p className="resource-card-desc">
+                        {resource.description}
+                      </p>
+                    )}
                   </div>
-                  <div className="resource-date">
-                    {formatDate(resource.updatedAt)}
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px', justifySelf: 'end' }}>
-                    <button
-                      className="resource-delete"
-                      onClick={e => { e.stopPropagation(); handleEditResource(resource) }}
-                      title={isZh ? '编辑' : 'Edit'}
-                      style={{ background: 'var(--secondary)' }}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      className="resource-delete"
-                      onClick={e => handleDeleteResource(e, resource.id)}
-                      title={isZh ? '删除' : 'Delete'}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+
+                  {/* Card Footer */}
+                  <div className="resource-card-footer">
+                    {resource.tags?.map(tag => {
+                      const tagName = parseTagName(tag)
+                      const color = getTagColor(tag)
+                      return (
+                        <span
+                          key={tag}
+                          className="resource-tag"
+                          style={{
+                            backgroundColor: color.bg,
+                            borderColor: color.border,
+                            color: color.text,
+                            borderRadius: '20px',
+                            padding: '0.2rem 0.5rem 0.2rem 0.6rem',
+                            border: `1px solid ${color.border}`,
+                            fontSize: '0.65rem',
+                            fontFamily: 'var(--font-sans)',
+                            letterSpacing: '0.04em',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                          }}
+                        >
+                          {tagName}
+                        </span>
+                      )
+                    })}
                   </div>
                 </div>
               )
