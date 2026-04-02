@@ -2670,16 +2670,15 @@ body {
 }
 
 .thoughts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   padding-bottom: 120px;
   overflow-y: auto;
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  grid-auto-rows: minmax(100px, auto);
-  align-items: start;
+  align-items: flex-start;
 }
 
 .thoughts-grid::-webkit-scrollbar {
@@ -2707,6 +2706,8 @@ body {
   transition: all 0.2s var(--ease-out);
   height: fit-content;
   max-height: 400px;
+  flex: 1 1 300px;
+  min-width: 300px;
 }
 
 .thought-card:hover {
