@@ -1,20 +1,27 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
-import { Check, Plus } from 'lucide-react'
+import { Check, Plus, Pencil, Trash2 } from 'lucide-react'
 
 const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function Habit() {
-  const { habits, toggleHabitComplete, addHabit, settings, setView, loadHabitById } = useStore()
+  const { habits, toggleHabitComplete, addHabit, updateHabit, removeHabit, settings, setView, loadHabitById } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [editingHabit, setEditingHabit] = useState<any>(null)
+  const [deleteHabitId, setDeleteHabitId] = useState<string | null>(null)
   const [newHabitTitle, setNewHabitTitle] = useState('')
   const [newHabitDescription, setNewHabitDescription] = useState('')
   const [newHabitTime, setNewHabitTime] = useState('')
+  const [editHabitTitle, setEditHabitTitle] = useState('')
+  const [editHabitDescription, setEditHabitDescription] = useState('')
+  const [editHabitTime, setEditHabitTime] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
   const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 // 周一为0
@@ -39,6 +46,54 @@ export default function Habit() {
     setNewHabitTitle('')
     setNewHabitDescription('')
     setNewHabitTime('')
+  }
+
+  // 打开编辑弹窗
+  const handleOpenEdit = (habit: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingHabit(habit)
+    setEditHabitTitle(habit.title)
+    setEditHabitDescription(habit.description || '')
+    setEditHabitTime(habit.time_of_day || '')
+    setShowEditModal(true)
+  }
+
+  // 处理编辑保存
+  const handleEditHabit = async () => {
+    if (!editHabitTitle.trim() || !editingHabit) return
+
+    await updateHabit(editingHabit.id, {
+      title: editHabitTitle.trim(),
+      description: editHabitDescription.trim() || undefined,
+      time_of_day: editHabitTime.trim() || undefined,
+    })
+
+    setShowEditModal(false)
+    setEditingHabit(null)
+    setEditHabitTitle('')
+    setEditHabitDescription('')
+    setEditHabitTime('')
+  }
+
+  // 打开删除确认
+  const handleOpenDelete = (habitId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeleteHabitId(habitId)
+    setShowDeleteConfirm(true)
+  }
+
+  // 处理删除确认
+  const handleConfirmDelete = async () => {
+    if (!deleteHabitId) return
+    await removeHabit(deleteHabitId)
+    setShowDeleteConfirm(false)
+    setDeleteHabitId(null)
+  }
+
+  // 取消删除
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false)
+    setDeleteHabitId(null)
   }
 
   // 获取周几的显示文本
@@ -110,6 +165,22 @@ export default function Habit() {
                     {habit.time_of_day && `, ${habit.time_of_day}`}
                   </span>
                 </div>
+              </div>
+              <div className="habit-actions">
+                <button
+                  className="habit-action-btn"
+                  onClick={(e) => handleOpenEdit(habit, e)}
+                  title={isZh ? '编辑' : 'Edit'}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  className="habit-action-btn delete"
+                  onClick={(e) => handleOpenDelete(habit.id, e)}
+                  title={isZh ? '删除' : 'Delete'}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
               <div className="habit-progress">
                 {WEEK_DAYS.map((_, index) => {
@@ -198,6 +269,100 @@ export default function Habit() {
                 onClick={handleAddHabit}
               >
                 {t.create}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑习惯弹窗 */}
+      {showEditModal && (
+        <div className="habit-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="habit-modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="habit-modal-title">
+              {isZh ? '编辑习惯' : 'Edit Habit'}
+            </h3>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '习惯名称' : 'Habit Name'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '例如：晨间冥想 15 分钟' : 'e.g. Morning Meditation 15min'}
+                value={editHabitTitle}
+                onChange={e => setEditHabitTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '描述（可选）' : 'Description (Optional)'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '简单描述这个习惯' : 'Brief description of the habit'}
+                value={editHabitDescription}
+                onChange={e => setEditHabitDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '时间（可选）' : 'Time (Optional)'}
+              </label>
+              <input
+                type="text"
+                className="habit-modal-input"
+                placeholder={isZh ? '例如：早上 / 晚上' : 'e.g. Morning / Evening'}
+                value={editHabitTime}
+                onChange={e => setEditHabitTime(e.target.value)}
+              />
+            </div>
+
+            <div className="habit-modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => setShowEditModal(false)}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleEditHabit}
+              >
+                {isZh ? '保存' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div className="habit-modal-overlay" onClick={handleCancelDelete}>
+          <div className="habit-modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="habit-modal-title">
+              {isZh ? '确认删除' : 'Confirm Delete'}
+            </h3>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--muted-foreground)' }}>
+              {isZh ? '确定要删除这个习惯吗？此操作无法撤销。' : 'Are you sure you want to delete this habit? This action cannot be undone.'}
+            </p>
+            <div className="habit-modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={handleCancelDelete}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="btn-danger"
+                onClick={handleConfirmDelete}
+              >
+                {isZh ? '删除' : 'Delete'}
               </button>
             </div>
           </div>

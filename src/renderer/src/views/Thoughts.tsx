@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
-import { Search, MoreHorizontal, Plus, Sun, Cloud, CloudDrizzle, Wind } from 'lucide-react'
+import { Search, MoreHorizontal, Plus, Sun, Cloud, CloudDrizzle, Wind, Pencil, Trash2 } from 'lucide-react'
 
 const WEATHER_ICONS: Record<string, React.ElementType> = {
   '晴朗': Sun,
@@ -11,15 +11,21 @@ const WEATHER_ICONS: Record<string, React.ElementType> = {
 }
 
 export default function Thoughts() {
-  const { notes, addNote, searchNotes, settings } = useStore()
+  const { notes, addNote, updateNote, removeNote, searchNotes, settings } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
   const [searchKeyword, setSearchKeyword] = useState('')
   const [activeTag, setActiveTag] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [editingNote, setEditingNote] = useState<any>(null)
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null)
   const [newNoteContent, setNewNoteContent] = useState('')
   const [newNoteTags, setNewNoteTags] = useState('')
+  const [editNoteContent, setEditNoteContent] = useState('')
+  const [editNoteTags, setEditNoteTags] = useState('')
 
   // 从所有笔记中提取唯一的标签列表
   const availableTags = useMemo(() => {
@@ -81,6 +87,56 @@ export default function Thoughts() {
   // 处理标签切换
   const handleTagClick = (tagKey: string) => {
     setActiveTag(tagKey)
+  }
+
+  // 打开编辑弹窗
+  const handleOpenEdit = (note: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingNote(note)
+    setEditNoteContent(note.content)
+    setEditNoteTags(note.tags?.join(', ') || '')
+    setShowEditModal(true)
+  }
+
+  // 处理编辑保存
+  const handleEditNote = async () => {
+    if (!editNoteContent.trim() || !editingNote) return
+
+    const tags = editNoteTags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0)
+
+    await updateNote(editingNote.id, {
+      content: editNoteContent.trim(),
+      tags: tags.length > 0 ? tags : undefined
+    })
+
+    setShowEditModal(false)
+    setEditingNote(null)
+    setEditNoteContent('')
+    setEditNoteTags('')
+  }
+
+  // 打开删除确认
+  const handleOpenDelete = (noteId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeleteNoteId(noteId)
+    setShowDeleteConfirm(true)
+  }
+
+  // 处理删除确认
+  const handleConfirmDelete = async () => {
+    if (!deleteNoteId) return
+    await removeNote(deleteNoteId)
+    setShowDeleteConfirm(false)
+    setDeleteNoteId(null)
+  }
+
+  // 取消删除
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false)
+    setDeleteNoteId(null)
   }
 
   return (
@@ -148,7 +204,20 @@ export default function Thoughts() {
                     {formatDate(note.created_at)}
                   </span>
                   <div className="thought-action">
-                    <MoreHorizontal size={16} />
+                    <button
+                      className="thought-action-btn"
+                      onClick={(e) => handleOpenEdit(note, e)}
+                      title={isZh ? '编辑' : 'Edit'}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      className="thought-action-btn delete"
+                      onClick={(e) => handleOpenDelete(note.id, e)}
+                      title={isZh ? '删除' : 'Delete'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
                 <div className="thought-body">
@@ -257,6 +326,114 @@ export default function Thoughts() {
                 }}
               >
                 {t.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑随想弹窗 */}
+      {showEditModal && (
+        <div className="thought-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="thought-modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="thought-modal-title">
+              {isZh ? '编辑随想' : 'Edit Thought'}
+            </h3>
+            <textarea
+              className="thought-modal-textarea"
+              placeholder={isZh ? '记录你的想法...' : 'Write your thoughts...'}
+              value={editNoteContent}
+              onChange={e => setEditNoteContent(e.target.value)}
+            />
+            <div className="thought-modal-tag-input-container">
+              <label className="thought-modal-label">
+                {isZh ? '标签（多个用逗号分隔）' : 'Tags (separate with commas)'}
+              </label>
+              <input
+                type="text"
+                className="thought-modal-input"
+                placeholder={isZh ? '例如：感悟, 灵感, 工作' : 'e.g. insight, inspiration, work'}
+                value={editNoteTags}
+                onChange={e => setEditNoteTags(e.target.value)}
+              />
+            </div>
+            <div className="thought-modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingNote(null)
+                  setEditNoteContent('')
+                  setEditNoteTags('')
+                }}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--foreground)',
+                  cursor: 'pointer'
+                }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleEditNote}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                  cursor: 'pointer'
+                }}
+              >
+                {t.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div className="thought-modal-overlay" onClick={handleCancelDelete}>
+          <div className="thought-modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="thought-modal-title">
+              {isZh ? '确认删除' : 'Confirm Delete'}
+            </h3>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--muted-foreground)' }}>
+              {isZh ? '确定要删除这条随想吗？此操作无法撤销。' : 'Are you sure you want to delete this thought? This action cannot be undone.'}
+            </p>
+            <div className="thought-modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={handleCancelDelete}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--foreground)',
+                  cursor: 'pointer'
+                }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="btn-danger"
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  background: '#ef4444',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                {isZh ? '删除' : 'Delete'}
               </button>
             </div>
           </div>
