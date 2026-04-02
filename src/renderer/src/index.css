@@ -2670,16 +2670,14 @@ body {
 }
 
 .thoughts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  grid-template-rows: masonry;
-  gap: 24px;
+  column-count: auto;
+  column-width: 300px;
+  column-gap: 24px;
   padding-bottom: 120px;
   overflow-y: auto;
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  align-items: start;
 }
 
 .thoughts-grid::-webkit-scrollbar {
@@ -2707,6 +2705,8 @@ body {
   transition: all 0.2s var(--ease-out);
   height: fit-content;
   max-height: 400px;
+  break-inside: avoid;
+  margin-bottom: 24px;
 }
 
 .thought-card:hover {
@@ -3812,19 +3812,6 @@ body {
   color: var(--destructive-foreground);
 }
 
-/* Masonry 兼容性适配 */
-@supports not (grid-template-rows: masonry) {
-  .thoughts-grid {
-    column-count: auto;
-    column-width: 300px;
-    column-gap: 24px;
-  }
-
-  .thought-card {
-    break-inside: avoid;
-    margin-bottom: 24px;
-  }
-}
 
 .resource-empty {
   display: flex;
