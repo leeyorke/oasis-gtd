@@ -3748,6 +3748,11 @@ body {
   gap: 8px;
 }
 
+.resource-item[data-type="link"]:hover .resource-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .resource-meta {
   display: flex;
   align-items: center;

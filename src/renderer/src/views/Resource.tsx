@@ -284,6 +284,7 @@ export default function Resource() {
                 <div
                   key={resource.id}
                   className="resource-item"
+                  data-type={resource.type}
                   onClick={() => handleResourceClick(resource)}
                   style={{ cursor: resource.type === 'link' ? 'pointer' : 'default' }}
                 >
@@ -343,16 +344,6 @@ export default function Resource() {
                     {formatDate(resource.updatedAt)}
                   </div>
                   <div style={{ display: 'flex', gap: '4px', justifySelf: 'end' }}>
-                    {resource.type === 'link' && resource.url && (
-                      <button
-                        className="resource-delete"
-                        onClick={e => handleOpenLink(e, resource.url!)}
-                        title={isZh ? '在浏览器中打开' : 'Open in browser'}
-                        style={{ background: 'var(--secondary)' }}
-                      >
-                        <ExternalLink size={14} />
-                      </button>
-                    )}
                     <button
                       className="resource-delete"
                       onClick={e => { e.stopPropagation(); handleEditResource(resource) }}
