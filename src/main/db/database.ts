@@ -165,6 +165,19 @@ function createTables(): void {
     db.exec(`ALTER TABLE someday_items ADD COLUMN category TEXT DEFAULT ''`)
   } catch { /* column already exists */ }
 
+  // Migration: Add target and is_quantitative columns to habits if they don't exist
+  try {
+    db.exec(`ALTER TABLE habits ADD COLUMN target INTEGER NOT NULL DEFAULT 1`)
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE habits ADD COLUMN is_quantitative INTEGER NOT NULL DEFAULT 0`)
+  } catch { /* column already exists */ }
+
+  // Migration: Add count column to habit_records if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE habit_records ADD COLUMN count INTEGER NOT NULL DEFAULT 1`)
+  } catch { /* column already exists */ }
+
   // Create resources table
   db.exec(`
     CREATE TABLE IF NOT EXISTS resources (
@@ -614,8 +627,8 @@ export const habitQueries = {
     const now = new Date().toISOString()
     const id = uuidv4()
     db.prepare(`
-      INSERT INTO habits (id, title, description, frequency, time_of_day, color, created_at, updated_at, is_archived)
-      VALUES (@id, @title, @description, @frequency, @time_of_day, @color, @created_at, @updated_at, @is_archived)
+      INSERT INTO habits (id, title, description, frequency, time_of_day, color, created_at, updated_at, is_archived, target, is_quantitative)
+      VALUES (@id, @title, @description, @frequency, @time_of_day, @color, @created_at, @updated_at, @is_archived, @target, @is_quantitative)
     `).run({
       id,
       title: habit.title,
@@ -626,6 +639,8 @@ export const habitQueries = {
       created_at: now,
       updated_at: now,
       is_archived: 0,
+      target: habit.target ?? 1,
+      is_quantitative: habit.is_quantitative ?? 0,
     })
     return id
   },
@@ -687,6 +702,79 @@ export const habitRecordQueries = {
       })
       return id
     }
+  },
+
+  // For quantifiable habits: increment count (or set if no record exists)
+  // Returns null if max count reached, otherwise returns record id
+  incrementCount: (habitId: string, recordDate: string, maxCount: number) => {
+    const now = new Date().toISOString()
+    const existing = habitRecordQueries.getByHabitAndDate(habitId, recordDate)
+    const currentCount = existing ? (existing.count as number || 1) : 0
+
+    // Don't exceed max count
+    if (currentCount >= maxCount) {
+      return existing?.id || null
+    }
+
+    if (existing) {
+      db.prepare(`
+        UPDATE habit_records
+        SET count = count + 1, created_at = @updated_at
+        WHERE habit_id = @habitId AND record_date = @recordDate
+      `).run({ habitId, recordDate, updated_at: now })
+      return existing.id
+    } else {
+      const id = uuidv4()
+      db.prepare(`
+        INSERT INTO habit_records (id, habit_id, record_date, completed, count, created_at)
+        VALUES (@id, @habitId, @recordDate, 1, 1, @created_at)
+      `).run({ id, habitId, recordDate, created_at: now })
+      return id
+    }
+  },
+
+  // For quantifiable habits: decrement count
+  decrementCount: (habitId: string, recordDate: string) => {
+    const now = new Date().toISOString()
+    const existing = habitRecordQueries.getByHabitAndDate(habitId, recordDate)
+
+    if (!existing) return null
+
+    if (existing.count <= 1) {
+      // Delete the record if count would go to 0
+      db.prepare('DELETE FROM habit_records WHERE id = ?').run(existing.id)
+      return null
+    } else {
+      db.prepare(`
+        UPDATE habit_records
+        SET count = count - 1, created_at = @updated_at
+        WHERE habit_id = @habitId AND record_date = @recordDate
+      `).run({ habitId, recordDate, updated_at: now })
+      return existing.id
+    }
+  },
+
+  // Toggle complete for normal habits (completed = 1 or 0)
+  toggleComplete: (habitId: string, recordDate: string, completed: boolean) => {
+    const now = new Date().toISOString()
+    const existing = habitRecordQueries.getByHabitAndDate(habitId, recordDate)
+
+    if (existing) {
+      db.prepare(`
+        UPDATE habit_records
+        SET completed = @completed, created_at = @updated_at
+        WHERE habit_id = @habitId AND record_date = @recordDate
+      `).run({ habitId, recordDate, completed: completed ? 1 : 0, updated_at: now })
+      return existing.id
+    } else if (completed) {
+      const id = uuidv4()
+      db.prepare(`
+        INSERT INTO habit_records (id, habit_id, record_date, completed, count, created_at)
+        VALUES (@id, @habitId, @recordDate, 1, 1, @created_at)
+      `).run({ id, habitId, recordDate, created_at: now })
+      return id
+    }
+    return null
   },
 
   delete: (id: string) =>

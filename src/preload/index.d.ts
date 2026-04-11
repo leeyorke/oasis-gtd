@@ -36,10 +36,12 @@ declare global {
       deleteResource: (id: string) => Promise<void>
       getHabits: () => Promise<Habit[]>
       getHabitById: (id: string) => Promise<HabitDetail | null>
-      createHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'weekRecords'>) => Promise<string>
+      createHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'todayCount' | 'weekRecords'>) => Promise<string>
       updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
       deleteHabit: (id: string) => Promise<void>
       toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<string>
+      incrementHabitCount: (habitId: string, date: string) => Promise<string | null>
+      decrementHabitCount: (habitId: string, date: string) => Promise<string | null>
       getReview: () => Promise<ReviewItem[]>
       updateReviewItem: (id: string, completed: boolean) => Promise<void>
       resetReview: () => Promise<void>

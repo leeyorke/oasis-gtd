@@ -52,6 +52,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.setSize(windowWidth, windowHeight)
     mainWindow.show()
   })
 

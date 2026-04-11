@@ -333,14 +333,21 @@ export function registerHandlers(): void {
     // 计算每个习惯的连续打卡天数和本周打卡情况
     return habits.map(habit => {
       const records = habitRecordQueries.getByHabitId(habit.id as string) as Array<Record<string, unknown>>
+      const isQuantitative = (habit.is_quantitative as number) === 1
+      const target = (habit.target as number) || 1
 
-      // 计算连续打卡天数
+      // 计算连续打卡天数（基于是否"完成"）
       let streak = 0
       let currentDate = new Date()
       while (true) {
         const dateStr = currentDate.toISOString().split('T')[0]
-        const hasRecord = records.some(r => r.record_date === dateStr && r.completed === 1)
-        if (hasRecord) {
+        const record = records.find(r => r.record_date === dateStr)
+        const isCompleted = record
+          ? isQuantitative
+            ? (record.count as number) >= target
+            : (record.completed as number) === 1
+          : false
+        if (isCompleted) {
           streak++
           currentDate.setDate(currentDate.getDate() - 1)
         } else {
@@ -350,24 +357,26 @@ export function registerHandlers(): void {
 
       // 检查今日是否已打卡
       const todayRecord = records.find(r => r.record_date === today)
-      const completedToday = !!todayRecord && todayRecord.completed === 1
+      const todayCount = todayRecord ? (todayRecord.count as number || 1) : 0
+      const completedToday = todayCount >= target
 
       // 获取本周打卡记录（周一到周日）
       const now = new Date()
       const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 周一
-      const weekRecords: Record<string, boolean> = {}
+      const weekRecords: Record<string, number> = {}
       for (let i = 0; i < 7; i++) {
         const date = new Date(startOfWeek)
         date.setDate(startOfWeek.getDate() + i)
         const dateStr = date.toISOString().split('T')[0]
         const record = records.find(r => r.record_date === dateStr)
-        weekRecords[dateStr] = !!record && record.completed === 1
+        weekRecords[dateStr] = record ? (record.count as number || 1) : 0
       }
 
       return {
         ...habit,
         streak,
         completedToday,
+        todayCount,
         weekRecords,
       }
     })
@@ -375,8 +384,17 @@ export function registerHandlers(): void {
   ipcMain.handle('habits:create', (_, habit) => habitQueries.create(habit))
   ipcMain.handle('habits:update', (_, id: string, updates) => habitQueries.update(id, updates))
   ipcMain.handle('habits:delete', (_, id: string) => habitQueries.delete(id))
+  ipcMain.handle('habits:incrementCount', (_, habitId: string, date: string) => {
+    const habit = habitQueries.getById(habitId) as Record<string, unknown> | undefined
+    if (!habit) return null
+    const target = (habit.target as number) || 1
+    return habitRecordQueries.incrementCount(habitId, date, target)
+  })
+  ipcMain.handle('habits:decrementCount', (_, habitId: string, date: string) => {
+    return habitRecordQueries.decrementCount(habitId, date)
+  })
   ipcMain.handle('habits:toggleComplete', (_, habitId: string, date: string, completed: boolean) => {
-    return habitRecordQueries.createOrUpdate(habitId, date, completed)
+    return habitRecordQueries.toggleComplete(habitId, date, completed)
   })
   ipcMain.handle('habits:getById', (_, habitId: string) => {
     const habit = habitQueries.getById(habitId) as Record<string, unknown> | undefined
@@ -384,14 +402,21 @@ export function registerHandlers(): void {
 
     const records = habitRecordQueries.getByHabitId(habitId) as Array<Record<string, unknown>>
     const today = new Date().toISOString().split('T')[0]
+    const isQuantitative = (habit.is_quantitative as number) === 1
+    const target = (habit.target as number) || 1
 
-    // 计算当前连续打卡天数
+    // 计算当前连续打卡天数（基于是否"完成"）
     let streak = 0
     let currentDate = new Date()
     while (true) {
       const dateStr = currentDate.toISOString().split('T')[0]
-      const hasRecord = records.some(r => r.record_date === dateStr && r.completed === 1)
-      if (hasRecord) {
+      const record = records.find(r => r.record_date === dateStr)
+      const isCompleted = record
+        ? isQuantitative
+          ? (record.count as number) >= target
+          : (record.completed as number) === 1
+        : false
+      if (isCompleted) {
         streak++
         currentDate.setDate(currentDate.getDate() - 1)
       } else {
@@ -399,11 +424,14 @@ export function registerHandlers(): void {
       }
     }
 
-    // 计算最长连续打卡天数
+    // 计算最长连续打卡天数（基于是否"完成"）
     let longestStreak = 0
     let tempStreak = 0
     const sortedRecords = [...records]
-      .filter(r => r.completed === 1)
+      .filter(r => {
+        const count = r.count as number || 1
+        return isQuantitative ? count >= target : (r.completed as number) === 1
+      })
       .sort((a, b) => (a.record_date as string).localeCompare(b.record_date as string))
 
     for (let i = 0; i < sortedRecords.length; i++) {
@@ -424,8 +452,11 @@ export function registerHandlers(): void {
       }
     }
 
-    // 总打卡次数
-    const totalSessions = records.filter(r => r.completed === 1).length
+    // 总打卡次数（完成的天数，不是累计次数）
+    const totalSessions = records.filter(r => {
+      const count = r.count as number || 1
+      return isQuantitative ? count >= target : (r.completed as number) === 1
+    }).length
 
     // 完成率：总完成天数 / 自创建以来总天数
     const createdAt = new Date(habit.created_at as string)
@@ -437,27 +468,28 @@ export function registerHandlers(): void {
 
     // 检查今日是否已打卡
     const todayRecord = records.find(r => r.record_date === today)
-    const completedToday = !!todayRecord && todayRecord.completed === 1
+    const todayCount = todayRecord ? (todayRecord.count as number || 1) : 0
+    const completedToday = todayCount >= target
 
     // 获取本周打卡记录（周一到周日）
     const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1))
-    const weekRecords: Record<string, boolean> = {}
+    const weekRecords: Record<string, number> = {}
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek)
       date.setDate(startOfWeek.getDate() + i)
       const dateStr = date.toISOString().split('T')[0]
       const record = records.find(r => r.record_date === dateStr)
-      weekRecords[dateStr] = !!record && record.completed === 1
+      weekRecords[dateStr] = record ? (record.count as number || 1) : 0
     }
 
     // 获取近12个月所有打卡记录用于日历
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-    const allRecords: Record<string, boolean> = {}
+    const allRecords: Record<string, number> = {}
     records.forEach(r => {
       const recordDate = new Date(r.record_date as string)
       if (recordDate >= twelveMonthsAgo) {
-        allRecords[r.record_date as string] = r.completed === 1
+        allRecords[r.record_date as string] = r.count as number || 1
       }
     })
 
@@ -468,6 +500,7 @@ export function registerHandlers(): void {
       totalSessions,
       completionRate,
       completedToday,
+      todayCount,
       weekRecords,
       allRecords,
     }

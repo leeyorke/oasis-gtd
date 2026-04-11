@@ -1706,15 +1706,16 @@ body {
 }
 
 .task-checkbox {
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid var(--muted-foreground);
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--muted-foreground);
   border-radius: 50%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+  opacity: 0.8;
 }
 
 .task-checkbox:hover {
@@ -1724,6 +1725,13 @@ body {
 
 .task-checkbox:hover svg {
   opacity: 1 !important;
+}
+
+.task-checkbox.checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  opacity: 1;
 }
 
 .task-content {
@@ -3298,6 +3306,109 @@ body {
 }
 
 /* ==============================================
+   Quantifiable Habit Styles
+   ============================================== */
+
+.quantifiable-indicator {
+  width: 48px;
+  height: 48px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.indicator-text {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.daily-slots {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.slot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
+}
+
+.slot.filled {
+  background-color: var(--primary);
+}
+
+.habit-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.habit-type-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.habit-type-option input {
+  display: none;
+}
+
+.habit-type-option:hover {
+  border-color: var(--muted-foreground);
+}
+
+.habit-type-option.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background-color: var(--secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: opacity 0.2s;
+  border: none;
+}
+
+.action-btn:active {
+  opacity: 0.7;
+}
+
+.action-btn-primary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* ==============================================
    Someday Page Styles (独立命名空间)
    ============================================== */
 .someday-page-container {
@@ -4306,6 +4417,9 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  width: 360px;
+  height: 300px;
+  overflow: hidden;
 }
 
 .project-card:hover {
@@ -4317,6 +4431,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 8px;
+}
+
+.project-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .project-icon {
@@ -4347,6 +4468,17 @@ body {
   background-color: var(--foreground);
   border-color: var(--foreground);
   color: var(--primary-foreground);
+}
+
+.project-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.project-card:hover .project-actions {
+  opacity: 1;
 }
 
 .project-info {

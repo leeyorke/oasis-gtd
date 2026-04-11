@@ -59,6 +59,10 @@ const api = {
   deleteHabit: (id: string) => ipcRenderer.invoke('habits:delete', id),
   toggleHabitComplete: (habitId: string, date: string, completed: boolean) =>
     ipcRenderer.invoke('habits:toggleComplete', habitId, date, completed),
+  incrementHabitCount: (habitId: string, date: string) =>
+    ipcRenderer.invoke('habits:incrementCount', habitId, date),
+  decrementHabitCount: (habitId: string, date: string) =>
+    ipcRenderer.invoke('habits:decrementCount', habitId, date),
 
   // Review
   getReview: () => ipcRenderer.invoke('review:getAll'),

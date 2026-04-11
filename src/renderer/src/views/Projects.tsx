@@ -3,23 +3,27 @@ import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import AddTaskModal from '../components/AddTaskModal'
 import { Task } from '../types'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 export default function Projects() {
-  const { projects, tasks, addProject, removeProject, updateTask, loadTasks } = useStore()
+  const { projects, tasks, addProject, removeProject, updateProject, updateTask, loadTasks } = useStore()
   const t = useT()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [showNewProject, setShowNewProject] = useState(false)
   const [showAddTask, setShowAddTask] = useState(false)
+  const [showEditProject, setShowEditProject] = useState(false)
+  const [editingProject, setEditingProject] = useState<any>(null)
   const [newTitle, setNewTitle] = useState('')
   const [newOutcome, setNewOutcome] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null
   const projectTasks = tasks.filter(tk => tk.project_id === selectedProjectId)
 
   const handleCreateProject = async () => {
     if (!newTitle.trim()) return
-    await addProject({ title: newTitle.trim(), outcome: newOutcome || undefined, status: 'active' })
+    await addProject({ title: newTitle.trim(), description: newOutcome || undefined, status: 'active' })
     setNewTitle('')
     setNewOutcome('')
     setShowNewProject(false)
@@ -35,6 +39,26 @@ export default function Projects() {
     if (selectedProjectId === id) {
       setSelectedProjectId(null)
     }
+  }
+
+  const handleOpenEdit = (project: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingProject(project)
+    setEditTitle(project.title)
+    setEditDescription(project.description || '')
+    setShowEditProject(true)
+  }
+
+  const handleEditProject = async () => {
+    if (!editTitle.trim() || !editingProject) return
+    await updateProject(editingProject.id, {
+      title: editTitle.trim(),
+      description: editDescription.trim() || undefined,
+    })
+    setShowEditProject(false)
+    setEditingProject(null)
+    setEditTitle('')
+    setEditDescription('')
   }
 
   const activeProjects = projects.filter(p => p.status === 'active')
@@ -75,8 +99,26 @@ export default function Projects() {
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                     </svg>
                   </div>
-                  <div className={`project-status ${project.status === 'active' ? 'active' : ''}`}>
-                    {project.status === 'active' ? t.proj_statusActive : t.proj_statusOnHold}
+                  <div className="project-header-right">
+                    <div className={`project-status ${project.status === 'active' ? 'active' : ''}`}>
+                      {project.status === 'active' ? t.proj_statusActive : t.proj_statusOnHold}
+                    </div>
+                    <div className="project-actions" onClick={e => e.stopPropagation()}>
+                      <button
+                        className="habit-action-btn"
+                        onClick={(e) => handleOpenEdit(project, e)}
+                        title={t.edit}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="habit-action-btn delete"
+                        onClick={() => handleDeleteProject(project.id)}
+                        title={t.delete}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -144,6 +186,44 @@ export default function Projects() {
                 onClick={handleCreateProject}
               >
                 {t.create}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditProject && (
+        <div className="project-modal-overlay" onClick={() => setShowEditProject(false)}>
+          <div className="project-modal-content" onClick={e => e.stopPropagation()}>
+            <h2 className="project-modal-title">
+              {t.proj_editProject}
+            </h2>
+            <input
+              className="waiting-page-input project-modal-input-title"
+              placeholder={t.proj_titlePlaceholder}
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEditProject()}
+              autoFocus
+            />
+            <input
+              className="waiting-page-input project-modal-input-outcome"
+              placeholder={t.proj_outcomePlaceholder}
+              value={editDescription}
+              onChange={e => setEditDescription(e.target.value)}
+            />
+            <div className="project-modal-actions">
+              <button
+                className="btn-text"
+                onClick={() => setShowEditProject(false)}
+              >
+                {t.cancel}
+              </button>
+              <button
+                className="project-modal-create-btn"
+                onClick={handleEditProject}
+              >
+                {t.save}
               </button>
             </div>
           </div>

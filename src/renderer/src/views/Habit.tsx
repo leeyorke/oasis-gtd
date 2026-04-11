@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import { Check, Plus, Pencil, Trash2 } from 'lucide-react'
@@ -7,7 +7,7 @@ const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function Habit() {
-  const { habits, toggleHabitComplete, addHabit, updateHabit, removeHabit, settings, setView, loadHabitById } = useStore()
+  const { habits, toggleHabitComplete, incrementHabitCount, addHabit, updateHabit, removeHabit, settings, setView, loadHabitById } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
@@ -19,16 +19,33 @@ export default function Habit() {
   const [newHabitTitle, setNewHabitTitle] = useState('')
   const [newHabitDescription, setNewHabitDescription] = useState('')
   const [newHabitTime, setNewHabitTime] = useState('')
+  const [newHabitType, setNewHabitType] = useState<'normal' | 'quantitative'>('normal')
+  const [newHabitTarget, setNewHabitTarget] = useState(8)
   const [editHabitTitle, setEditHabitTitle] = useState('')
   const [editHabitDescription, setEditHabitDescription] = useState('')
   const [editHabitTime, setEditHabitTime] = useState('')
+  const [animatingId, setAnimatingId] = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
   const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 // 周一为0
 
-  // 处理打卡切换
+  // 清除动画状态
+  useEffect(() => {
+    if (animatingId) {
+      const timer = setTimeout(() => setAnimatingId(null), 300)
+      return () => clearTimeout(timer)
+    }
+  }, [animatingId])
+
+  // 处理单次习惯打卡切换
   const handleToggleComplete = async (habitId: string, completed: boolean) => {
     await toggleHabitComplete(habitId, today, !completed)
+  }
+
+  // 处理多次习惯 +1
+  const handleIncrement = async (habitId: string) => {
+    setAnimatingId(habitId)
+    await incrementHabitCount(habitId, today)
   }
 
   // 处理新建习惯
@@ -39,13 +56,17 @@ export default function Habit() {
       title: newHabitTitle.trim(),
       description: newHabitDescription.trim() || undefined,
       time_of_day: newHabitTime.trim() || undefined,
-      frequency: 'daily'
+      frequency: 'daily',
+      target: newHabitType === 'quantitative' ? newHabitTarget : 1,
+      is_quantitative: newHabitType === 'quantitative' ? 1 : 0,
     })
 
     setShowAddModal(false)
     setNewHabitTitle('')
     setNewHabitDescription('')
     setNewHabitTime('')
+    setNewHabitType('normal')
+    setNewHabitTarget(8)
   }
 
   // 打开编辑弹窗
@@ -108,13 +129,63 @@ export default function Habit() {
     const date = new Date(startOfWeek)
     date.setDate(startOfWeek.getDate() + dayIndex)
     const dateStr = date.toISOString().split('T')[0]
-    return habit.weekRecords[dateStr] || false
+    const count = habit.weekRecords[dateStr] || 0
+    return count >= habit.target
   }
 
   // 处理点击标题进入详情页
   const handleHabitClick = async (habitId: string) => {
     await loadHabitById(habitId)
     setView('habit-detail')
+  }
+
+  // 渲染环形进度
+  const renderProgressRing = (todayCount: number, target: number) => {
+    const radius = 20
+    const circumference = 2 * Math.PI * radius // 125.6
+    const progress = Math.min(todayCount / target, 1)
+    const dashOffset = circumference * (1 - progress)
+
+    return (
+      <div className="quantifiable-indicator">
+        <svg width="44" height="44" viewBox="0 0 44 44">
+          <circle
+            cx="22"
+            cy="22"
+            r={radius}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth="3"
+          />
+          <circle
+            className="progress-ring-circle"
+            cx="22"
+            cy="22"
+            r={radius}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth="3"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+          />
+        </svg>
+        <div className="indicator-text">{todayCount}/{target}</div>
+      </div>
+    )
+  }
+
+  // 渲染每日小方块
+  const renderDailySlots = (todayCount: number, target: number) => {
+    return (
+      <div className="daily-slots">
+        {Array.from({ length: target }).map((_, i) => (
+          <div
+            key={i}
+            className={`slot ${i < todayCount ? 'filled' : ''}`}
+          />
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -142,62 +213,115 @@ export default function Habit() {
             {isZh ? '还没有添加任何习惯，点击右下角按钮开始建立好习惯吧' : 'No habits yet. Click the button below to start building good habits.'}
           </div>
         ) : (
-          habits.map(habit => (
-            <div key={habit.id} className="habit-card">
-              <div
-                className={`habit-checkbox ${habit.completedToday ? 'checked' : ''}`}
-                onClick={() => handleToggleComplete(habit.id, habit.completedToday)}
-              >
-                {habit.completedToday && <Check size={14} />}
-              </div>
-              <div className="habit-content">
-                <button
-                  className="habit-title-link"
-                  onClick={() => handleHabitClick(habit.id)}
-                >
-                  {habit.title}
-                </button>
-                <div className="habit-meta">
-                  <span>{isZh ? `连续: ${habit.streak} 天` : `Streak: ${habit.streak} Days`}</span>
-                  <span className="habit-meta-dot"></span>
-                  <span>
-                    {habit.frequency === 'daily' ? (isZh ? '每天' : 'Daily') : (isZh ? '每周' : 'Weekly')}
-                    {habit.time_of_day && `, ${habit.time_of_day}`}
-                  </span>
+          habits.map(habit => {
+            const isQuantitative = habit.is_quantitative === 1
+            const target = habit.target || 1
+            const todayCount = habit.todayCount || 0
+
+            return (
+              <div key={habit.id} className="habit-card">
+                {isQuantitative ? (
+                  // 多次习惯
+                  <>
+                    <div
+                      className={`task-checkbox ${animatingId === habit.id || habit.completedToday ? 'checked' : ''}`}
+                      onClick={() => handleIncrement(habit.id)}
+                    >
+                      {(animatingId === habit.id || habit.completedToday) && <Check size={14} />}
+                    </div>
+                    <div className="habit-content">
+                      <button
+                        className="habit-title-link"
+                        onClick={() => handleHabitClick(habit.id)}
+                      >
+                        {habit.title}
+                      </button>
+                      <div className="habit-meta">
+                        <span>{isZh ? `连续: ${habit.streak} 天` : `Streak: ${habit.streak} Days`}</span>
+                        <span className="habit-meta-dot"></span>
+                        <span>
+                          {isZh ? `目标: ${target} 次/天` : `Target: ${target} Daily`}
+                        </span>
+                      </div>
+                      {renderDailySlots(todayCount, target)}
+                    </div>
+                    <div className="habit-actions">
+                      <button
+                        className="habit-action-btn"
+                        onClick={(e) => handleOpenEdit(habit, e)}
+                        title={isZh ? '编辑' : 'Edit'}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="habit-action-btn delete"
+                        onClick={(e) => handleOpenDelete(habit.id, e)}
+                        title={isZh ? '删除' : 'Delete'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  // 单次习惯
+                  <>
+                    <div
+                      className={`task-checkbox ${habit.completedToday ? 'checked' : ''}`}
+                      onClick={() => handleToggleComplete(habit.id, habit.completedToday)}
+                    >
+                      {habit.completedToday && <Check size={14} />}
+                    </div>
+                    <div className="habit-content">
+                      <button
+                        className="habit-title-link"
+                        onClick={() => handleHabitClick(habit.id)}
+                      >
+                        {habit.title}
+                      </button>
+                      <div className="habit-meta">
+                        <span>{isZh ? `连续: ${habit.streak} 天` : `Streak: ${habit.streak} Days`}</span>
+                        <span className="habit-meta-dot"></span>
+                        <span>
+                          {habit.frequency === 'daily' ? (isZh ? '每天' : 'Daily') : (isZh ? '每周' : 'Weekly')}
+                          {habit.time_of_day && `, ${habit.time_of_day}`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="habit-actions">
+                      <button
+                        className="habit-action-btn"
+                        onClick={(e) => handleOpenEdit(habit, e)}
+                        title={isZh ? '编辑' : 'Edit'}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="habit-action-btn delete"
+                        onClick={(e) => handleOpenDelete(habit.id, e)}
+                        title={isZh ? '删除' : 'Delete'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                )}
+                <div className="habit-progress">
+                  {WEEK_DAYS.map((_, index) => {
+                    const completed = isDayCompleted(habit, index)
+                    const isCurrent = index === currentDayIndex
+                    return (
+                      <div
+                        key={index}
+                        className={`habit-day ${completed ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
+                      >
+                        {getWeekDayText(index)}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-              <div className="habit-actions">
-                <button
-                  className="habit-action-btn"
-                  onClick={(e) => handleOpenEdit(habit, e)}
-                  title={isZh ? '编辑' : 'Edit'}
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  className="habit-action-btn delete"
-                  onClick={(e) => handleOpenDelete(habit.id, e)}
-                  title={isZh ? '删除' : 'Delete'}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <div className="habit-progress">
-                {WEEK_DAYS.map((_, index) => {
-                  const completed = isDayCompleted(habit, index)
-                  const isCurrent = index === currentDayIndex
-                  return (
-                    <div
-                      key={index}
-                      className={`habit-day ${completed ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
-                    >
-                      {getWeekDayText(index)}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -256,6 +380,49 @@ export default function Habit() {
                 onChange={e => setNewHabitTime(e.target.value)}
               />
             </div>
+
+            <div className="habit-modal-form-group">
+              <label className="habit-modal-label">
+                {isZh ? '习惯类型' : 'Habit Type'}
+              </label>
+              <div className="habit-type-toggle">
+                <label className={`habit-type-option ${newHabitType === 'normal' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="habitType"
+                    value="normal"
+                    checked={newHabitType === 'normal'}
+                    onChange={() => setNewHabitType('normal')}
+                  />
+                  {isZh ? '单次习惯' : 'Single'}
+                </label>
+                <label className={`habit-type-option ${newHabitType === 'quantitative' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="habitType"
+                    value="quantitative"
+                    checked={newHabitType === 'quantitative'}
+                    onChange={() => setNewHabitType('quantitative')}
+                  />
+                  {isZh ? '多次习惯' : 'Multiple'}
+                </label>
+              </div>
+            </div>
+
+            {newHabitType === 'quantitative' && (
+              <div className="habit-modal-form-group">
+                <label className="habit-modal-label">
+                  {isZh ? '每日目标次数' : 'Daily Target'}
+                </label>
+                <input
+                  type="number"
+                  className="habit-modal-input"
+                  min="2"
+                  value={newHabitTarget}
+                  onChange={e => setNewHabitTarget(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
 
             <div className="habit-modal-actions">
               <button

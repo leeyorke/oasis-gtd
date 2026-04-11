@@ -73,10 +73,12 @@ interface AppStore {
   selectedHabitId: string | null
   selectedHabit: HabitDetail | null
   loadHabitById: (id: string) => Promise<void>
-  addHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'weekRecords'>) => Promise<void>
+  addHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'todayCount' | 'weekRecords'>) => Promise<void>
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
   removeHabit: (id: string) => Promise<void>
   toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<void>
+  incrementHabitCount: (habitId: string, date: string) => Promise<void>
+  decrementHabitCount: (habitId: string, date: string) => Promise<void>
 
   // ─── Review ────────────────────────────────────────────────────────────────
   reviewItems: ReviewItem[]
@@ -275,6 +277,14 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   toggleHabitComplete: async (habitId, date, completed) => {
     await window.api.toggleHabitComplete(habitId, date, completed)
+    await get().loadHabits()
+  },
+  incrementHabitCount: async (habitId, date) => {
+    await window.api.incrementHabitCount(habitId, date)
+    await get().loadHabits()
+  },
+  decrementHabitCount: async (habitId, date) => {
+    await window.api.decrementHabitCount(habitId, date)
     await get().loadHabits()
   },
 

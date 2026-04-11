@@ -111,16 +111,19 @@ export interface Habit {
   created_at: string
   updated_at: string
   is_archived: number
-  streak: number // 连续打卡天数
-  completedToday: boolean // 今日是否已打卡
-  weekRecords: Record<string, boolean> // 本周打卡记录，key为日期字符串，value为是否完成
+  target: number              // 每日目标次数
+  is_quantitative: number     // 0=普通习惯，1=可量化习惯
+  streak: number              // 连续打卡天数
+  completedToday: boolean     // 今日是否已完成（count >= target）
+  todayCount: number          // 今日已打卡次数
+  weekRecords: Record<string, number>  // 本周每天打卡次数
 }
 
 export interface HabitDetail extends Habit {
-  longestStreak: number // 最长连续打卡天数
-  totalSessions: number // 总打卡次数
-  completionRate: number // 完成率百分比
-  allRecords: Record<string, boolean> // 12个月所有打卡记录
+  longestStreak: number       // 最长连续打卡天数
+  totalSessions: number       // 总打卡次数
+  completionRate: number      // 完成率百分比
+  allRecords: Record<string, number>   // 12个月每天打卡次数
 }
 
 export interface Resource {
