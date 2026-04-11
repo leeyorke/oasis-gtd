@@ -33,7 +33,9 @@ export default function HabitDetail() {
 
   // 计算当前年份的12个月数据
   const getTwelveMonthsData = () => {
-    const months: Array<{ name: string; days: Array<{ date: string; completed: boolean; isEmpty: boolean }> }> = []
+    const isQuantitative = selectedHabit.is_quantitative === 1
+    const target = selectedHabit.target || 1
+    const months: Array<{ name: string; days: Array<{ date: string; completed: boolean; isEmpty: boolean; count: number }> }> = []
     const now = new Date()
     const currentYear = now.getFullYear()
 
@@ -45,18 +47,19 @@ export default function HabitDetail() {
       // 调整：周一为0
       const startPadding = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
 
-      const days: Array<{ date: string; completed: boolean; isEmpty: boolean }> = []
+      const days: Array<{ date: string; completed: boolean; isEmpty: boolean; count: number }> = []
 
       // 添加空白的padding
       for (let j = 0; j < startPadding; j++) {
-        days.push({ date: '', completed: false, isEmpty: true })
+        days.push({ date: '', completed: false, isEmpty: true, count: 0 })
       }
 
       // 添加实际天数
       for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-        const completed = selectedHabit.allRecords?.[dateStr] || false
-        days.push({ date: dateStr, completed, isEmpty: false })
+        const count = selectedHabit.allRecords?.[dateStr] || 0
+        const completed = isQuantitative ? count >= target : count >= 1
+        days.push({ date: dateStr, completed, isEmpty: false, count })
       }
 
       months.push({
@@ -135,12 +138,28 @@ export default function HabitDetail() {
               <div key={monthIndex} className="habit-month-block">
                 <div className="habit-month-name">{month.name}</div>
                 <div className="habit-month-grid">
-                  {month.days.map((day, dayIndex) => (
-                    <div
-                      key={dayIndex}
-                      className={`habit-day-square ${day.completed ? 'habit-day-square-done' : ''} ${day.isEmpty ? 'habit-day-square-empty' : ''}`}
-                    />
-                  ))}
+                  {month.days.map((day, dayIndex) => {
+                    const isQuantitative = selectedHabit.is_quantitative === 1
+                    const target = selectedHabit.target || 1
+
+                    // 计算颜色深浅：已完成次数/总次数，100%黑色，最小0.15
+                    const getOpacity = () => {
+                      if (day.isEmpty || day.count === 0) return undefined
+                      if (!isQuantitative) return 1
+                      const ratio = day.count / target
+                      return Math.max(0.15, Math.min(1, ratio))
+                    }
+
+                    const opacity = getOpacity()
+
+                    return (
+                      <div
+                        key={dayIndex}
+                        className={`habit-day-square ${day.completed ? 'habit-day-square-done' : ''} ${day.isEmpty ? 'habit-day-square-empty' : ''}`}
+                        style={opacity !== undefined ? { backgroundColor: `rgba(0, 0, 0, ${opacity})`, borderColor: `rgba(0, 0, 0, ${opacity})` } : undefined}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             ))}
