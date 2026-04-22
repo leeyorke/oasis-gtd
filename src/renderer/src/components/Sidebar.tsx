@@ -15,9 +15,10 @@ import {
   RefreshCw,
   MessageSquare,
   Settings,
-  Menu,
+  PanelLeft,
   Feather,
-  Kanban
+  Kanban,
+  Sprout
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -56,13 +57,13 @@ export default function Sidebar() {
     <nav className={`nav-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div>
         <div className="nav-brand-wrapper">
-          <div className="nav-brand">Oasis</div>
+          <div className="logo-icon"><Sprout size={32} /></div>
           <button
             className="sidebar-toggle"
             onClick={() => setIsCollapsed(!isCollapsed)}
             title={isCollapsed ? '展开侧边栏' : '收起侧边栏'}
           >
-            <Menu size={18} />
+            <PanelLeft size={18} />
           </button>
         </div>
         <ul className="nav-links">
@@ -71,10 +72,9 @@ export default function Sidebar() {
               <button
                 className={`nav-link ${currentView === item.id ? 'active' : ''}`}
                 onClick={() => { console.log('Navigation button clicked:', item.id); setView(item.id); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
               >
                 <item.icon size={18} />
-                {!isCollapsed && <span>{item.label}</span>}
+                <span className="nav-link-text">{item.label}</span>
               </button>
             </li>
           ))}
@@ -96,7 +96,6 @@ export default function Sidebar() {
                     setView(item.id);
                   }
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}
               >
                 <item.icon size={18} />
               </button>

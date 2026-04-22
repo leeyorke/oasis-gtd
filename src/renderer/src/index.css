@@ -69,11 +69,12 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding-top: 4vh;
+  padding-top: 2vh;
   padding-bottom: 1vh;
+  padding-left: 0;
   z-index: 10;
   width: 180px;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, padding-left 0.3s ease;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
 }
@@ -81,7 +82,6 @@ body {
 .nav-sidebar.collapsed {
   width: 76px;
   padding-left: 5px;
-  align-items: flex-start;
 }
 
 .nav-brand-wrapper {
@@ -89,23 +89,31 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 3rem;
+  height: 38px;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding-left: 12px;
 }
 
 .nav-sidebar.collapsed .nav-brand-wrapper {
+  justify-content: flex-start;
+  padding-left: 6px;
+}
+
+.logo-icon {
+  display: flex;
+  align-items: center;
   justify-content: center;
-}
-
-.nav-brand {
-  font-family: var(--font-display);
-  font-size: 2.8rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
   color: var(--ink-primary);
-  line-height: 1;
+  overflow: hidden;
+  transition: width 0.3s ease, opacity 0.3s ease;
+  width: 32px;
+  flex-shrink: 0;
 }
 
-.nav-sidebar.collapsed .nav-brand {
-  display: none;
+.nav-sidebar.collapsed .logo-icon {
+  width: 0;
+  opacity: 0;
 }
 
 .sidebar-toggle {
@@ -119,6 +127,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: background 0.2s ease;
+  flex-shrink: 0;
 }
 
 .sidebar-toggle:hover {
@@ -146,19 +155,25 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px;
+  padding: 0 8px;
+  padding-left: 12px;
   border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
-  position: relative;
-  width: fit-content;
+  transition: color 0.2s ease, background 0.2s ease, width 0.3s ease, padding-left 0.3s ease;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  width: 140px;
+  overflow: hidden;
+}
+
+.nav-link > svg {
+  flex-shrink: 0;
 }
 
 .nav-sidebar.collapsed .nav-link {
   width: 34px;
-  height: 34px;
-  justify-content: center;
-  padding: 0;
+  padding-left: 7px;
 }
 
 .nav-sidebar.collapsed .nav-link.active {
@@ -171,9 +186,19 @@ body {
   font-weight: 600;
 }
 
-.nav-link.active:has(span) {
-  border-radius: var(--nav-sidebar-radius);
-  width: 120px;
+.nav-link-text {
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+  max-width: 200px;
+  margin-left: 12px;
+  transition: opacity 0.3s ease, max-width 0.3s ease, margin-left 0.3s ease;
+}
+
+.nav-sidebar.collapsed .nav-link-text {
+  opacity: 0;
+  max-width: 0;
+  margin-left: 0;
 }
 
 .nav-meta {
