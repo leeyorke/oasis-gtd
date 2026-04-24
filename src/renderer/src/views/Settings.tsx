@@ -171,7 +171,7 @@ export default function Settings() {
         </div>
 
         {/* ─── Right panel: section content ────────────────────── */}
-        <div style={{ flex: 1, padding: '3rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ flex: 1, padding: '3rem', overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
           {/* ── GENERAL ───────────────────────────────────────────── */}
           {activeSection === 'general' && (

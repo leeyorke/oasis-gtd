@@ -11,14 +11,15 @@ const WEATHER_ICONS: Record<string, React.ElementType> = {
 }
 
 const TAG_COLORS = [
-  { name: 'gray', bg: '#cccccc', text: '#333333', border: '#cccccc' },
-  { name: 'red', bg: '#cc3333', text: '#ffffff', border: '#cc3333' },
-  { name: 'orange', bg: '#ff6600', text: '#ffffff', border: '#ff6600' },
-  { name: 'yellow', bg: '#ffff00', text: '#333333', border: '#ffff00' },
-  { name: 'green', bg: '#669933', text: '#ffffff', border: '#669933' },
-  { name: 'blue', bg: '#3399cc', text: '#ffffff', border: '#3399cc' },
-  { name: 'purple', bg: '#9966cc', text: '#ffffff', border: '#9966cc' },
-  { name: 'pink', bg: '#ff99cc', text: '#333333', border: '#ff99cc' },
+  { name: 'gray',     bg: '#E9E6E2', text: '#333333', border: '#E9E6E2' },
+  { name: 'red',      bg: '#F5C9B0', text: '#333333', border: '#F5C9B0' },
+  { name: 'orange',   bg: '#A6B28B', text: '#333333', border: '#A6B28B' },
+  { name: 'yellow',   bg: '#1C352D', text: '#ffffff', border: '#1C352D' },
+  { name: 'green',    bg: '#3E2C23', text: '#ffffff', border: '#3E2C23' },
+  { name: 'blue',     bg: '#35858E', text: '#ffffff', border: '#35858E' },
+  { name: 'purple',   bg: '#612D53', text: '#ffffff', border: '#612D53' },
+  { name: 'pink',     bg: '#853953', text: '#ffffff', border: '#853953' },
+  { name: 'charcoal', bg: '#2C2C2C', text: '#ffffff', border: '#2C2C2C' },
 ]
 
 export default function Thoughts() {
@@ -401,7 +402,7 @@ export default function Thoughts() {
                             <div
                               key={tag}
                               onClick={() => {
-                                setNewNoteTags([...newNoteTags, { name: tag, color: color.border === '#cccccc' ? 'gray' : color.name }])
+                                setNewNoteTags([...newNoteTags, { name: tag, color: color.border === TAG_COLORS[0].border ? TAG_COLORS[0].name : color.name }])
                                 setNewNoteTagInput('')
                                 setShowNewTagDropdown(false)
                               }}
@@ -593,7 +594,7 @@ export default function Thoughts() {
                             <div
                               key={tag}
                               onClick={() => {
-                                setEditNoteTags([...editNoteTags, { name: tag, color: color.border === '#cccccc' ? 'gray' : color.name }])
+                                setEditNoteTags([...editNoteTags, { name: tag, color: color.border === TAG_COLORS[0].border ? TAG_COLORS[0].name : color.name }])
                                 setEditNoteTagInput('')
                                 setShowEditTagDropdown(false)
                               }}
