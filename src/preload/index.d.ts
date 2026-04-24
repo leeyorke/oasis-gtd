@@ -39,7 +39,7 @@ declare global {
       createHabit: (habit: Omit<Habit, 'id' | 'created_at' | 'updated_at' | 'streak' | 'completedToday' | 'todayCount' | 'weekRecords'>) => Promise<string>
       updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
       deleteHabit: (id: string) => Promise<void>
-      toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<string>
+      toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<string | null>
       incrementHabitCount: (habitId: string, date: string) => Promise<string | null>
       decrementHabitCount: (habitId: string, date: string) => Promise<string | null>
       getReview: () => Promise<ReviewItem[]>

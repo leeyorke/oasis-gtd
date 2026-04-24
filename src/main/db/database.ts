@@ -5,13 +5,25 @@ import { v4 as uuidv4 } from 'uuid'
 
 let db: Database.Database
 
+// Whitelist filtering for dynamic update queries to prevent setting arbitrary columns
+function filterFields(updates: Record<string, unknown>, allowed: string[]): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {}
+  for (const key of allowed) {
+    if (key in updates) {
+      filtered[key] = updates[key]
+    }
+  }
+  return filtered
+}
+
 export function initDatabase(): void {
   const dbPath = join(app.getPath('userData'), 'oasis-gtd.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   createTables()
-  migrateProjects()
+  createIndexes()
+  runMigrations()
   seedIfEmpty()
 }
 
@@ -19,8 +31,91 @@ export function getDb(): Database.Database {
   return db
 }
 
-function migrateProjects(): void {
-  db.prepare("UPDATE projects SET status = 'active' WHERE status IN ('completed', 'someday')").run()
+function createIndexes(): void {
+  const indexes = [
+    'CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_messages_conversation ON chat_messages(conversation_id)',
+    'CREATE INDEX IF NOT EXISTS idx_habit_records_habit ON habit_records(habit_id)',
+    'CREATE INDEX IF NOT EXISTS idx_habits_archived ON habits(is_archived)',
+    'CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_waiting_project ON waiting_items(project_id)',
+  ]
+  for (const sql of indexes) {
+    db.exec(sql)
+  }
+}
+
+function getSchemaVersion(): number {
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = '_schema_version'").get() as { value: string } | undefined
+  return row ? parseInt(row.value, 10) || 0 : 0
+}
+
+function setSchemaVersion(version: number): void {
+  db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('_schema_version', ?)").run(String(version))
+}
+
+function runMigrations(): void {
+  const version = getSchemaVersion()
+
+  if (version < 1) {
+    // v1: Migrate old project status values
+    db.prepare("UPDATE projects SET status = 'active' WHERE status IN ('completed', 'someday')").run()
+    // v1: Add priority column to tasks
+    try { db.exec(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium'`) } catch { /* exists */ }
+    // v1: Add system_prompt, temperature, max_tokens to ai_providers
+    try { db.exec(`ALTER TABLE ai_providers ADD COLUMN system_prompt TEXT DEFAULT ''`) } catch { /* exists */ }
+    try { db.exec(`ALTER TABLE ai_providers ADD COLUMN temperature REAL DEFAULT 0.7`) } catch { /* exists */ }
+    try { db.exec(`ALTER TABLE ai_providers ADD COLUMN max_tokens INTEGER DEFAULT 2048`) } catch { /* exists */ }
+    // v1: Add category to someday_items
+    try { db.exec(`ALTER TABLE someday_items ADD COLUMN category TEXT DEFAULT ''`) } catch { /* exists */ }
+    // v1: Add habit columns
+    try { db.exec(`ALTER TABLE habits ADD COLUMN target INTEGER NOT NULL DEFAULT 1`) } catch { /* exists */ }
+    try { db.exec(`ALTER TABLE habits ADD COLUMN is_quantitative INTEGER NOT NULL DEFAULT 0`) } catch { /* exists */ }
+    try { db.exec(`ALTER TABLE habit_records ADD COLUMN count INTEGER NOT NULL DEFAULT 1`) } catch { /* exists */ }
+    // v1: Add resources table
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS resources (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'document',
+          description TEXT,
+          file_size TEXT,
+          url TEXT,
+          tags TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `)
+    } catch { /* exists */ }
+    // v1: Add updated_at to someday_items
+    try { db.exec(`ALTER TABLE someday_items ADD COLUMN updated_at TEXT`) } catch { /* exists */ }
+    setSchemaVersion(1)
+  }
+
+  if (version < 2) {
+    // v2: Foreign key migration - clean up orphans and recreate tables
+    db.prepare(`UPDATE tasks SET project_id = NULL WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT id FROM projects)`).run()
+    db.prepare(`UPDATE waiting_items SET project_id = NULL WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT id FROM projects)`).run()
+    db.prepare(`UPDATE chat_conversations SET provider_id = NULL WHERE provider_id IS NOT NULL AND provider_id NOT IN (SELECT id FROM ai_providers)`).run()
+
+    db.exec(`CREATE TABLE IF NOT EXISTS tasks_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,notes TEXT,context TEXT,due_date TEXT,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,status TEXT NOT NULL DEFAULT 'inbox',waiting_for TEXT,priority TEXT DEFAULT 'medium',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
+    db.exec('INSERT INTO tasks_new SELECT id,title,notes,context,due_date,project_id,status,waiting_for,priority,created_at,updated_at FROM tasks')
+    db.exec('DROP TABLE tasks'); db.exec('ALTER TABLE tasks_new RENAME TO tasks')
+
+    db.exec(`CREATE TABLE IF NOT EXISTS waiting_items_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,waiting_for TEXT NOT NULL,since TEXT NOT NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,notes TEXT,created_at TEXT NOT NULL)`)
+    db.exec('INSERT INTO waiting_items_new SELECT * FROM waiting_items')
+    db.exec('DROP TABLE waiting_items'); db.exec('ALTER TABLE waiting_items_new RENAME TO waiting_items')
+
+    db.exec(`CREATE TABLE IF NOT EXISTS chat_conversations_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,provider_id TEXT REFERENCES ai_providers(id) ON DELETE SET NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
+    db.exec('INSERT INTO chat_conversations_new SELECT * FROM chat_conversations')
+    db.exec('DROP TABLE chat_conversations'); db.exec('ALTER TABLE chat_conversations_new RENAME TO chat_conversations')
+    setSchemaVersion(2)
+  }
+
+  // v3+ can add more migrations here as the schema evolves
 }
 
 function createTables(): void {
@@ -32,9 +127,9 @@ function createTables(): void {
       context TEXT,
       due_date TEXT,
       project_id TEXT,
-      status TEXT NOT NULL DEFAULT 'inbox',
+      status TEXT NOT NULL DEFAULT 'inbox' CHECK(status IN ('inbox','next','waiting','someday','done')),
       waiting_for TEXT,
-      priority TEXT DEFAULT 'medium',
+      priority TEXT DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -44,7 +139,7 @@ function createTables(): void {
       title TEXT NOT NULL,
       description TEXT,
       outcome TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','on-hold')),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -63,22 +158,24 @@ function createTables(): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       notes TEXT,
-      horizon TEXT NOT NULL DEFAULT 'someday',
-      created_at TEXT NOT NULL
+      horizon TEXT NOT NULL DEFAULT 'someday' CHECK(horizon IN ('soon','1month','3months','1year','someday')),
+      category TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS review_checklist (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL,
       title TEXT NOT NULL,
-      completed INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
       review_date TEXT
     );
 
     CREATE TABLE IF NOT EXISTS ai_providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      provider_type TEXT NOT NULL DEFAULT 'openai',
+      provider_type TEXT NOT NULL DEFAULT 'openai' CHECK(provider_type IN ('openai','anthropic','ollama','custom')),
       base_url TEXT NOT NULL,
       model TEXT NOT NULL,
       api_key TEXT,
@@ -100,7 +197,7 @@ function createTables(): void {
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
-      role TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
@@ -124,66 +221,32 @@ function createTables(): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT,
-      frequency TEXT NOT NULL DEFAULT 'daily',
+      frequency TEXT NOT NULL DEFAULT 'daily' CHECK(frequency IN ('daily','weekly')),
       time_of_day TEXT,
       color TEXT,
+      target INTEGER NOT NULL DEFAULT 1,
+      is_quantitative INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      is_archived INTEGER NOT NULL DEFAULT 0
+      is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0,1))
     );
 
     CREATE TABLE IF NOT EXISTS habit_records (
       id TEXT PRIMARY KEY,
       habit_id TEXT NOT NULL,
       record_date TEXT NOT NULL,
-      completed INTEGER NOT NULL DEFAULT 1,
+      completed INTEGER NOT NULL DEFAULT 1 CHECK(completed IN (0,1)),
+      count INTEGER NOT NULL DEFAULT 1,
       notes TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
       UNIQUE(habit_id, record_date)
     );
-  `)
 
-  // Migration: Add new columns to ai_providers if they don't exist
-  try {
-    db.exec(`ALTER TABLE ai_providers ADD COLUMN system_prompt TEXT DEFAULT ''`)
-  } catch { /* column already exists */ }
-  try {
-    db.exec(`ALTER TABLE ai_providers ADD COLUMN temperature REAL DEFAULT 0.7`)
-  } catch { /* column already exists */ }
-  try {
-    db.exec(`ALTER TABLE ai_providers ADD COLUMN max_tokens INTEGER DEFAULT 2048`)
-  } catch { /* column already exists */ }
-
-  // Migration: Add priority column to tasks if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium'`)
-  } catch { /* column already exists */ }
-
-  // Migration: Add category column to someday_items if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE someday_items ADD COLUMN category TEXT DEFAULT ''`)
-  } catch { /* column already exists */ }
-
-  // Migration: Add target and is_quantitative columns to habits if they don't exist
-  try {
-    db.exec(`ALTER TABLE habits ADD COLUMN target INTEGER NOT NULL DEFAULT 1`)
-  } catch { /* column already exists */ }
-  try {
-    db.exec(`ALTER TABLE habits ADD COLUMN is_quantitative INTEGER NOT NULL DEFAULT 0`)
-  } catch { /* column already exists */ }
-
-  // Migration: Add count column to habit_records if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE habit_records ADD COLUMN count INTEGER NOT NULL DEFAULT 1`)
-  } catch { /* column already exists */ }
-
-  // Create resources table
-  db.exec(`
     CREATE TABLE IF NOT EXISTS resources (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'document',
+      type TEXT NOT NULL DEFAULT 'document' CHECK(type IN ('document','link','spreadsheet','image','collection')),
       description TEXT,
       file_size TEXT,
       url TEXT,
@@ -295,9 +358,12 @@ export const taskQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    const allowed = ['title', 'notes', 'context', 'due_date', 'project_id', 'status', 'waiting_for', 'priority']
+    const filtered = filterFields(updates, allowed)
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
     db.prepare(`UPDATE tasks SET ${fields}, updated_at = @updated_at WHERE id = @id`)
-      .run({ ...updates, id, updated_at: now })
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>
@@ -328,9 +394,12 @@ export const projectQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    const allowed = ['title', 'description', 'outcome', 'status']
+    const filtered = filterFields(updates, allowed)
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
     db.prepare(`UPDATE projects SET ${fields}, updated_at = @updated_at WHERE id = @id`)
-      .run({ ...updates, id, updated_at: now })
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>
@@ -375,9 +444,12 @@ export const somedayQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
-    db.prepare(`UPDATE someday_items SET ${fields}, created_at = @created_at WHERE id = @id`)
-      .run({ ...updates, id, created_at: now })
+    const allowed = ['title', 'notes', 'horizon', 'category']
+    const filtered = filterFields(updates, allowed)
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
+    db.prepare(`UPDATE someday_items SET ${fields}, updated_at = @updated_at WHERE id = @id`)
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>
@@ -600,15 +672,18 @@ export const noteQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    const allowed = ['content', 'tags', 'weather']
+    const filtered = filterFields(updates, allowed)
 
-    const params: Record<string, unknown> = { ...updates, id, updated_at: now }
-    if (updates.tags) {
-      params.tags = JSON.stringify(updates.tags)
+    // Always serialize tags to JSON string
+    if (filtered.tags) {
+      filtered.tags = JSON.stringify(filtered.tags)
     }
 
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
     db.prepare(`UPDATE notes SET ${fields}, updated_at = @updated_at WHERE id = @id`)
-      .run(params)
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>
@@ -647,9 +722,12 @@ export const habitQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    const allowed = ['title', 'description', 'frequency', 'time_of_day', 'color', 'is_archived', 'target', 'is_quantitative']
+    const filtered = filterFields(updates, allowed)
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
     db.prepare(`UPDATE habits SET ${fields}, updated_at = @updated_at WHERE id = @id`)
-      .run({ ...updates, id, updated_at: now })
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>
@@ -673,17 +751,16 @@ export const habitRecordQueries = {
     const existing = habitRecordQueries.getByHabitAndDate(habitId, recordDate)
 
     if (existing) {
-      // 更新现有记录
+      // 更新现有记录（不覆盖 created_at）
       db.prepare(`
         UPDATE habit_records
-        SET completed = @completed, notes = @notes, created_at = @updated_at
+        SET completed = @completed, notes = @notes
         WHERE habit_id = @habitId AND record_date = @recordDate
       `).run({
         habitId,
         recordDate,
         completed: completed ? 1 : 0,
-        notes: notes ?? null,
-        updated_at: now
+        notes: notes ?? null
       })
       return existing.id
     } else {
@@ -719,9 +796,9 @@ export const habitRecordQueries = {
     if (existing) {
       db.prepare(`
         UPDATE habit_records
-        SET count = count + 1, created_at = @updated_at
+        SET count = count + 1
         WHERE habit_id = @habitId AND record_date = @recordDate
-      `).run({ habitId, recordDate, updated_at: now })
+      `).run({ habitId, recordDate })
       return existing.id
     } else {
       const id = uuidv4()
@@ -762,9 +839,9 @@ export const habitRecordQueries = {
     if (existing) {
       db.prepare(`
         UPDATE habit_records
-        SET completed = @completed, created_at = @updated_at
+        SET completed = @completed
         WHERE habit_id = @habitId AND record_date = @recordDate
-      `).run({ habitId, recordDate, completed: completed ? 1 : 0, updated_at: now })
+      `).run({ habitId, recordDate, completed: completed ? 1 : 0 })
       return existing.id
     } else if (completed) {
       const id = uuidv4()
@@ -811,20 +888,22 @@ export const resourceQueries = {
 
   update: (id: string, updates: Record<string, unknown>) => {
     const now = new Date().toISOString()
-    const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')
+    const allowed = ['title', 'type', 'description', 'url', 'tags', 'fileSize']
+    const filtered = filterFields(updates, allowed)
 
-    const params: Record<string, unknown> = { ...updates, id, updated_at: now }
-    if (updates.tags) {
-      params.tags = JSON.stringify(updates.tags)
+    if (filtered.tags) {
+      filtered.tags = JSON.stringify(filtered.tags)
     }
     // Map camelCase to snake_case for DB
-    if (updates.fileSize) {
-      params.file_size = updates.fileSize
-      delete params.fileSize
+    if (filtered.fileSize) {
+      filtered.file_size = filtered.fileSize
+      delete filtered.fileSize
     }
 
+    const fields = Object.keys(filtered).map(k => `${k} = @${k}`).join(', ')
+    if (!fields) return
     db.prepare(`UPDATE resources SET ${fields}, updated_at = @updated_at WHERE id = @id`)
-      .run(params)
+      .run({ ...filtered, id, updated_at: now })
   },
 
   delete: (id: string) =>

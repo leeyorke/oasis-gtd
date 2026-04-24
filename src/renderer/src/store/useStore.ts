@@ -119,6 +119,10 @@ interface AppStore {
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>
 }
 
+function logError(context: string, err: unknown): void {
+  console.error(`[Store] ${context}:`, err instanceof Error ? err.message : err)
+}
+
 export const useStore = create<AppStore>((set, get) => ({
   // ─── Navigation ────────────────────────────────────────────────────────────
   currentView: 'start',
@@ -129,125 +133,173 @@ export const useStore = create<AppStore>((set, get) => ({
   // ─── Tasks ─────────────────────────────────────────────────────────────────
   tasks: [],
   loadTasks: async (status) => {
-    const tasks = await window.api.getTasks(status)
-    set({ tasks })
+    try {
+      const tasks = await window.api.getTasks(status)
+      set({ tasks })
+    } catch (err) { logError('loadTasks', err) }
   },
   addTask: async (task) => {
-    await window.api.createTask(task)
-    await get().loadTasks()
+    try {
+      await window.api.createTask(task)
+      await get().loadTasks()
+    } catch (err) { logError('addTask', err) }
   },
   updateTask: async (id, updates) => {
-    await window.api.updateTask(id, updates)
-    const currentView = get().currentView
-    const status = currentView === 'next-actions' ? 'next' : undefined
-    await get().loadTasks(status)
+    try {
+      await window.api.updateTask(id, updates)
+      const currentView = get().currentView
+      const status = currentView === 'next-actions' ? 'next' : undefined
+      await get().loadTasks(status)
+    } catch (err) { logError('updateTask', err) }
   },
   removeTask: async (id) => {
-    await window.api.deleteTask(id)
-    const tasks = get().tasks.filter(t => t.id !== id)
-    set({ tasks })
+    try {
+      await window.api.deleteTask(id)
+      const tasks = get().tasks.filter(t => t.id !== id)
+      set({ tasks })
+    } catch (err) { logError('removeTask', err) }
   },
 
   // ─── Projects ──────────────────────────────────────────────────────────────
   projects: [],
   selectedProjectId: null,
   loadProjects: async () => {
-    const projects = await window.api.getProjects()
-    set({ projects })
+    try {
+      const projects = await window.api.getProjects()
+      set({ projects })
+    } catch (err) { logError('loadProjects', err) }
   },
   addProject: async (project) => {
-    await window.api.createProject(project)
-    await get().loadProjects()
+    try {
+      await window.api.createProject(project)
+      await get().loadProjects()
+    } catch (err) { logError('addProject', err) }
   },
   updateProject: async (id, updates) => {
-    await window.api.updateProject(id, updates)
-    await get().loadProjects()
+    try {
+      await window.api.updateProject(id, updates)
+      await get().loadProjects()
+    } catch (err) { logError('updateProject', err) }
   },
   removeProject: async (id) => {
-    await window.api.deleteProject(id)
-    const projects = get().projects.filter(p => p.id !== id)
-    set({ projects, selectedProjectId: get().selectedProjectId === id ? null : get().selectedProjectId })
+    try {
+      await window.api.deleteProject(id)
+      const projects = get().projects.filter(p => p.id !== id)
+      set({ projects, selectedProjectId: get().selectedProjectId === id ? null : get().selectedProjectId })
+    } catch (err) { logError('removeProject', err) }
   },
   setSelectedProject: (id) => set({ selectedProjectId: id }),
 
   // ─── Waiting ───────────────────────────────────────────────────────────────
   waitingItems: [],
   loadWaiting: async () => {
-    const waitingItems = await window.api.getWaiting()
-    set({ waitingItems })
+    try {
+      const waitingItems = await window.api.getWaiting()
+      set({ waitingItems })
+    } catch (err) { logError('loadWaiting', err) }
   },
   addWaiting: async (item) => {
-    await window.api.createWaiting(item)
-    await get().loadWaiting()
+    try {
+      await window.api.createWaiting(item)
+      await get().loadWaiting()
+    } catch (err) { logError('addWaiting', err) }
   },
   removeWaiting: async (id) => {
-    await window.api.deleteWaiting(id)
-    const waitingItems = get().waitingItems.filter(w => w.id !== id)
-    set({ waitingItems })
+    try {
+      await window.api.deleteWaiting(id)
+      const waitingItems = get().waitingItems.filter(w => w.id !== id)
+      set({ waitingItems })
+    } catch (err) { logError('removeWaiting', err) }
   },
 
   // ─── Someday ───────────────────────────────────────────────────────────────
   somedayItems: [],
   loadSomeday: async () => {
-    const somedayItems = await window.api.getSomeday()
-    set({ somedayItems })
+    try {
+      const somedayItems = await window.api.getSomeday()
+      set({ somedayItems })
+    } catch (err) { logError('loadSomeday', err) }
   },
   addSomeday: async (item) => {
-    await window.api.createSomeday(item)
-    await get().loadSomeday()
+    try {
+      await window.api.createSomeday(item)
+      await get().loadSomeday()
+    } catch (err) { logError('addSomeday', err) }
   },
   updateSomeday: async (id, updates) => {
-    await window.api.updateSomeday(id, updates)
-    await get().loadSomeday()
+    try {
+      await window.api.updateSomeday(id, updates)
+      await get().loadSomeday()
+    } catch (err) { logError('updateSomeday', err) }
   },
   removeSomeday: async (id) => {
-    await window.api.deleteSomeday(id)
-    const somedayItems = get().somedayItems.filter(s => s.id !== id)
-    set({ somedayItems })
+    try {
+      await window.api.deleteSomeday(id)
+      const somedayItems = get().somedayItems.filter(s => s.id !== id)
+      set({ somedayItems })
+    } catch (err) { logError('removeSomeday', err) }
   },
 
   // ─── Notes ─────────────────────────────────────────────────────────────────
   notes: [],
   loadNotes: async () => {
-    const notes = await window.api.getNotes()
-    set({ notes })
+    try {
+      const notes = await window.api.getNotes()
+      set({ notes })
+    } catch (err) { logError('loadNotes', err) }
   },
   addNote: async (note) => {
-    await window.api.createNote(note)
-    await get().loadNotes()
+    try {
+      await window.api.createNote(note)
+      await get().loadNotes()
+    } catch (err) { logError('addNote', err) }
   },
   updateNote: async (id, updates) => {
-    await window.api.updateNote(id, updates)
-    await get().loadNotes()
+    try {
+      await window.api.updateNote(id, updates)
+      await get().loadNotes()
+    } catch (err) { logError('updateNote', err) }
   },
   removeNote: async (id) => {
-    await window.api.deleteNote(id)
-    const notes = get().notes.filter(n => n.id !== id)
-    set({ notes })
+    try {
+      await window.api.deleteNote(id)
+      const notes = get().notes.filter(n => n.id !== id)
+      set({ notes })
+    } catch (err) { logError('removeNote', err) }
   },
   searchNotes: async (keyword) => {
-    const notes = await window.api.searchNotes(keyword)
-    set({ notes })
+    try {
+      const notes = await window.api.searchNotes(keyword)
+      set({ notes })
+    } catch (err) { logError('searchNotes', err) }
   },
 
   // ─── Resources ─────────────────────────────────────────────────────────────
   resources: [],
   loadResources: async () => {
-    const resources = await window.api.getResources()
-    set({ resources })
+    try {
+      const resources = await window.api.getResources()
+      set({ resources })
+    } catch (err) { logError('loadResources', err) }
   },
   addResource: async (resource) => {
-    await window.api.createResource(resource)
-    await get().loadResources()
+    try {
+      await window.api.createResource(resource)
+      await get().loadResources()
+    } catch (err) { logError('addResource', err) }
   },
   updateResource: async (id, updates) => {
-    await window.api.updateResource(id, updates)
-    await get().loadResources()
+    try {
+      await window.api.updateResource(id, updates)
+      await get().loadResources()
+    } catch (err) { logError('updateResource', err) }
   },
   removeResource: async (id) => {
-    await window.api.deleteResource(id)
-    const resources = get().resources.filter(r => r.id !== id)
-    set({ resources })
+    try {
+      await window.api.deleteResource(id)
+      const resources = get().resources.filter(r => r.id !== id)
+      set({ resources })
+    } catch (err) { logError('removeResource', err) }
   },
 
   // ─── Habits ────────────────────────────────────────────────────────────────
@@ -255,54 +307,76 @@ export const useStore = create<AppStore>((set, get) => ({
   selectedHabitId: null,
   selectedHabit: null,
   loadHabits: async () => {
-    const habits = await window.api.getHabits()
-    set({ habits })
+    try {
+      const habits = await window.api.getHabits()
+      set({ habits })
+    } catch (err) { logError('loadHabits', err) }
   },
   loadHabitById: async (id) => {
-    const habit = await window.api.getHabitById(id)
-    set({ selectedHabit: habit, selectedHabitId: id })
+    try {
+      const habit = await window.api.getHabitById(id)
+      set({ selectedHabit: habit, selectedHabitId: id })
+    } catch (err) { logError('loadHabitById', err) }
   },
   addHabit: async (habit) => {
-    await window.api.createHabit(habit)
-    await get().loadHabits()
+    try {
+      await window.api.createHabit(habit)
+      await get().loadHabits()
+    } catch (err) { logError('addHabit', err) }
   },
   updateHabit: async (id, updates) => {
-    await window.api.updateHabit(id, updates)
-    await get().loadHabits()
+    try {
+      await window.api.updateHabit(id, updates)
+      await get().loadHabits()
+    } catch (err) { logError('updateHabit', err) }
   },
   removeHabit: async (id) => {
-    await window.api.deleteHabit(id)
-    const habits = get().habits.filter(h => h.id !== id)
-    set({ habits })
+    try {
+      await window.api.deleteHabit(id)
+      const habits = get().habits.filter(h => h.id !== id)
+      set({ habits })
+    } catch (err) { logError('removeHabit', err) }
   },
   toggleHabitComplete: async (habitId, date, completed) => {
-    await window.api.toggleHabitComplete(habitId, date, completed)
-    await get().loadHabits()
+    try {
+      await window.api.toggleHabitComplete(habitId, date, completed)
+      await get().loadHabits()
+    } catch (err) { logError('toggleHabitComplete', err) }
   },
   incrementHabitCount: async (habitId, date) => {
-    await window.api.incrementHabitCount(habitId, date)
-    await get().loadHabits()
+    try {
+      await window.api.incrementHabitCount(habitId, date)
+      await get().loadHabits()
+    } catch (err) { logError('incrementHabitCount', err) }
   },
   decrementHabitCount: async (habitId, date) => {
-    await window.api.decrementHabitCount(habitId, date)
-    await get().loadHabits()
+    try {
+      await window.api.decrementHabitCount(habitId, date)
+      await get().loadHabits()
+    } catch (err) { logError('decrementHabitCount', err) }
   },
 
   // ─── Review ────────────────────────────────────────────────────────────────
   reviewItems: [],
   loadReview: async () => {
-    const reviewItems = await window.api.getReview()
-    set({ reviewItems })
+    try {
+      const reviewItems = await window.api.getReview()
+      set({ reviewItems })
+    } catch (err) { logError('loadReview', err) }
   },
   toggleReviewItem: async (id, completed) => {
-    await window.api.updateReviewItem(id, completed)
-    const reviewItems = get().reviewItems.map(r => r.id === id ? { ...r, completed: completed ? 1 : 0 } : r)
-    set({ reviewItems })
+    try {
+      await window.api.updateReviewItem(id, completed)
+      const reviewItems = get().reviewItems.map(r => r.id === id ? { ...r, completed: completed ? 1 : 0 } : r)
+      set({ reviewItems })
+    } catch (err) { logError('toggleReviewItem', err) }
   },
   resetReview: async () => {
-    await window.api.resetReview()
-    const reviewItems = get().reviewItems.map(r => ({ ...r, completed: 0 }))
-    set({ reviewItems })
+    try {
+      await window.api.resetReview()
+      const reviewItems = get().reviewItems.map(r => ({ ...r, completed: 0 }))
+      set({ reviewItems })
+    } catch (err) { logError('resetReview', err) }
   },
 
   // ─── AI ────────────────────────────────────────────────────────────────────
@@ -318,47 +392,65 @@ export const useStore = create<AppStore>((set, get) => ({
   streamUpdatedMessages: null,
 
   loadProviders: async () => {
-    const providers = await window.api.getProviders()
-    const activeProvider = providers.find(p => p.is_active) || null
-    set({ providers, activeProvider })
+    try {
+      const providers = await window.api.getProviders()
+      const activeProvider = providers.find(p => p.is_active) || null
+      set({ providers, activeProvider })
+    } catch (err) { logError('loadProviders', err) }
   },
   saveProvider: async (provider) => {
-    await window.api.saveProvider(provider)
-    await get().loadProviders()
+    try {
+      await window.api.saveProvider(provider)
+      await get().loadProviders()
+    } catch (err) { logError('saveProvider', err) }
   },
   setActiveProvider: async (id) => {
-    await window.api.setActiveProvider(id)
-    await get().loadProviders()
+    try {
+      await window.api.setActiveProvider(id)
+      await get().loadProviders()
+    } catch (err) { logError('setActiveProvider', err) }
   },
   deleteProvider: async (id) => {
-    await window.api.deleteProvider(id)
-    await get().loadProviders()
+    try {
+      await window.api.deleteProvider(id)
+      await get().loadProviders()
+    } catch (err) { logError('deleteProvider', err) }
   },
   loadConversations: async () => {
-    const conversations = await window.api.getConversations()
-    set({ conversations })
+    try {
+      const conversations = await window.api.getConversations()
+      set({ conversations })
+    } catch (err) { logError('loadConversations', err) }
   },
   selectConversation: async (id) => {
-    const messages = await window.api.getMessages(id)
-    set({ currentConversationId: id, messages, streamingMessageId: null, streamingContent: '' })
+    try {
+      const messages = await window.api.getMessages(id)
+      set({ currentConversationId: id, messages, streamingMessageId: null, streamingContent: '' })
+    } catch (err) { logError('selectConversation', err) }
   },
   newConversation: async () => {
-    const { activeProvider } = get()
-    if (!activeProvider) return
-    const id = await window.api.createConversation('New Conversation', activeProvider.id)
-    await get().loadConversations()
-    set({ currentConversationId: id, messages: [], streamingMessageId: null, streamingContent: '' })
+    try {
+      const { activeProvider } = get()
+      if (!activeProvider) return
+      const id = await window.api.createConversation('New Conversation', activeProvider.id)
+      await get().loadConversations()
+      set({ currentConversationId: id, messages: [], streamingMessageId: null, streamingContent: '' })
+    } catch (err) { logError('newConversation', err) }
   },
   deleteConversation: async (id) => {
-    await window.api.deleteConversation(id)
-    const conversations = get().conversations.filter(c => c.id !== id)
-    const currentId = get().currentConversationId === id ? null : get().currentConversationId
-    set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [], streamingMessageId: null, streamingContent: '' })
+    try {
+      await window.api.deleteConversation(id)
+      const conversations = get().conversations.filter(c => c.id !== id)
+      const currentId = get().currentConversationId === id ? null : get().currentConversationId
+      set({ conversations, currentConversationId: currentId, messages: currentId ? get().messages : [], streamingMessageId: null, streamingContent: '' })
+    } catch (err) { logError('deleteConversation', err) }
   },
   renameConversation: async (id, title) => {
-    await window.api.renameConversation(id, title)
-    const conversations = get().conversations.map(c => c.id === id ? { ...c, title } : c)
-    set({ conversations })
+    try {
+      await window.api.renameConversation(id, title)
+      const conversations = get().conversations.map(c => c.id === id ? { ...c, title } : c)
+      set({ conversations })
+    } catch (err) { logError('renameConversation', err) }
   },
   sendChatMessage: async (content) => {
     const { currentConversationId, messages: currentMessages, activeProvider } = get()
@@ -465,7 +557,9 @@ export const useStore = create<AppStore>((set, get) => ({
     window.api.sendMessageStream(currentConversationId, updatedMessages, activeProvider)
 
     // Also reload conversations to get any updated list
-    await get().loadConversations()
+    try {
+      await get().loadConversations()
+    } catch (err) { logError('sendChatMessage/loadConversations', err) }
   },
 
   stopStreaming: () => {
@@ -513,20 +607,24 @@ export const useStore = create<AppStore>((set, get) => ({
     language: 'en',
   },
   loadSettings: async () => {
-    const raw = await window.api.getSettings()
-    set({
-      settings: {
-        app_name: raw.app_name ?? 'Oasis',
-        review_day: Number(raw.review_day ?? 0),
-        default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
-        contexts: raw.contexts ? JSON.parse(raw.contexts) : [],
-        language: (raw.language as AppSettings['language']) ?? 'en',
-      },
-    })
+    try {
+      const raw = await window.api.getSettings()
+      set({
+        settings: {
+          app_name: raw.app_name ?? 'Oasis',
+          review_day: Number(raw.review_day ?? 0),
+          default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
+          contexts: raw.contexts ? JSON.parse(raw.contexts) : [],
+          language: (raw.language as AppSettings['language']) ?? 'en',
+        },
+      })
+    } catch (err) { logError('loadSettings', err) }
   },
   updateSetting: async (key, value) => {
-    const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value)
-    await window.api.setSetting(key, serialized)
-    set(state => ({ settings: { ...state.settings, [key]: value } }))
+    try {
+      const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value)
+      await window.api.setSetting(key, serialized)
+      set(state => ({ settings: { ...state.settings, [key]: value } }))
+    } catch (err) { logError('updateSetting', err) }
   },
 }))

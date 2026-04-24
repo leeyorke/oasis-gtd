@@ -26,6 +26,17 @@ const safeJson = async (res: Response): Promise<Record<string, unknown> | null> 
   try { return JSON.parse(text) } catch { return { __raw: text } }
 }
 
+// Helper: safely parse JSON string, returning fallback on invalid input
+function safeParseJSON(value: unknown, fallback: unknown[] = []): unknown[] {
+  if (!value) return fallback
+  try {
+    const parsed = JSON.parse(value as string)
+    return Array.isArray(parsed) ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
 // Parse SSE (Server-Sent Events) stream line by line
 async function* parseSSE(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
   const reader = stream.getReader()
@@ -277,7 +288,7 @@ export function registerHandlers(): void {
     const notes = noteQueries.getAll() as Array<Record<string, unknown>>
     return notes.map(note => ({
       ...note,
-      tags: note.tags ? JSON.parse(note.tags as string) : [],
+      tags: safeParseJSON(note.tags),
     }))
   })
   ipcMain.handle('notes:getById', (_, id: string) => {
@@ -285,14 +296,14 @@ export function registerHandlers(): void {
     if (!note) return null
     return {
       ...note,
-      tags: note.tags ? JSON.parse(note.tags as string) : [],
+      tags: safeParseJSON(note.tags),
     }
   })
   ipcMain.handle('notes:search', (_, keyword: string) => {
     const notes = noteQueries.search(keyword) as Array<Record<string, unknown>>
     return notes.map(note => ({
       ...note,
-      tags: note.tags ? JSON.parse(note.tags as string) : [],
+      tags: safeParseJSON(note.tags),
     }))
   })
   ipcMain.handle('notes:create', (_, note) => noteQueries.create(note))
@@ -304,7 +315,7 @@ export function registerHandlers(): void {
     const resources = resourceQueries.getAll() as Array<Record<string, unknown>>
     return resources.map(r => ({
       ...r,
-      tags: r.tags ? JSON.parse(r.tags as string) : [],
+      tags: safeParseJSON(r.tags),
       fileSize: r.file_size,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
@@ -315,7 +326,7 @@ export function registerHandlers(): void {
     if (!resource) return null
     return {
       ...resource,
-      tags: resource.tags ? JSON.parse(resource.tags as string) : [],
+      tags: safeParseJSON(resource.tags),
       fileSize: resource.file_size,
       createdAt: resource.created_at,
       updatedAt: resource.updated_at,
