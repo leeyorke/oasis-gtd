@@ -121,6 +121,10 @@ const api = {
   // Chat export
   exportConversationMarkdown: (conversationId: string, title: string, messages: Array<{role: string; content: string}>) =>
     ipcRenderer.invoke('chat:exportMarkdown', conversationId, title, messages),
+
+  // File operations
+  openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
+  showItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
 }
 
 if (process.contextIsolated) {

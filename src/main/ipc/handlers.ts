@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app, WebContents } from 'electron'
+import { ipcMain, dialog, app, shell, WebContents } from 'electron'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import {
@@ -848,5 +848,13 @@ export function registerHandlers(): void {
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
     }
+  })
+
+  // ─── File operations ────────────────────────────────────────────────
+  ipcMain.handle('shell:openPath', async (_, filePath: string) => {
+    return shell.openPath(filePath)
+  })
+  ipcMain.handle('shell:showItemInFolder', (_, filePath: string) => {
+    shell.showItemInFolder(filePath)
   })
 }

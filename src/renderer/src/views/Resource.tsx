@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
-import { Search, Plus, FileText, Link, FileSpreadsheet, Image, Bookmark, Trash2, Pencil, ExternalLink } from 'lucide-react'
+import { Search, Plus, FileText, Link, FileSpreadsheet, Image, Bookmark, Trash2, Pencil, ExternalLink, FolderOpen } from 'lucide-react'
 import type { Resource } from '../types'
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
@@ -225,9 +225,27 @@ export default function Resource() {
     }
   }
 
+  const handleOpenFile = async (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation()
+    if (!filePath) return
+    const error = await window.api.openPath(filePath)
+    if (error) {
+      console.error('Failed to open file:', error)
+    }
+  }
+
+  const handleShowInFolder = (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation()
+    if (filePath) {
+      window.api.showItemInFolder(filePath)
+    }
+  }
+
   const handleResourceClick = (resource: Resource) => {
     if (resource.type === 'link' && resource.url) {
       window.open(resource.url, '_blank', 'noopener,noreferrer')
+    } else if (resource.type === 'document' && resource.url) {
+      window.api.openPath(resource.url)
     }
   }
 
@@ -294,7 +312,7 @@ export default function Resource() {
                   className="resource-card"
                   data-type={resource.type}
                   onClick={() => handleResourceClick(resource)}
-                  style={{ cursor: resource.type === 'link' ? 'pointer' : 'default' }}
+                  style={{ cursor: resource.type === 'link' || resource.type === 'document' ? 'pointer' : 'default' }}
                 >
                   {/* Card Header */}
                   <div className="resource-card-header">
@@ -331,6 +349,31 @@ export default function Resource() {
                         <ExternalLink size={14} style={{ opacity: 0.5 }} />
                       )}
                     </div>
+                    {resource.type === 'document' && resource.url && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.4rem',
+                        fontFamily: 'var(--font-sans)', fontSize: '0.6rem', color: 'var(--ink-secondary)',
+                        wordBreak: 'break-all', lineHeight: 1.4,
+                      }}>
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {resource.url}
+                        </span>
+                        <button
+                          onClick={e => handleShowInFolder(e, resource.url!)}
+                          title={isZh ? '打开所在文件夹' : 'Show in folder'}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--ink-secondary)', padding: '2px',
+                            display: 'flex', alignItems: 'center', flexShrink: 0,
+                            transition: 'color 0.2s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink-primary)')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--ink-secondary)')}
+                        >
+                          <FolderOpen size={13} />
+                        </button>
+                      </div>
+                    )}
                     {resource.description && (
                       <p className="resource-card-desc">
                         {resource.description}
@@ -443,13 +486,13 @@ export default function Resource() {
                 </div>
               </div>
 
-              {/* URL (for link type) */}
-              {newType === 'link' && (
+              {/* URL (for link or document type) */}
+              {(newType === 'link' || newType === 'document') && (
                 <div className="resource-form-group">
                   <input
                     type="text"
                     className="resource-form-input"
-                    placeholder={isZh ? 'https://...' : t.resource_urlPlaceholder}
+                    placeholder={newType === 'link' ? (isZh ? 'https://...' : t.resource_urlPlaceholder) : (isZh ? '文件路径...' : 'File path...')}
                     value={newUrl}
                     onChange={e => setNewUrl(e.target.value)}
                   />
@@ -688,13 +731,13 @@ export default function Resource() {
                 </div>
               </div>
 
-              {/* URL (for link type) */}
-              {editType === 'link' && (
+              {/* URL (for link or document type) */}
+              {(editType === 'link' || editType === 'document') && (
                 <div className="resource-form-group">
                   <input
                     type="text"
                     className="resource-form-input"
-                    placeholder={isZh ? 'https://...' : t.resource_urlPlaceholder}
+                    placeholder={editType === 'link' ? (isZh ? 'https://...' : t.resource_urlPlaceholder) : (isZh ? '文件路径...' : 'File path...')}
                     value={editUrl}
                     onChange={e => setEditUrl(e.target.value)}
                   />

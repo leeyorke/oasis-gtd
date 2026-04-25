@@ -78,6 +78,9 @@ declare global {
       // Chat export
       exportConversationMarkdown: (conversationId: string, title: string, messages: Array<{role: string; content: string}>) =>
         Promise<{success: boolean; path?: string; canceled?: boolean; error?: string}>
+      // File operations
+      openPath: (filePath: string) => Promise<string>
+      showItemInFolder: (filePath: string) => void
     }
   }
 }
