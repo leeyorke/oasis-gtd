@@ -5,7 +5,20 @@ import { useT } from '../i18n/useT'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light'
+
+const codeTheme = {
+  ...oneLight,
+  'code[class*="language-"]': {
+    ...(oneLight as any)['code[class*="language-"]'],
+    background: 'transparent',
+    fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', 'Microsoft YaHei', monospace",
+  },
+  'pre[class*="language-"]': {
+    ...(oneLight as any)['pre[class*="language-"]'],
+    background: 'transparent',
+  },
+}
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI', type: 'openai' as const, base_url: 'https://api.openai.com', model: 'gpt-4o' },
@@ -164,16 +177,16 @@ function CodeBlock({ language, content }: { language: string; content: string })
 
   return isHighlighted ? (
     <SyntaxHighlighter
-      style={tomorrow as any}
+      style={codeTheme as any}
       language={language}
       PreTag="div"
       className="code-block-content"
-      customStyle={{ margin: 0, borderRadius: '0 0 6px 6px' }}
+      customStyle={{ margin: 0, borderRadius: 0, background: 'transparent' }}
     >
       {content}
     </SyntaxHighlighter>
   ) : (
-    <pre className="code-block-content" style={{ margin: 0, borderRadius: '0 0 6px 6px', padding: '1rem', background: '#f5f5f5', overflow: 'auto' }}>
+    <pre className="code-block-content" style={{ margin: 0, borderRadius: 0, padding: '1rem', background: 'transparent', overflow: 'auto' }}>
       {content}
     </pre>
   )
