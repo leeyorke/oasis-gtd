@@ -482,11 +482,27 @@ export const useStore = create<AppStore>((set, get) => ({
       if (data.conversationId !== currentConversationId) return
     }
 
+    // RAF 节流：合并同一帧内的多个 chunk，减少 React 重渲染频率
+    let rawBuffer = ''
+    let rafScheduled = false
+
+    const flushBuffer = () => {
+      if (rawBuffer) {
+        set(state => ({
+          streamingContent: state.streamingContent + rawBuffer,
+        }))
+        rawBuffer = ''
+      }
+      rafScheduled = false
+    }
+
     const onStreamChunk = (_event: any, data: { conversationId: string; content: string }) => {
       if (data.conversationId !== currentConversationId) return
-      set(state => ({
-        streamingContent: state.streamingContent + data.content,
-      }))
+      rawBuffer += data.content
+      if (!rafScheduled) {
+        rafScheduled = true
+        requestAnimationFrame(flushBuffer)
+      }
     }
 
     const onStreamEnd = (_event: any, data: { conversationId: string; content: string; title?: string; aborted?: boolean }) => {

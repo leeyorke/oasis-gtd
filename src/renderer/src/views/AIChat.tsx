@@ -289,14 +289,57 @@ export default function AIChat() {
   const chatMainRef = useRef<HTMLDivElement>(null)
   const prevMessageCountRef = useRef<number>(0)
 
+  // Typing effect: progressively display streaming content
+  const [displayedContent, setDisplayedContent] = useState('')
+  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!streamingContent) {
+      setDisplayedContent('')
+      if (bufferTimerRef.current) {
+        clearTimeout(bufferTimerRef.current)
+        bufferTimerRef.current = null
+      }
+      return
+    }
+
+    const CHUNK_SIZE = 12   // 每次显示的字符数
+    const INTERVAL = 50     // 每批间隔（ms）
+
+    const consume = () => {
+      const target = streamingContent
+      const current = displayedContent
+      if (target.length > current.length) {
+        const next = target.slice(current.length, current.length + CHUNK_SIZE)
+        setDisplayedContent(prev => prev + next)
+        bufferTimerRef.current = setTimeout(consume, INTERVAL)
+      } else {
+        bufferTimerRef.current = null
+      }
+    }
+
+    if (!bufferTimerRef.current && displayedContent !== streamingContent) {
+      bufferTimerRef.current = setTimeout(consume, INTERVAL)
+    }
+
+    return () => {
+      if (bufferTimerRef.current) {
+        clearTimeout(bufferTimerRef.current)
+        bufferTimerRef.current = null
+      }
+    }
+  }, [streamingContent, displayedContent])
+
   // Combine actual messages with streaming content for display
   const displayMessages = useMemo(() => {
-    if (!streamingMessageId || !streamingContent) return messages
+    if (!streamingMessageId) return messages
+    const content = displayedContent || streamingContent
+    if (!content) return messages
     return [
       ...messages,
-      { role: 'assistant' as const, content: streamingContent }
+      { role: 'assistant' as const, content }
     ]
-  }, [messages, streamingMessageId, streamingContent])
+  }, [messages, streamingMessageId, displayedContent, streamingContent])
 
   // Check if user is at bottom of scroll
   const checkIsAtBottom = () => {
@@ -606,23 +649,30 @@ export default function AIChat() {
             ) : displayMessages.length === 0 ? (
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'rgba(20,28,58,0.15)', fontStyle: 'italic', paddingTop: '2rem' }}>{t.chat_whatsOnMind}</div>
             ) : (
-              displayMessages.map((msg, i) => (
-                <div key={msg.role + '-' + i} className={`chat-message ${msg.role} fade-in`}>
-                  <div className="chat-role-label">{msg.role === 'user' ? t.chat_you : t.chat_assistant}</div>
-                  <div className={`chat-bubble-wrapper ${msg.role}`}>
-                    <div className={`chat-bubble ${msg.role}`}>
-                      {msg.role === 'assistant' ? (
-                        <MarkdownMessage content={msg.content} />
-                      ) : (
-                        <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                      )}
+              displayMessages.map((msg, i) => {
+                const isLast = i === displayMessages.length - 1
+                const isStreaming = msg.role === 'assistant' && isLast && !!streamingMessageId
+                return (
+                  <div key={msg.role + '-' + i} className={`chat-message ${msg.role} fade-in${isStreaming ? ' streaming' : ''}`}>
+                    <div className="chat-role-label">{msg.role === 'user' ? t.chat_you : t.chat_assistant}</div>
+                    <div className={`chat-bubble-wrapper ${msg.role}`}>
+                      <div className={`chat-bubble ${msg.role}`}>
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <MarkdownMessage content={msg.content} />
+                            {isStreaming && <span className="streaming-cursor" />}
+                          </>
+                        ) : (
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                        )}
+                      </div>
+                      {msg.role === 'assistant' && <CopyButton content={msg.content} />}
                     </div>
-                    {msg.role === 'assistant' && <CopyButton content={msg.content} />}
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
-            {isAILoading && !streamingContent && (
+            {isAILoading && !streamingMessageId && (
               <div className="chat-message assistant">
                 <div className="chat-role-label">{t.chat_assistant}</div>
                 <div className="chat-bubble assistant" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.8rem 1rem' }}>

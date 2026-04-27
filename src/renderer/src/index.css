@@ -1271,6 +1271,38 @@ body {
   animation: fadeInUp 0.5s var(--ease-out) both;
 }
 
+/* 流式消息容器优化 */
+.chat-message.streaming .markdown-body {
+  will-change: contents;
+}
+
+/* 打字机光标 */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--ink-secondary);
+  margin-left: 2px;
+  animation: blink 0.8s infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 内容渐入效果 */
+.markdown-body p,
+.markdown-body li {
+  animation: fadeInContent 0.2s ease-out both;
+}
+
+@keyframes fadeInContent {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
 @keyframes dotPulse {
   0%, 100% { opacity: 0.3; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.2); }
@@ -1548,7 +1580,6 @@ body {
   color: var(--ink-secondary);
   transition: all 0.2s ease;
   font-size: 0.65rem;
-  line-height: 1;
 }
 
 .copy-button:hover {
