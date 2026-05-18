@@ -81,6 +81,12 @@ declare global {
       // File operations
       openPath: (filePath: string) => Promise<string>
       showItemInFolder: (filePath: string) => void
+      // Auto Launch
+      setAutoLaunch: (enable: boolean) => Promise<void>
+      getAutoLaunch: () => Promise<boolean>
+      // Quick Capture
+      closeQuickCapture: () => void
+      registerQuickCaptureShortcut: (shortcut: string) => void
     }
   }
 }

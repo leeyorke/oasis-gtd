@@ -16,9 +16,36 @@ import Settings from './views/Settings'
 import Start from './views/Start'
 import Thoughts from './views/Thoughts'
 import Kanban from './views/Kanban'
+import QuickCaptureWindow from './QuickCaptureWindow'
+
+// Match a KeyboardEvent against a stored shortcut string like "Ctrl+\" or "Ctrl+N"
+function matchShortcut(e: KeyboardEvent, shortcut: string): boolean {
+  const parts = shortcut.split('+')
+  const key = parts.pop()!
+  const ctrl = parts.includes('Ctrl')
+  const alt = parts.includes('Alt')
+  const shift = parts.includes('Shift')
+  const meta = parts.includes('Cmd')
+  return (
+    e.ctrlKey === ctrl &&
+    e.altKey === alt &&
+    e.shiftKey === shift &&
+    e.metaKey === meta &&
+    (e.key === key || e.key.toUpperCase() === key.toUpperCase())
+  )
+}
 
 export default function App() {
+  // Quick-capture mode: standalone window for quick thought entry
+  if (window.location.hash === '#quick-capture') {
+    return <QuickCaptureWindow />
+  }
+
   const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadNotes, loadHabits, loadReview, loadProviders, loadConversations, loadSettings } = useStore()
+  const shortcuts = useStore(s => s.settings.shortcuts)
+  const toggleSidebar = useStore(s => s.toggleSidebar)
+  const setView = useStore(s => s.setView)
+  const setShowAddThought = useStore(s => s.setShowAddThought)
 
   useEffect(() => {
     loadTasks()  // Load all tasks for dashboard view
@@ -32,6 +59,23 @@ export default function App() {
     loadConversations()
     loadSettings()
   }, [])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      for (const [action, shortcut] of Object.entries(shortcuts)) {
+        if (!matchShortcut(e, shortcut)) continue
+        e.preventDefault()
+        if (action === 'toggleSidebar') toggleSidebar()
+        else if (action === 'newThought') {
+          setView('thoughts')
+          setShowAddThought(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [shortcuts, toggleSidebar, setView, setShowAddThought])
 
   const renderView = () => {
     switch (currentView) {

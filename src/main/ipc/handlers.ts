@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app, shell, WebContents } from 'electron'
+import { ipcMain, dialog, app, shell, WebContents, BrowserWindow } from 'electron'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import {
@@ -856,5 +856,23 @@ export function registerHandlers(): void {
   })
   ipcMain.handle('shell:showItemInFolder', (_, filePath: string) => {
     shell.showItemInFolder(filePath)
+  })
+
+  // ─── Auto Launch ─────────────────────────────────────────────────
+  ipcMain.handle('app:setAutoLaunch', async (_, enable: boolean) => {
+    app.setLoginItemSettings({
+      openAtLogin: enable,
+      path: process.execPath,
+    })
+  })
+
+  ipcMain.handle('app:getAutoLaunch', async () => {
+    return app.getLoginItemSettings().openAtLogin
+  })
+
+  // ─── Quick Capture ──────────────────────────────────────────────
+  ipcMain.on('quick-capture:close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) win.close()
   })
 }

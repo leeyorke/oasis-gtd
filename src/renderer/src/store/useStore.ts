@@ -22,6 +22,10 @@ interface AppStore {
   previousView: ViewType
   setView: (view: ViewType) => void
   goBack: () => void
+  sidebarCollapsed: boolean
+  toggleSidebar: () => void
+  showAddThought: boolean
+  setShowAddThought: (show: boolean) => void
 
   // ─── Tasks ─────────────────────────────────────────────────────────────────
   tasks: Task[]
@@ -129,6 +133,10 @@ export const useStore = create<AppStore>((set, get) => ({
   previousView: 'next-actions',
   setView: (view) => set(state => ({ previousView: state.currentView, currentView: view })),
   goBack: () => set(state => ({ currentView: state.previousView })),
+  sidebarCollapsed: false,
+  toggleSidebar: () => set(state => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  showAddThought: false,
+  setShowAddThought: (show) => set({ showAddThought: show }),
 
   // ─── Tasks ─────────────────────────────────────────────────────────────────
   tasks: [],
@@ -621,10 +629,12 @@ export const useStore = create<AppStore>((set, get) => ({
     default_capture_status: 'inbox',
     contexts: ['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home'],
     language: 'en',
+    shortcuts: { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' },
   },
   loadSettings: async () => {
     try {
       const raw = await window.api.getSettings()
+      const autoLaunch = await window.api.getAutoLaunch()
       set({
         settings: {
           app_name: raw.app_name ?? 'Oasis',
@@ -632,6 +642,8 @@ export const useStore = create<AppStore>((set, get) => ({
           default_capture_status: (raw.default_capture_status as AppSettings['default_capture_status']) ?? 'inbox',
           contexts: raw.contexts ? JSON.parse(raw.contexts) : [],
           language: (raw.language as AppSettings['language']) ?? 'en',
+          auto_launch: autoLaunch ?? false,
+          shortcuts: raw.shortcuts ? JSON.parse(raw.shortcuts) : { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' },
         },
       })
     } catch (err) { logError('loadSettings', err) }
@@ -640,6 +652,16 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value)
       await window.api.setSetting(key, serialized)
+      // Sync auto_launch to OS login items
+      if (key === 'auto_launch') {
+        await window.api.setAutoLaunch(value as boolean)
+      }
+      // Sync quick capture shortcut to globalShortcut
+      if (key === 'shortcuts') {
+        const shortcuts = value as Record<string, string>
+        const combo = shortcuts.newThought || 'Ctrl+N'
+        window.api.registerQuickCaptureShortcut(combo)
+      }
       set(state => ({ settings: { ...state.settings, [key]: value } }))
     } catch (err) { logError('updateSetting', err) }
   },

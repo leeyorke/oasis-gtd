@@ -23,7 +23,7 @@ const TAG_COLORS = [
 ]
 
 export default function Thoughts() {
-  const { notes, addNote, updateNote, removeNote, searchNotes, settings } = useStore()
+  const { notes, addNote, updateNote, removeNote, searchNotes, settings, showAddThought, setShowAddThought } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
@@ -58,6 +58,12 @@ export default function Thoughts() {
     })
     return Array.from(tagSet)
   }, [notes])
+
+  // Sync global showAddThought → local showAddModal
+  if (showAddThought && !showAddModal) {
+    setShowAddModal(true)
+    setShowAddThought(false)
+  }
 
   // 获取标签颜色
   const getTagColor = (tag: string) => {
@@ -321,7 +327,7 @@ export default function Thoughts() {
 
       {/* 添加随想弹窗 */}
       {showAddModal && (
-        <div className="thought-modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="thought-modal-overlay" onClick={() => { setShowAddThought(false); setShowAddModal(false) }}>
           <div className="thought-modal-content" onClick={e => e.stopPropagation()}>
             <h3 className="thought-modal-title">
               {isZh ? '新建随想' : 'New Thought'}
@@ -461,6 +467,7 @@ export default function Thoughts() {
               <button
                 className="btn-secondary"
                 onClick={() => {
+                  setShowAddThought(false)
                   setShowAddModal(false)
                   setNewNoteContent('')
                   setNewNoteTags([])
@@ -490,6 +497,7 @@ export default function Thoughts() {
                     tags: storedTags.length > 0 ? storedTags : undefined
                   })
 
+                  setShowAddThought(false)
                   setShowAddModal(false)
                   setNewNoteContent('')
                   setNewNoteTags([])

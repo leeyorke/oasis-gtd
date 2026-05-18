@@ -4,7 +4,7 @@ import type { AIProvider } from '../types'
 import { useT } from '../i18n/useT'
 import { Check, Pencil, Trash2 } from 'lucide-react'
 
-type Section = 'general' | 'contexts' | 'ai-providers' | 'data'
+type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'data'
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI',                  type: 'openai' as const,    base_url: 'https://api.openai.com',   model: 'gpt-4o' },
@@ -23,6 +23,7 @@ export default function Settings() {
     { id: 'general',      label: t.settings_general,      description: t.settings_generalDesc },
     { id: 'contexts',     label: t.settings_contexts,     description: t.settings_contextsDesc },
     { id: 'ai-providers', label: t.settings_aiProviders,  description: t.settings_aiProvidersDesc },
+    { id: 'shortcuts',    label: t.settings_shortcuts,    description: t.settings_shortcutsDesc },
     { id: 'data',         label: t.settings_data,         description: t.settings_dataDesc },
   ]
 
@@ -239,6 +240,34 @@ export default function Settings() {
                       }}
                     >
                       {s === 'inbox' ? t.capture_inbox : t.modal_statusNext}
+                    </button>
+                  ))}
+                </div>
+              </FieldGroup>
+
+              <Divider />
+
+              <FieldGroup label={t.settings_autoLaunch}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {[true, false].map(val => (
+                    <button
+                      key={String(val)}
+                      onClick={() => updateSetting('auto_launch', val)}
+                      style={{
+                        background: settings.auto_launch === val ? 'var(--ink-primary)' : 'transparent',
+                        color: settings.auto_launch === val ? 'var(--ink-light)' : 'var(--ink-secondary)',
+                        border: '1px solid',
+                        borderColor: settings.auto_launch === val ? 'var(--ink-primary)' : 'rgba(20,28,58,0.12)',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.62rem',
+                        padding: '0.35rem 0.9rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {val ? t.on : t.off}
                     </button>
                   ))}
                 </div>
@@ -496,6 +525,9 @@ export default function Settings() {
             </div>
           )}
 
+          {/* ── SHORTCUTS ───────────────────────────────────────────── */}
+          {activeSection === 'shortcuts' && <ShortcutsSection />}
+
           {/* ── DATA ──────────────────────────────────────────────── */}
           {activeSection === 'data' && (
             <div className="fade-in">
@@ -612,4 +644,92 @@ function FieldHint({ children, style }: { children: React.ReactNode; style?: Rea
 
 function Divider() {
   return <div style={{ borderTop: '1px solid rgba(20,28,58,0.07)', margin: '1.8rem 0' }} />
+}
+
+// ─── Shortcuts Section ─────────────────────────────────────────────────────
+
+function normalizeKey(event: KeyboardEvent): string {
+  const mods: string[] = []
+  if (event.ctrlKey) mods.push('Ctrl')
+  if (event.altKey) mods.push('Alt')
+  if (event.shiftKey) mods.push('Shift')
+  if (event.metaKey) mods.push('Cmd')
+  const rawKey = event.key
+  if (['Control', 'Alt', 'Shift', 'Meta'].includes(rawKey)) return ''
+  const key = rawKey === '\\' ? '\\' : rawKey.length === 1 ? rawKey.toUpperCase() : rawKey
+  return [...mods, key].join('+')
+}
+
+const SHORTCUT_DEFS: { id: string; labelKey: string }[] = [
+  { id: 'toggleSidebar', labelKey: 'shortcuts_toggleSidebar' },
+  { id: 'newThought',    labelKey: 'shortcuts_newThought' },
+]
+
+function ShortcutsSection() {
+  const { settings, updateSetting } = useStore()
+  const t = useT()
+  const [recording, setRecording] = useState<string | null>(null)
+
+  // Capture key combo when recording
+  useEffect(() => {
+    if (!recording) return
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const combo = normalizeKey(e)
+      if (!combo) return
+      const updated = { ...settings.shortcuts, [recording]: combo }
+      updateSetting('shortcuts', updated)
+      setRecording(null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [recording, settings.shortcuts, updateSetting])
+
+  return (
+    <div className="fade-in">
+      <SectionTitle>{t.settings_shortcuts}</SectionTitle>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {SHORTCUT_DEFS.map(def => {
+          const combo = settings.shortcuts[def.id] || ''
+          const isRecording = recording === def.id
+          return (
+            <button
+              key={def.id}
+              onClick={() => setRecording(isRecording ? null : def.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.7rem 0.9rem',
+                border: `1px solid ${isRecording ? 'var(--ink-primary)' : 'rgba(20,28,58,0.07)'}`,
+                background: isRecording ? 'rgba(20,28,58,0.04)' : 'rgba(255,255,255,0.2)',
+                borderRadius: 0,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-primary)' }}>
+                {(t as any)[def.labelKey] || def.labelKey}
+              </span>
+              <kbd style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: '0.62rem',
+                padding: '0.25rem 0.6rem',
+                background: isRecording ? 'var(--ink-primary)' : 'var(--border)',
+                color: isRecording ? 'var(--ink-light)' : 'var(--ink-primary)',
+                borderRadius: '4px',
+                letterSpacing: '0.04em',
+                minWidth: '80px',
+                textAlign: 'center',
+              }}>
+                {isRecording ? '...' : combo}
+              </kbd>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }

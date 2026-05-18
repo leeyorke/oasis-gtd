@@ -6,6 +6,8 @@ export interface AppSettings {
   default_capture_status: 'inbox' | 'next'
   contexts: string[]          // custom @context list
   language: 'en' | 'zh'
+  auto_launch: boolean        // start at OS login
+  shortcuts: Record<string, string>  // key combos, e.g. { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' }
 }
 
 export interface Task {

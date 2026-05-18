@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import type { ViewType } from '../types'
@@ -22,8 +21,7 @@ import {
 } from 'lucide-react'
 
 export default function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const { currentView, setView, goBack, tasks, projects, waitingItems, settings } = useStore()
+  const { currentView, setView, goBack, tasks, projects, waitingItems, settings, sidebarCollapsed, toggleSidebar } = useStore()
   const t = useT()
 
   const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
@@ -54,14 +52,14 @@ export default function Sidebar() {
   const activeCount = projects.filter(p => p.status === 'active').length
 
   return (
-    <nav className={`nav-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <nav className={`nav-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
       <div>
         <div className="nav-brand-wrapper">
           <div className="logo-icon"><Sprout size={32} /></div>
           <button
             className="sidebar-toggle"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            title={isCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            onClick={() => toggleSidebar()}
+            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
           >
             <PanelLeft size={18} />
           </button>

@@ -125,6 +125,14 @@ const api = {
   // File operations
   openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
   showItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
+
+  // Auto Launch
+  setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('app:setAutoLaunch', enable),
+  getAutoLaunch: () => ipcRenderer.invoke('app:getAutoLaunch'),
+
+  // Quick Capture
+  closeQuickCapture: () => ipcRenderer.send('quick-capture:close'),
+  registerQuickCaptureShortcut: (shortcut: string) => ipcRenderer.send('quick-capture:registerShortcut', shortcut),
 }
 
 if (process.contextIsolated) {
