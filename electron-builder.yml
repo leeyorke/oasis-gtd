@@ -17,6 +17,12 @@ asarUnpack:
   - resources/**
   - node_modules/better-sqlite3/**
 
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+  - from: resources/icon.png
+    to: icon.png
+
 win:
   target:
     - target: nsis

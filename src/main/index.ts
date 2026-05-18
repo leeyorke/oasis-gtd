@@ -23,7 +23,9 @@ let tray: Tray | null = null
 let quickCaptureWindow: BrowserWindow | null = null
 
 function createTray(): void {
-  const iconPath = join(__dirname, '../../resources/icon.ico')
+  const iconPath = is.dev
+    ? join(__dirname, '../../resources/icon.ico')
+    : join(process.resourcesPath, 'icon.ico')
   const icon = nativeImage.createFromPath(iconPath)
   tray = new Tray(icon)
 
@@ -67,7 +69,7 @@ function createWindow(): void {
 
   // Center the window on the screen where the cursor is
   const windowWidth = 1100
-  const windowHeight = 700
+  const windowHeight = 800
   const x = Math.round(screenX + (screenWidth - windowWidth) / 2)
   const y = Math.round(screenY + (screenHeight - windowHeight) / 2)
 
@@ -83,7 +85,7 @@ function createWindow(): void {
     titleBarStyle: 'hidden',
     backgroundColor: '#e9e6e2',
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon: join(__dirname, '../../resources/icon.png') } : {}),
+    ...(process.platform === 'linux' ? { icon: is.dev ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png') } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
