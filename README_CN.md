@@ -1,4 +1,4 @@
-# Oasis GTD — Alpha
+# Oasis GTD
 
 使用 Electron + React + TypeScript 构建的高级桌面 GTD 系统。
 

@@ -1,4 +1,10 @@
-# Oasis GTD — Alpha
+# Oasis GTD
+
+<p align="center">
+  <strong>English</strong>
+  &nbsp;·&nbsp;
+  <a href="./README_CN.md">简体中文</a>
+</p>
 
 Premium desktop GTD system built with Electron + React + TypeScript.
 
