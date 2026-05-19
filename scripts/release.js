@@ -155,6 +155,8 @@ async function main() {
     dryRun: args.includes('--dry-run'),
   };
 
+  const currentVersion = getCurrentVersion();
+
   // Temp mode: build without version bump or git
   if (options.temp) {
     const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
@@ -198,8 +200,6 @@ async function main() {
 
   // Get version from args or prompt
   let newVersion = args.find(arg => !arg.startsWith('--'));
-
-  const currentVersion = getCurrentVersion();
 
   log(`\n${colors.bright}╔══════════════════════════════════════╗${colors.reset}`);
   log(`${colors.bright}║     Oasis GTD Release Builder        ║${colors.reset}`);
