@@ -21,6 +21,7 @@ if (process.platform === 'win32') {
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let quickCaptureWindow: BrowserWindow | null = null
+let isQuitting = false
 
 function createTray(): void {
   const iconPath = is.dev
@@ -97,6 +98,14 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.setSize(windowWidth, windowHeight)
     mainWindow.show()
+  })
+
+  // Intercept close (Alt+F4) → minimize to tray; only quit via tray menu
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -230,6 +239,7 @@ app.on('window-all-closed', () => {
 
 // Ensure window is shown before quitting (helps macOS restore state)
 app.on('before-quit', () => {
+  isQuitting = true
   if (mainWindow) {
     mainWindow.show()
   }
