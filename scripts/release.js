@@ -92,6 +92,7 @@ Options:
   --help, -h          Show this help message
   --skip-build        Skip the build step
   --skip-git          Skip git commit and tag
+  --temp              Build a temporary test package without version bump or git
   --dry-run           Show what would happen without making changes
 
 Examples:
@@ -150,8 +151,45 @@ async function main() {
     help: args.includes('--help') || args.includes('-h'),
     skipBuild: args.includes('--skip-build'),
     skipGit: args.includes('--skip-git'),
+    temp: args.includes('--temp'),
     dryRun: args.includes('--dry-run'),
   };
+
+  // Temp mode: build without version bump or git
+  if (options.temp) {
+    const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+    const tempVersion = `${currentVersion}-temp-${timestamp}`;
+
+    log(`\n${colors.bright}╔══════════════════════════════════════╗${colors.reset}`);
+    log(`${colors.bright}║      Temp Build (no version bump)    ║${colors.reset}`);
+    log(`${colors.bright}╚══════════════════════════════════════╝${colors.reset}\n`);
+    log(`  Version:       ${currentVersion}`);
+    log(`  Build version: ${tempVersion}`);
+    log(`  Git commit:    skipped\n`);
+
+    log('\n[1/2] Building...', 'blue');
+    try {
+      const platform = process.platform;
+      let buildCmd = 'npm run build:win';
+      if (platform === 'darwin') buildCmd = 'npm run build:mac';
+      else if (platform !== 'win32') buildCmd = 'npm run build:linux';
+
+      if (options.skipBuild) {
+        log('(skipped)', 'yellow');
+      } else {
+        execCommand(buildCmd);
+        log('✓ Build complete!', 'green');
+      }
+    } catch (error) {
+      log('Build failed!', 'red');
+      process.exit(1);
+    }
+
+    log('\n[2/2] Temp build complete!', 'green');
+    log('  No files were modified or committed.', 'yellow');
+    console.log();
+    process.exit(0);
+  }
 
   if (options.help) {
     printHelp();

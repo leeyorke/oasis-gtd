@@ -81,6 +81,9 @@ node scripts/release.js 1.0.0
 
 # Dry run (no actual file changes)
 node scripts/release.js --dry-run 1.0.0
+
+# Temp build (no version bump, no git commit)
+node scripts/release.js --temp
 ```
 
 The script will:
@@ -88,6 +91,8 @@ The script will:
 2. Create git commit and tag
 3. Auto-detect platform and build appropriate installer
 4. Output build summary
+
+Use `--temp` for quick test builds — it builds an installer using the current version without modifying any files or creating git commits.
 
 ## AI Provider Setup
 
