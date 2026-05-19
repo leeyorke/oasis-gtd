@@ -19,6 +19,15 @@ import {
 // Global store for AbortControllers per conversation
 const streamControllers = new Map<string, AbortController>()
 
+// Helper: get local date string YYYY-MM-DD instead of UTC-based toISOString
+function getLocalDateString(date?: Date): string {
+  const d = date || new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Helper: safely parse JSON, returning null on empty/invalid body
 const safeJson = async (res: Response): Promise<Record<string, unknown> | null> => {
   const text = await res.text()
@@ -339,7 +348,7 @@ export function registerHandlers(): void {
   // ─── Habits ─────────────────────────────────────────────────────────────────
   ipcMain.handle('habits:getAll', () => {
     const habits = habitQueries.getAll() as Array<Record<string, unknown>>
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
 
     // 计算每个习惯的连续打卡天数和本周打卡情况
     return habits.map(habit => {
@@ -351,7 +360,7 @@ export function registerHandlers(): void {
       let streak = 0
       let currentDate = new Date()
       while (true) {
-        const dateStr = currentDate.toISOString().split('T')[0]
+        const dateStr = getLocalDateString(currentDate)
         const record = records.find(r => r.record_date === dateStr)
         const isCompleted = record
           ? isQuantitative
@@ -378,7 +387,7 @@ export function registerHandlers(): void {
       for (let i = 0; i < 7; i++) {
         const date = new Date(startOfWeek)
         date.setDate(startOfWeek.getDate() + i)
-        const dateStr = date.toISOString().split('T')[0]
+        const dateStr = getLocalDateString(date)
         const record = records.find(r => r.record_date === dateStr)
         weekRecords[dateStr] = record ? (record.count as number || 1) : 0
       }
@@ -412,7 +421,7 @@ export function registerHandlers(): void {
     if (!habit) return null
 
     const records = habitRecordQueries.getByHabitId(habitId) as Array<Record<string, unknown>>
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
     const isQuantitative = (habit.is_quantitative as number) === 1
     const target = (habit.target as number) || 1
 
@@ -420,7 +429,7 @@ export function registerHandlers(): void {
     let streak = 0
     let currentDate = new Date()
     while (true) {
-      const dateStr = currentDate.toISOString().split('T')[0]
+      const dateStr = getLocalDateString(currentDate)
       const record = records.find(r => r.record_date === dateStr)
       const isCompleted = record
         ? isQuantitative
@@ -488,7 +497,7 @@ export function registerHandlers(): void {
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek)
       date.setDate(startOfWeek.getDate() + i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = getLocalDateString(date)
       const record = records.find(r => r.record_date === dateStr)
       weekRecords[dateStr] = record ? (record.count as number || 1) : 0
     }
@@ -803,7 +812,7 @@ export function registerHandlers(): void {
   ipcMain.handle('data:exportJSON', async () => {
     const result = await dialog.showSaveDialog({
       title: 'Export Oasis GTD Data',
-      defaultPath: join(app.getPath('documents'), `oasis-gtd-export-${new Date().toISOString().split('T')[0]}.json`),
+      defaultPath: join(app.getPath('documents'), `oasis-gtd-export-${getLocalDateString()}.json`),
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     if (result.canceled || !result.filePath) return { success: false, canceled: true }
@@ -820,7 +829,7 @@ export function registerHandlers(): void {
   ipcMain.handle('chat:exportMarkdown', async (_, conversationId: string, title: string, messages: Array<{role: string; content: string}>) => {
     // Sanitize title for filename
     const sanitizedTitle = title.replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, '-').slice(0, 60)
-    const dateStr = new Date().toISOString().split('T')[0]
+    const dateStr = getLocalDateString()
 
     const result = await dialog.showSaveDialog({
       title: 'Export Conversation',

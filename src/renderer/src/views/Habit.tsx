@@ -7,7 +7,7 @@ const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function Habit() {
-  const { habits, toggleHabitComplete, incrementHabitCount, addHabit, updateHabit, removeHabit, settings, setView, loadHabitById } = useStore()
+  const { habits, loadHabits, toggleHabitComplete, incrementHabitCount, addHabit, updateHabit, removeHabit, settings, setView, loadHabitById } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
 
@@ -26,8 +26,28 @@ export default function Habit() {
   const [editHabitTime, setEditHabitTime] = useState('')
   const [animatingId, setAnimatingId] = useState<string | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const getLocalToday = () => {
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const [today, setToday] = useState(getLocalToday)
   const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 // 周一为0
+
+  // Auto-refresh habits when date changes (e.g., after midnight)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newToday = getLocalToday()
+      if (newToday !== today) {
+        setToday(newToday)
+        loadHabits()
+      }
+    }, 30000) // check every 30 seconds
+    return () => clearInterval(interval)
+  }, [today])
 
   // 清除动画状态
   useEffect(() => {
