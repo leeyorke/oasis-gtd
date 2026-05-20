@@ -157,9 +157,21 @@ async function main() {
 
   const currentVersion = getCurrentVersion();
 
+  if (options.help) {
+    printHelp();
+    process.exit(0);
+  }
+
   // Temp mode: build without version bump or git
   if (options.temp) {
-    const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+    const d = new Date();
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    const timestamp = `${y}${mo}${dd}T${h}${mi}${s}`;
     const tempVersion = `${currentVersion}-temp-${timestamp}`;
 
     log(`\n${colors.bright}╔══════════════════════════════════════╗${colors.reset}`);
@@ -193,10 +205,6 @@ async function main() {
     process.exit(0);
   }
 
-  if (options.help) {
-    printHelp();
-    process.exit(0);
-  }
 
   // Get version from args or prompt
   let newVersion = args.find(arg => !arg.startsWith('--'));

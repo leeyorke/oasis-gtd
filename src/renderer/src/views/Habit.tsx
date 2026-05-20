@@ -35,7 +35,10 @@ export default function Habit() {
   }
 
   const [today, setToday] = useState(getLocalToday)
-  const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 // 周一为0
+  const [currentDayIndex, setCurrentDayIndex] = useState(() => {
+    const d = new Date().getDay()
+    return d === 0 ? 6 : d - 1
+  })
 
   // Auto-refresh habits when date changes (e.g., after midnight)
   useEffect(() => {
@@ -43,6 +46,8 @@ export default function Habit() {
       const newToday = getLocalToday()
       if (newToday !== today) {
         setToday(newToday)
+        const d = new Date().getDay()
+        setCurrentDayIndex(d === 0 ? 6 : d - 1)
         loadHabits()
       }
     }, 30000) // check every 30 seconds
@@ -142,13 +147,16 @@ export default function Habit() {
     return isZh ? WEEK_DAYS[index] : WEEK_DAYS_EN[index]
   }
 
-  // 检查指定日期是否已打卡
+  // 检查指定日期是否已打卡（使用本地日期）
   const isDayCompleted = (habit: any, dayIndex: number) => {
     const now = new Date()
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 本周一
-    const date = new Date(startOfWeek)
-    date.setDate(startOfWeek.getDate() + dayIndex)
-    const dateStr = date.toISOString().split('T')[0]
+    const dayOfWeek = now.getDay()
+    // 计算本周一的日期（不突变 now）
+    const monDate = new Date(now)
+    monDate.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+    const date = new Date(monDate)
+    date.setDate(monDate.getDate() + dayIndex)
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     const count = habit.weekRecords[dateStr] || 0
     return count >= habit.target
   }

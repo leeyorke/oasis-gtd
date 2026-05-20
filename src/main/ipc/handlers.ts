@@ -382,7 +382,9 @@ export function registerHandlers(): void {
 
       // 获取本周打卡记录（周一到周日）
       const now = new Date()
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 周一
+      const dayOfWeek = now.getDay()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)) // 周一
       const weekRecords: Record<string, number> = {}
       for (let i = 0; i < 7; i++) {
         const date = new Date(startOfWeek)
@@ -492,7 +494,9 @@ export function registerHandlers(): void {
     const completedToday = todayCount >= target
 
     // 获取本周打卡记录（周一到周日）
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1))
+    const dayOfWeek = now.getDay()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
     const weekRecords: Record<string, number> = {}
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek)
