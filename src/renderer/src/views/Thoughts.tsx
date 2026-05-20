@@ -30,6 +30,18 @@ export default function Thoughts() {
   // Fresh load notes from DB when view mounts (in case QuickCaptureWindow added new ones)
   useEffect(() => { loadNotes() }, [loadNotes])
 
+  // Also refresh when window regains focus (tray hide/show or alt-tab back)
+  useEffect(() => {
+    const onFocus = () => loadNotes()
+    const onVisible = () => { if (document.visibilityState === 'visible') loadNotes() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadNotes])
+
   const [searchKeyword, setSearchKeyword] = useState('')
   const [activeTag, setActiveTag] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
