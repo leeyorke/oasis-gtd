@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import { Search, MoreHorizontal, Plus, Sun, Cloud, CloudDrizzle, Wind, Pencil, Trash2 } from 'lucide-react'
@@ -23,9 +23,12 @@ const TAG_COLORS = [
 ]
 
 export default function Thoughts() {
-  const { notes, addNote, updateNote, removeNote, searchNotes, settings, showAddThought, setShowAddThought } = useStore()
+  const { notes, addNote, updateNote, removeNote, loadNotes, searchNotes, settings, showAddThought, setShowAddThought } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
+
+  // Fresh load notes from DB when view mounts (in case QuickCaptureWindow added new ones)
+  useEffect(() => { loadNotes() }, [loadNotes])
 
   const [searchKeyword, setSearchKeyword] = useState('')
   const [activeTag, setActiveTag] = useState('all')
