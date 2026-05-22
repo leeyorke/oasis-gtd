@@ -40,6 +40,9 @@ export default function Habit() {
     return d === 0 ? 6 : d - 1
   })
 
+  // Refresh habits on mount (handles cross-midnight when user was on another view)
+  useEffect(() => { loadHabits() }, [loadHabits])
+
   // Auto-refresh habits when date changes (e.g., after midnight)
   useEffect(() => {
     const interval = setInterval(() => {
