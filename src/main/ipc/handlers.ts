@@ -106,6 +106,7 @@ async function streamOpenAICompatible(
 ): Promise<string> {
   const url = `${provider.base_url}/v1/chat/completions`
   const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
+  if (!isTitleCall) console.log(`[AI] -> ${provider.provider_type}:`, url)
 
   const response = await fetch(url, {
     method: 'POST',
@@ -162,6 +163,7 @@ async function streamAnthropic(
 ): Promise<string> {
   const url = `${provider.base_url}/v1/messages`
   const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
+  if (!isTitleCall) console.log('[AI] -> Anthropic:', url)
 
   const response = await fetch(url, {
     method: 'POST',
@@ -220,6 +222,7 @@ async function streamOllama(
   signal?: AbortSignal
 ): Promise<string> {
   const url = `${provider.base_url}/api/chat`
+  if (!isTitleCall) console.log('[AI] -> Ollama:', url)
 
   // Ollama: prepend system prompt as first message if set
   const ollamaMessages = provider.system_prompt
@@ -625,7 +628,7 @@ export function registerHandlers(): void {
       } else {
         // OpenAI-compatible
         const url = `${provider.base_url}/v1/chat/completions`
-        if (!isTitleCall) console.log('[AI] -> OpenAI-compatible:', url)
+        if (!isTitleCall) console.log(`[AI] -> ${provider.provider_type}:`, url)
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -707,13 +710,14 @@ export function registerHandlers(): void {
 
       // Auto-generate title if it's the first message
       let generatedTitle: string | undefined
+      console.log(`[AI] Title check: isTitleCall=${isTitleCall} messages.length=${messages.length}`)
       if (!isTitleCall && messages.length === 1) {
         try {
           const lang = 'en' // We'll get this from settings in a real implementation
           const titlePrompt: Array<{role: string; content: string}> = [
             {
               role: 'user',
-              content: `Summarize this conversation exchange in 5 words or fewer as a conversation title. Reply with ONLY the title, no punctuation, no quotes.\n\nUser: ${messages[messages.length - 1].content}\nAssistant: ${fullContent}`,
+              content: `Generate a conversation title of five words or fewer based on this exchange. Respond with only the title in the same language as the conversation. Do not use punctuation or quotation marks.\n\nUser: ${messages[messages.length - 1].content}\nAssistant: ${fullContent}`,
             },
           ]
           // Use non-streaming for title generation
@@ -736,7 +740,8 @@ export function registerHandlers(): void {
               if (!response.ok) return { success: false }
               const data = await safeJson(response)
               const content = data?.content as Array<{text: string}> | undefined
-              return { success: true, content: content?.[0]?.text }
+              const text = content?.[0]?.text
+              return { success: true, content: typeof text === 'string' ? text : '' }
             } else {
               const url = `${provider.base_url}/v1/chat/completions`
               const response = await fetch(url, {
@@ -750,16 +755,27 @@ export function registerHandlers(): void {
               if (!response.ok) return { success: false }
               const data = await safeJson(response)
               const choices = data?.choices as Array<{message: {content: string}}> | undefined
-              return { success: true, content: choices?.[0]?.message?.content }
+              const rawContent = choices?.[0]?.message?.content
+              return { success: true, content: typeof rawContent === 'string' ? rawContent : '' }
             }
           })()
 
           if (titleResult.success && titleResult.content) {
             generatedTitle = titleResult.content.trim().slice(0, 60)
-            await aiQueries.renameConversation(conversationId, generatedTitle)
+          } else {
+            // Fallback: use first few words of user message as title
+            const firstMsg = messages.find(m => m.role === 'user')
+            if (firstMsg) {
+              generatedTitle = firstMsg.content.replace(/[\n\r]+/g, ' ').slice(0, 10)
+            }
           }
-        } catch {
+          if (generatedTitle) {
+            await aiQueries.renameConversation(conversationId, generatedTitle)
+            console.log(`[AI] Title: "${generatedTitle}"`)
+          }
+        } catch (titleErr) {
           // Title generation failing is non-critical
+          console.log("[AI] Title generation failed:", titleErr instanceof Error ? titleErr.message : titleErr)
         }
       }
 

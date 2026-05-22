@@ -165,17 +165,8 @@ interface MarkdownMessageProps {
   content: string
 }
 
-// Code block component with lazy highlighting
 function CodeBlock({ language, content }: { language: string; content: string }) {
-  const [isHighlighted, setIsHighlighted] = useState(false)
-
-  useEffect(() => {
-    // Delay highlighting to not block main rendering
-    const id = requestAnimationFrame(() => setIsHighlighted(true))
-    return () => cancelAnimationFrame(id)
-  }, [content])
-
-  return isHighlighted ? (
+  return (
     <SyntaxHighlighter
       style={codeTheme as any}
       language={language}
@@ -185,10 +176,6 @@ function CodeBlock({ language, content }: { language: string; content: string })
     >
       {content}
     </SyntaxHighlighter>
-  ) : (
-    <pre className="code-block-content" style={{ margin: 0, borderRadius: 0, padding: '1rem', background: 'transparent', overflow: 'auto' }}>
-      {content}
-    </pre>
   )
 }
 
@@ -255,8 +242,7 @@ const MarkdownMessage = React.memo(function MarkdownMessage({ content }: Markdow
         {content}
       </ReactMarkdown>
     </div>
-  )
-}, (prevProps, nextProps) => prevProps.content === nextProps.content)
+  )}, (prevProps, nextProps) => prevProps.content === nextProps.content)
 
 export default function AIChat() {
   const {
@@ -291,44 +277,49 @@ export default function AIChat() {
 
   // Typing effect: progressively display streaming content
   const [displayedContent, setDisplayedContent] = useState('')
-  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const lastIndexRef = useRef(0)
 
   useEffect(() => {
     if (!streamingContent) {
       setDisplayedContent('')
-      if (bufferTimerRef.current) {
-        clearTimeout(bufferTimerRef.current)
-        bufferTimerRef.current = null
+      lastIndexRef.current = 0
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
       }
       return
     }
 
-    const CHUNK_SIZE = 12   // 每次显示的字符数
-    const INTERVAL = 50     // 每批间隔（ms）
+    const CHUNK_SIZE = 12
 
     const consume = () => {
       const target = streamingContent
-      const current = displayedContent
-      if (target.length > current.length) {
-        const next = target.slice(current.length, current.length + CHUNK_SIZE)
-        setDisplayedContent(prev => prev + next)
-        bufferTimerRef.current = setTimeout(consume, INTERVAL)
+      const start = lastIndexRef.current
+      if (start < target.length) {
+        const end = Math.min(start + CHUNK_SIZE, target.length)
+        const next = target.slice(start, end)
+        if (next) {
+          setDisplayedContent(prev => prev + next)
+          lastIndexRef.current = end
+        }
+        rafRef.current = requestAnimationFrame(consume)
       } else {
-        bufferTimerRef.current = null
+        rafRef.current = null
       }
     }
 
-    if (!bufferTimerRef.current && displayedContent !== streamingContent) {
-      bufferTimerRef.current = setTimeout(consume, INTERVAL)
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(consume)
     }
 
     return () => {
-      if (bufferTimerRef.current) {
-        clearTimeout(bufferTimerRef.current)
-        bufferTimerRef.current = null
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
       }
     }
-  }, [streamingContent, displayedContent])
+  }, [streamingContent])
 
   // Combine actual messages with streaming content for display
   const displayMessages = useMemo(() => {
@@ -350,6 +341,34 @@ export default function AIChat() {
     return scrollHeight - scrollTop - clientHeight < 50
   }
 
+  // Ref to break stale closure in scroll handler — always reflects current streamingMessageId
+  const streamingRef = useRef(!!streamingMessageId)
+  useEffect(() => { streamingRef.current = !!streamingMessageId }, [streamingMessageId])
+
+  // Force show scroll button during streaming; hide when streaming ends and user is at bottom
+  useEffect(() => {
+    if (streamingMessageId) {
+      setShowScrollButton(true)
+      // Update position immediately so button appears at correct spot
+      const container = wrapperRef.current
+      if (container) {
+        const rect = container.getBoundingClientRect()
+        setButtonPosition({
+          left: rect.left + rect.width / 2 - 18,
+          bottom: window.innerHeight - rect.bottom + 16
+        })
+      }
+    } else {
+      // Streaming ended — let scroll state decide
+      const atBottom = checkIsAtBottom()
+      const container = wrapperRef.current
+      const shouldShow = container
+        ? container.scrollHeight > container.clientHeight && !atBottom
+        : false
+      setShowScrollButton(shouldShow)
+    }
+  }, [streamingMessageId])
+
   // Handle scroll events
   useEffect(() => {
     const container = wrapperRef.current
@@ -367,8 +386,8 @@ export default function AIChat() {
     const handleScroll = () => {
       const atBottom = checkIsAtBottom()
       setIsAtBottom(atBottom)
-      // Show scroll button when content overflows and user is not at bottom
-      const shouldShowButton = container.scrollHeight > container.clientHeight && !atBottom
+      // During streaming, always show button; otherwise use scroll-based logic
+      const shouldShowButton = (container.scrollHeight > container.clientHeight && !atBottom) || streamingRef.current
       setShowScrollButton(shouldShowButton)
       updateButtonPosition()
     }
@@ -402,7 +421,10 @@ export default function AIChat() {
   const handleScrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     setIsAtBottom(true)
-    setShowScrollButton(false)
+    // During streaming, keep button visible; otherwise hide it
+    if (!streamingRef.current) {
+      setShowScrollButton(false)
+    }
   }
 
   // Update button position when messages change
@@ -692,6 +714,7 @@ export default function AIChat() {
               position: 'fixed',
               left: buttonPosition.left,
               bottom: buttonPosition.bottom,
+              zIndex: 100,
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
