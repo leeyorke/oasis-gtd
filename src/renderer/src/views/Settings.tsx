@@ -448,9 +448,6 @@ export default function Settings() {
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
                           ) : null}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'var(--ink-secondary)', marginTop: '0.2rem' }}>
-                          {p.model} · {p.base_url}
-                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         {!p.is_active && (
