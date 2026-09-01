@@ -392,7 +392,7 @@ export default function Projects() {
         {showAddTask && selectedProject && (
           <AddTaskModal
             onClose={() => setShowAddTask(false)}
-            defaultStatus="next"
+            projectId={selectedProject.id}
           />
         )}
       </div>

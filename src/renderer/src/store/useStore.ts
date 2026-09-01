@@ -172,10 +172,12 @@ export const useStore = create<AppStore>((set, get) => ({
   updateTask: async (id, updates) => {
     try {
       await window.api.updateTask(id, updates)
-      const currentView = get().currentView
-      const status = currentView === 'next-actions' ? 'next' : undefined
-      await get().loadTasks(status)
-    } catch (err) { logError('updateTask', err) }
+      // 全量拉取任务，跨视图（NextActions ↔ Projects ↔ Kanban）状态保持一致
+      await get().loadTasks()
+    } catch (err) {
+      logError('updateTask', err)
+      throw err
+    }
   },
   removeTask: async (id) => {
     try {

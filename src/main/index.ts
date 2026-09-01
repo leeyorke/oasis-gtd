@@ -185,6 +185,9 @@ function createQuickCaptureWindow(): void {
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.oasis.gtd')
 
+  // 禁用 Chromium 内置拼写检查，避免输入框出现红色波浪线
+  session.defaultSession.setSpellCheckerEnabled(false)
+
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })

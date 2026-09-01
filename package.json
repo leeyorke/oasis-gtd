@@ -1,6 +1,6 @@
 {
   "name": "oasis-gtd",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "description": "Oasis — Premium GTD Desktop System",
   "author": {
     "name": "Lee Yorke",
@@ -11,6 +11,7 @@
   "scripts": {
     "start": "electron-vite preview",
     "dev": "chcp 65001 && electron-vite dev -- --remote-debugging-port=9222",
+    "dev:inspect": "chcp 65001 && set V8_INSPECTOR_PORT=9229&& electron-vite dev -- --remote-debugging-port=9222",
     "build": "electron-vite build",
     "postinstall": "electron-builder install-app-deps && node scripts/patch-electron-vite.js",
     "build:win": "npm run build && electron-builder --win --x64",

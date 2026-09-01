@@ -6,7 +6,7 @@ import QuickAddTaskModal from '../components/QuickAddTaskModal'
 import TaskEditSidebar from '../components/TaskEditSidebar'
 
 export default function NextActions() {
-  const { tasks, removeTask, loadTasks, settings, updateTask } = useStore()
+  const { tasks, projects, removeTask, loadTasks, settings, updateTask } = useStore()
   const t = useT()
   const isZh = settings.language === 'zh'
   const [showAddModal, setShowAddModal] = useState(false)
@@ -15,6 +15,8 @@ export default function NextActions() {
   const [selectedEditingTask, setSelectedEditingTask] = useState<any>(null)
 
   const nextTasks = tasks.filter(tk => tk.status === 'next')
+  // 把 projects 数组转成 { id -> title } 查找表，避免渲染时 N+1
+  const projectMap = new Map(projects.map(p => [p.id, p.title]))
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const lang = settings.language === 'zh' ? 'zh-CN' : 'en-US'
 
@@ -50,8 +52,12 @@ export default function NextActions() {
   const handleComplete = async (id: string) => {
     setCompletingTaskId(id)
     setTimeout(async () => {
-      await window.api.updateTask(id, { status: 'archive' })
-      await loadTasks()
+      try {
+        await window.api.updateTask(id, { status: 'done' })
+        await loadTasks()
+      } catch (err) {
+        console.error('Failed to complete task', id, err)
+      }
     }, 100)
   }
 
@@ -107,6 +113,14 @@ export default function NextActions() {
                     <span className="meta-dot"></span>
                     <Clock size={10} />
                     <span>{formatTimeAgo(task.created_at)}</span>
+                    {task.project_id && projectMap.get(task.project_id) && (
+                      <>
+                        <span className="meta-dot"></span>
+                        <span title={projectMap.get(task.project_id)}>
+                          {projectMap.get(task.project_id)}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
