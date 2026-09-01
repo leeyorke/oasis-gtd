@@ -110,12 +110,20 @@ interface AppStore {
   newConversation: () => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   renameConversation: (id: string, title: string) => Promise<void>
+  updateConversationModel: (id: string, model: string) => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
   stopStreaming: () => void
 
   // ─── UI ────────────────────────────────────────────────────────────────────
   isCapturing: boolean
   setCapturing: (v: boolean) => void
+
+  // ─── Reminder ──────────────────────────────────────────────────────────────
+  showReminder: boolean
+  lastReminderDate: string | null
+  loadLastReminderDate: () => Promise<void>
+  checkReminderScheduled: () => Promise<void>
+  dismissReminder: () => Promise<void>
 
   // ─── Settings ──────────────────────────────────────────────────────────────
   settings: AppSettings
@@ -125,6 +133,15 @@ interface AppStore {
 
 function logError(context: string, err: unknown): void {
   console.error(`[Store] ${context}:`, err instanceof Error ? err.message : err)
+}
+
+function parseModelList(model: string): string[] {
+  try {
+    const parsed = JSON.parse(model)
+    return Array.isArray(parsed) ? parsed : [model]
+  } catch {
+    return model ? [model] : []
+  }
 }
 
 export const useStore = create<AppStore>((set, get) => ({
@@ -440,7 +457,10 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       const { activeProvider } = get()
       if (!activeProvider) return
-      const id = await window.api.createConversation('New Conversation', activeProvider.id)
+      // Extract first model from provider's model field (may be JSON array)
+      const models = parseModelList(activeProvider.model)
+      const defaultModel = models[0] || activeProvider.model
+      const id = await window.api.createConversation('New Conversation', activeProvider.id, defaultModel)
       await get().loadConversations()
       set({ currentConversationId: id, messages: [], streamingMessageId: null, streamingContent: '' })
     } catch (err) { logError('newConversation', err) }
@@ -460,8 +480,15 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ conversations })
     } catch (err) { logError('renameConversation', err) }
   },
+  updateConversationModel: async (id, model) => {
+    try {
+      await window.api.updateConversationModel(id, model)
+      const conversations = get().conversations.map(c => c.id === id ? { ...c, model } : c)
+      set({ conversations })
+    } catch (err) { logError('updateConversationModel', err) }
+  },
   sendChatMessage: async (content) => {
-    const { currentConversationId, messages: currentMessages, activeProvider } = get()
+    const { currentConversationId, messages: currentMessages, activeProvider, conversations } = get()
     if (!currentConversationId || !activeProvider) return
 
     // Clean up any existing listeners first
@@ -577,8 +604,14 @@ export const useStore = create<AppStore>((set, get) => ({
     window.api.onAIStreamEnd(onStreamEnd)
     window.api.onAIStreamError(onStreamError)
 
-    // Start streaming
-    window.api.sendMessageStream(currentConversationId, updatedMessages, activeProvider)
+    // Start streaming — use conversation's model if set
+    const currentConv = conversations.find(c => c.id === currentConversationId)
+    const providerWithModel = currentConv?.model
+      ? { ...activeProvider, model: currentConv.model }
+      : activeProvider
+    // Strip DB metadata fields before sending to AI
+    const cleanMessages = updatedMessages.map(m => ({ role: m.role, content: m.content }))
+    window.api.sendMessageStream(currentConversationId, cleanMessages, providerWithModel)
 
     // Also reload conversations to get any updated list
     try {
@@ -622,6 +655,32 @@ export const useStore = create<AppStore>((set, get) => ({
   isCapturing: false,
   setCapturing: (v) => set({ isCapturing: v }),
 
+  // ─── Reminder ──────────────────────────────────────────────────────────────
+  showReminder: false,
+  lastReminderDate: null,
+  loadLastReminderDate: async () => {
+    // Always show reminder on app start (first launch & restart)
+    set({ showReminder: true })
+  },
+  checkReminderScheduled: async () => {
+    // For 8:00 AM scheduled check — only show if not dismissed today
+    try {
+      const raw = await window.api.getSettings()
+      const date = raw.last_reminder_date || null
+      const today = new Date().toISOString().split('T')[0]
+      if (date !== today) {
+        set({ showReminder: true, lastReminderDate: date })
+      }
+    } catch (err) { logError('checkReminderScheduled', err) }
+  },
+  dismissReminder: async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      await window.api.setSetting('last_reminder_date', today)
+      set({ showReminder: false, lastReminderDate: today })
+    } catch (err) { logError('dismissReminder', err) }
+  },
+
   // ─── Settings ──────────────────────────────────────────────────────────────
   settings: {
     app_name: 'Oasis',
@@ -630,6 +689,8 @@ export const useStore = create<AppStore>((set, get) => ({
     contexts: ['@Email', '@Office', '@Deep Work', '@Design', '@Admin', '@Phone', '@Errands', '@Computer', '@Home'],
     language: 'en',
     shortcuts: { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' },
+    proxy_host: '',
+    proxy_port: 0,
   },
   loadSettings: async () => {
     try {
@@ -644,6 +705,8 @@ export const useStore = create<AppStore>((set, get) => ({
           language: (raw.language as AppSettings['language']) ?? 'en',
           auto_launch: autoLaunch ?? false,
           shortcuts: raw.shortcuts ? JSON.parse(raw.shortcuts) : { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' },
+          proxy_host: raw.proxy_host ?? '',
+          proxy_port: Number(raw.proxy_port ?? 0),
         },
       })
     } catch (err) { logError('loadSettings', err) }
@@ -661,6 +724,13 @@ export const useStore = create<AppStore>((set, get) => ({
         const shortcuts = value as Record<string, string>
         const combo = shortcuts.newThought || 'Ctrl+N'
         window.api.registerQuickCaptureShortcut(combo)
+      }
+      // Sync proxy settings to main process session
+      if (key === 'proxy_host' || key === 'proxy_port') {
+        const state = get()
+        const host = key === 'proxy_host' ? (value as string) : state.settings.proxy_host
+        const port = key === 'proxy_port' ? (value as number) : state.settings.proxy_port
+        window.api.setProxy(host, port)
       }
       set(state => ({ settings: { ...state.settings, [key]: value } }))
     } catch (err) { logError('updateSetting', err) }

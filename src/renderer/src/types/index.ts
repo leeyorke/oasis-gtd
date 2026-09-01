@@ -1,4 +1,4 @@
-export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts' | 'kanban'
+export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts' | 'kanban' | 'daily-reminder'
 
 export interface AppSettings {
   app_name: string
@@ -8,6 +8,8 @@ export interface AppSettings {
   language: 'en' | 'zh'
   auto_launch: boolean        // start at OS login
   shortcuts: Record<string, string>  // key combos, e.g. { toggleSidebar: 'Ctrl+\\', newThought: 'Ctrl+N' }
+  proxy_host: string          // proxy server address, e.g. '127.0.0.1'
+  proxy_port: number          // proxy server port, e.g. 7890
 }
 
 export interface Task {
@@ -82,6 +84,7 @@ export interface ChatConversation {
   id: string
   title: string
   provider_id?: string
+  model?: string
   created_at: string
   updated_at: string
 }

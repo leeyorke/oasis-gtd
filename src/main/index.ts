@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase, settingsQueries } from './db/database'
@@ -194,6 +194,19 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers
   registerHandlers()
+
+  // Apply proxy settings from DB on startup
+  try {
+    const proxyHost = settingsQueries.get('proxy_host') || ''
+    const proxyPort = Number(settingsQueries.get('proxy_port') || 0)
+    if (proxyHost && proxyPort) {
+      const proxyRule = `http://${proxyHost}:${proxyPort}`
+      session.defaultSession.setProxy({ mode: 'fixed_servers', proxyRules: proxyRule })
+      console.log(`[Proxy] Applied on startup: ${proxyRule}`)
+    }
+  } catch (err) {
+    console.error('[Proxy] Failed to apply on startup:', err)
+  }
 
   createTray()
   createWindow()

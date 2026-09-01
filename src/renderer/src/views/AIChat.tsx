@@ -244,13 +244,22 @@ const MarkdownMessage = React.memo(function MarkdownMessage({ content }: Markdow
     </div>
   )}, (prevProps, nextProps) => prevProps.content === nextProps.content)
 
+function parseModelList(model: string): string[] {
+  try {
+    const parsed = JSON.parse(model)
+    return Array.isArray(parsed) ? parsed : [model]
+  } catch {
+    return model ? [model] : []
+  }
+}
+
 export default function AIChat() {
   const {
     providers, activeProvider, conversations, currentConversationId, messages, isAILoading,
     streamingMessageId, streamingContent,
     loadProviders, saveProvider, setActiveProvider, deleteProvider,
     selectConversation, newConversation, deleteConversation, renameConversation,
-    sendChatMessage, stopStreaming,
+    updateConversationModel, sendChatMessage, stopStreaming,
   } = useStore()
   const t = useT()
 
@@ -265,6 +274,7 @@ export default function AIChat() {
   const [renameConvId, setRenameConvId] = useState<string | null>(null)
   // Provider quick switch
   const [showProviderDropdown, setShowProviderDropdown] = useState(false)
+  const [expandedProviderId, setExpandedProviderId] = useState<string | null>(null)
   // Scroll state
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -452,6 +462,7 @@ export default function AIChat() {
   const handleSwitchProvider = async (providerId: string) => {
     await setActiveProvider(providerId)
     setShowProviderDropdown(false)
+    setExpandedProviderId(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -622,7 +633,7 @@ export default function AIChat() {
               <button className="chat-provider-btn">
                 {activeProvider ? (
                   <>
-                    <span>{activeProvider.model.toUpperCase()}</span>
+                    <span>{(() => { const cur = conversations.find(c => c.id === currentConversationId); return (cur?.model || activeProvider.model).toUpperCase() })()}</span>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: '0.4rem', color: 'rgba(20,28,58,0.4)' }}>
                       <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -633,23 +644,55 @@ export default function AIChat() {
               </button>
               {showProviderDropdown && (
                 <div className="chat-provider-dropdown">
-                  {providers.map(p => (
-                    <div
-                      key={p.id}
-                      className={`chat-provider-item ${activeProvider?.id === p.id ? 'active' : ''}`}
-                      onClick={() => handleSwitchProvider(p.id)}
-                    >
-                      <div className="chat-provider-info">
-                        <div className="chat-provider-name">{p.name}</div>
-                        <div className="chat-provider-model">{p.model}</div>
+                  {providers.map(p => {
+                    const models = parseModelList(p.model)
+                    const isActive = activeProvider?.id === p.id
+                    const isExpanded = expandedProviderId === p.id
+                    return (
+                      <div key={p.id}>
+                        <div
+                          className={`chat-provider-item ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            if (models.length > 1) {
+                              setExpandedProviderId(isExpanded ? null : p.id)
+                            } else {
+                              handleSwitchProvider(p.id)
+                              if (currentConversationId) updateConversationModel(currentConversationId, models[0])
+                            }
+                          }}
+                        >
+                          <div className="chat-provider-info">
+                            <div className="chat-provider-name">{p.name}</div>
+                            <div className="chat-provider-model">{models.join(', ')}</div>
+                          </div>
+                          {isActive && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--sheet-blue)' }}>
+                              <path d="M4 7L7 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+                        {isExpanded && models.length > 1 && (
+                          <div style={{ paddingLeft: '0.75rem' }}>
+                            {models.map(m => (
+                              <div
+                                key={m}
+                                className={`chat-provider-item ${isActive && (conversations.find(c => c.id === currentConversationId)?.model || activeProvider?.model) === m ? 'active' : ''}`}
+                                onClick={() => {
+                                  handleSwitchProvider(p.id)
+                                  if (currentConversationId) updateConversationModel(currentConversationId, m)
+                                  setShowProviderDropdown(false)
+                                  setExpandedProviderId(null)
+                                }}
+                                style={{ fontSize: '0.68rem', padding: '0.25rem 0.75rem' }}
+                              >
+                                <div className="chat-provider-model">{m}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {activeProvider?.id === p.id && (
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--sheet-blue)' }}>
-                          <path d="M4 7L7 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

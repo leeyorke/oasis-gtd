@@ -17,15 +17,16 @@ function filterFields(updates: Record<string, unknown>, allowed: string[]): Reco
 }
 
 export function initDatabase(): void {
-  const dbPath = join(app.getPath('userData'), 'oasis-gtd.db')
+  const dbName = app.isPackaged ? 'oasis-gtd.db' : 'oasis-gtd-dev.db'
+  const dbPath = join(app.getPath('userData'), dbName)
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   createTables()
   createIndexes()
   runMigrations()
-  seedIfEmpty()
 }
+
 
 export function getDb(): Database.Database {
   return db
@@ -116,6 +117,11 @@ function runMigrations(): void {
   }
 
   // v3+ can add more migrations here as the schema evolves
+
+  if (version < 3) {
+    try { db.exec(`ALTER TABLE chat_conversations ADD COLUMN model TEXT`) } catch { /* exists */ }
+    setSchemaVersion(3)
+  }
 }
 
 function createTables(): void {
@@ -190,6 +196,7 @@ function createTables(): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       provider_id TEXT,
+      model TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -269,61 +276,6 @@ function createTables(): void {
   }
 }
 
-function seedIfEmpty(): void {
-  const taskCount = (db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number }).count
-  if (taskCount > 0) return
-
-  const now = new Date().toISOString()
-
-  // Seed tasks (standalone tasks, not linked to projects)
-  const insertTask = db.prepare(`
-    INSERT INTO tasks (id, title, notes, context, due_date, project_id, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  insertTask.run(uuidv4(), 'Review final proofs for editorial spread', null, '@Deep Work', '2024-10-14', null, 'next', now, now)
-  insertTask.run(uuidv4(), 'Follow up with curator regarding the archive', null, '@Email', null, null, 'next', now, now)
-  insertTask.run(uuidv4(), 'Process physical inbox notes', null, '@Admin', null, null, 'next', now, now)
-
-  // Seed waiting items (standalone items, not linked to projects)
-  const insertWaiting = db.prepare(`
-    INSERT INTO waiting_items (id, title, waiting_for, since, project_id, notes, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `)
-  insertWaiting.run(uuidv4(), 'Budget approval for print run', 'Finance Dept.', '2024-10-08', null, null, now)
-
-  // Seed review checklist
-  const insertReview = db.prepare(`
-    INSERT INTO review_checklist (id, category, title, completed, review_date)
-    VALUES (?, ?, ?, ?, ?)
-  `)
-  const reviewItems = [
-    ['Collect', 'Process all physical inboxes', 0],
-    ['Collect', 'Review email and clear to zero', 0],
-    ['Collect', 'Capture loose thoughts and ideas', 0],
-    ['Process', 'Review and process all inbox items', 0],
-    ['Process', 'Delete or archive what is no longer relevant', 0],
-    ['Review', 'Review all active Next Actions lists', 0],
-    ['Review', 'Review all active Projects', 0],
-    ['Review', 'Review Waiting For list', 0],
-    ['Review', 'Review Someday/Maybe list', 0],
-    ['Review', 'Review calendar — past week', 0],
-    ['Review', 'Review calendar — coming 2 weeks', 0],
-    ['Reflect', 'Celebrate completions and progress', 0],
-    ['Reflect', 'Assess what worked and what did not', 0],
-    ['Create', 'Identify the most important actions for next week', 0],
-  ]
-  for (const [category, title, completed] of reviewItems) {
-    insertReview.run(uuidv4(), category, title, completed, null)
-  }
-
-  // Seed AI provider (Ollama as default local option)
-  const insertProvider = db.prepare(`
-    INSERT INTO ai_providers (id, name, provider_type, base_url, model, api_key, system_prompt, temperature, max_tokens, is_active, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  insertProvider.run(uuidv4(), 'Ollama (Local)', 'ollama', 'http://localhost:11434', 'llama3', null, '', 0.7, 2048, 1, now)
-}
-
 // ─── Task Queries ─────────────────────────────────────────────────────────────
 
 export const taskQueries = {
@@ -368,6 +320,9 @@ export const taskQueries = {
 
   delete: (id: string) =>
     db.prepare('DELETE FROM tasks WHERE id = ?').run(id),
+
+  getRandomPending: () =>
+    db.prepare("SELECT * FROM tasks WHERE status NOT IN ('done','archive') ORDER BY RANDOM() LIMIT 1").get(),
 }
 
 // ─── Project Queries ──────────────────────────────────────────────────────────
@@ -555,13 +510,13 @@ export const aiQueries = {
   getConversations: () =>
     db.prepare('SELECT * FROM chat_conversations ORDER BY updated_at DESC').all(),
 
-  createConversation: (title: string, providerId: string) => {
+  createConversation: (title: string, providerId: string, model?: string) => {
     const now = new Date().toISOString()
     const id = uuidv4()
     db.prepare(`
-      INSERT INTO chat_conversations (id, title, provider_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, title, providerId, now, now)
+      INSERT INTO chat_conversations (id, title, provider_id, model, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, title, providerId, model || null, now, now)
     return id
   },
 
@@ -585,6 +540,10 @@ export const aiQueries = {
   renameConversation: (id: string, title: string) =>
     db.prepare('UPDATE chat_conversations SET title = ?, updated_at = ? WHERE id = ?')
       .run(title, new Date().toISOString(), id),
+
+  updateConversationModel: (id: string, model: string) =>
+    db.prepare('UPDATE chat_conversations SET model = ?, updated_at = ? WHERE id = ?')
+      .run(model, new Date().toISOString(), id),
 }
 
 // ─── Settings Queries ─────────────────────────────────────────────────────────

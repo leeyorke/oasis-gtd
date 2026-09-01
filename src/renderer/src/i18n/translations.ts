@@ -292,6 +292,10 @@ const translations = {
     settings_language:  'Interface Language',
     settings_langEn:    'English',
     settings_langZh:    '简体中文',
+    settings_proxy:     'Proxy',
+    settings_proxyHint: 'Format: 127.0.0.1:7890. Leave empty to disable. Useful for accessing Google APIs.',
+    settings_proxyHostPlaceholder: 'Host, e.g. 127.0.0.1',
+    settings_proxyPortPlaceholder: 'Port',
     weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     // Contexts section
     settings_contextsTitle: 'Your Contexts',
@@ -343,6 +347,16 @@ const translations = {
     settings_stat_someday:  'Someday',
     settings_stat_convs:    'Conversations',
     settings_stat_messages: 'Messages',
+
+    // ─── Daily Reminder
+    reminder_title:      'Daily Reminder',
+    reminder_noTask:     'No pending tasks',
+    reminder_viewAll:    'View All Tasks',
+    reminder_dismiss:    'Dismiss',
+    reminder_context:    'Context',
+    reminder_due:        'Due',
+    reminder_priority:   'Priority',
+    reminder_project:    'Project',
   },
 
   zh: {
@@ -636,6 +650,10 @@ const translations = {
     settings_language:  '界面语言',
     settings_langEn:    'English',
     settings_langZh:    '简体中文',
+    settings_proxy:     '代理设置',
+    settings_proxyHint: '格式：127.0.0.1:7890，留空则不使用代理。访问 Google API 等场景需要配置。',
+    settings_proxyHostPlaceholder: '地址，如 127.0.0.1',
+    settings_proxyPortPlaceholder: '端口',
     weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
     // Contexts section
     settings_contextsTitle: '你的情境',
@@ -687,6 +705,16 @@ const translations = {
     settings_shortcutsDesc: '自定义键盘快捷键',
     shortcuts_toggleSidebar: '折叠/展开侧边栏',
     shortcuts_newThought: '新建想法',
+
+    // ─── Daily Reminder
+    reminder_title:      '每日提醒',
+    reminder_noTask:     '暂无待办任务',
+    reminder_viewAll:    '查看全部任务',
+    reminder_dismiss:    '关闭',
+    reminder_context:    '上下文',
+    reminder_due:        '截止',
+    reminder_priority:   '优先级',
+    reminder_project:    '项目',
   },
 } as const
 

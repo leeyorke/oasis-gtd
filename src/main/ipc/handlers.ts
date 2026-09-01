@@ -1,6 +1,7 @@
-import { ipcMain, dialog, app, shell, WebContents, BrowserWindow } from 'electron'
+import { ipcMain, dialog, app, shell, WebContents, BrowserWindow, session } from 'electron'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
+import { ProxyAgent } from 'undici'
 import {
   taskQueries,
   projectQueries,
@@ -15,6 +16,19 @@ import {
   habitRecordQueries,
   resourceQueries,
 } from '../db/database'
+
+// ─── Proxy-aware fetch for main process ───────────────────────────────
+// session.setProxy() only affects renderer; main process Node.js fetch needs undici
+function getProxyFetch(): typeof fetch {
+  const host = settingsQueries.get('proxy_host') || ''
+  const port = settingsQueries.get('proxy_port') || ''
+  if (host && port) {
+    const dispatcher = new ProxyAgent(`http://${host}:${port}`)
+    return (url: any, init?: any) =>
+      fetch(url, { ...init, dispatcher })
+  }
+  return fetch
+}
 
 // Global store for AbortControllers per conversation
 const streamControllers = new Map<string, AbortController>()
@@ -106,28 +120,65 @@ async function streamOpenAICompatible(
 ): Promise<string> {
   const url = `${provider.base_url}/v1/chat/completions`
   const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
-  if (!isTitleCall) console.log(`[AI] -> ${provider.provider_type}:`, url)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
-    },
-    body: JSON.stringify({
-      model: provider.model,
-      messages,
-      max_tokens: maxTokens,
-      temperature: provider.temperature ?? 0.7,
-      system: provider.system_prompt || undefined,
-      stream: true,
-    }),
-    signal,
+  // Inject system prompt as first message (standard OpenAI format)
+  const finalMessages = provider.system_prompt && !messages.some(m => m.role === 'system')
+    ? [{ role: 'system', content: provider.system_prompt }, ...messages]
+    : messages
+
+  if (!isTitleCall) {
+    console.log(`[AI] -> ${provider.provider_type}:`, url)
+    console.log(`[AI] model:`, provider.model)
+    console.log(`[AI] api_key present:`, !!provider.api_key, `len:`, provider.api_key?.length)
+    console.log(`[AI] messages count:`, finalMessages.length)
+  }
+
+  // Build headers — include x-goog-api-key for Google Gemini compatibility
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (provider.api_key) {
+    headers['Authorization'] = `Bearer ${provider.api_key}`
+    headers['x-goog-api-key'] = provider.api_key
+  }
+
+  const requestBody = JSON.stringify({
+    model: provider.model,
+    messages: finalMessages,
+    max_tokens: maxTokens,
+    temperature: provider.temperature ?? 0.7,
+    stream: true,
   })
+
+  if (!isTitleCall) {
+    console.log(`[AI] request body (first 300):`, requestBody.slice(0, 300))
+  }
+
+  let response: Response
+  try {
+    response = await getProxyFetch()(url, {
+      method: 'POST',
+      headers,
+      body: requestBody,
+      signal,
+    })
+  } catch (fetchErr: any) {
+    console.error(`[AI] fetch error details:`, {
+      message: fetchErr?.message,
+      cause: fetchErr?.cause?.message || fetchErr?.cause,
+      code: fetchErr?.code,
+      errno: fetchErr?.errno,
+      type: fetchErr?.type,
+    })
+    throw new Error(`fetch failed: ${fetchErr?.cause?.message || fetchErr?.message || 'unknown'}`)
+  }
+
+  if (!isTitleCall) {
+    console.log(`[AI] response status:`, response.status, response.statusText)
+  }
 
   if (!response.ok) {
     const body = await response.text()
-    throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 200)}`)
+    console.error(`[AI] response body:`, body.slice(0, 300))
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${body.slice(0, 300)}`)
   }
 
   if (!response.body) {
@@ -165,7 +216,7 @@ async function streamAnthropic(
   const maxTokens = isTitleCall ? 30 : (provider.max_tokens || 2048)
   if (!isTitleCall) console.log('[AI] -> Anthropic:', url)
 
-  const response = await fetch(url, {
+  const response = await getProxyFetch()(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -229,7 +280,7 @@ async function streamOllama(
     ? [{ role: 'system' as const, content: provider.system_prompt }, ...messages]
     : messages
 
-  const response = await fetch(url, {
+  const response = await getProxyFetch()(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: provider.model, messages: ollamaMessages, stream: true }),
@@ -271,6 +322,7 @@ export function registerHandlers(): void {
   ipcMain.handle('tasks:create', (_, task) => taskQueries.create(task))
   ipcMain.handle('tasks:update', (_, id: string, updates) => taskQueries.update(id, updates))
   ipcMain.handle('tasks:delete', (_, id: string) => taskQueries.delete(id))
+  ipcMain.handle('tasks:getRandomPending', () => taskQueries.getRandomPending())
 
   // ─── Projects ───────────────────────────────────────────────────────────────
   ipcMain.handle('projects:getAll', () => {
@@ -548,8 +600,8 @@ export function registerHandlers(): void {
 
   // ─── Chat Conversations ──────────────────────────────────────────────────────
   ipcMain.handle('chat:getConversations', () => aiQueries.getConversations())
-  ipcMain.handle('chat:createConversation', (_, title: string, providerId: string) =>
-    aiQueries.createConversation(title, providerId)
+  ipcMain.handle('chat:createConversation', (_, title: string, providerId: string, model?: string) =>
+    aiQueries.createConversation(title, providerId, model)
   )
   ipcMain.handle('chat:getMessages', (_, conversationId: string) =>
     aiQueries.getMessages(conversationId)
@@ -557,6 +609,9 @@ export function registerHandlers(): void {
   ipcMain.handle('chat:deleteConversation', (_, id: string) => aiQueries.deleteConversation(id))
   ipcMain.handle('chat:renameConversation', (_, id: string, title: string) =>
     aiQueries.renameConversation(id, title)
+  )
+  ipcMain.handle('chat:updateConversationModel', (_, id: string, model: string) =>
+    aiQueries.updateConversationModel(id, model)
   )
 
   // ─── AI Send Message (Non-streaming for backwards compatibility & title generation) ───────────────────
@@ -583,7 +638,7 @@ export function registerHandlers(): void {
       if (provider.provider_type === 'anthropic') {
         const url = `${provider.base_url}/v1/messages`
         if (!isTitleCall) console.log('[AI] -> Anthropic:', url)
-        const response = await fetch(url, {
+        const response = await getProxyFetch()(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -612,7 +667,7 @@ export function registerHandlers(): void {
         const ollamaMessages = provider.system_prompt
           ? [{ role: 'system' as const, content: provider.system_prompt }, ...messages]
           : messages
-        const response = await fetch(url, {
+        const response = await getProxyFetch()(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: provider.model, messages: ollamaMessages, stream: false }),
@@ -629,18 +684,27 @@ export function registerHandlers(): void {
         // OpenAI-compatible
         const url = `${provider.base_url}/v1/chat/completions`
         if (!isTitleCall) console.log(`[AI] -> ${provider.provider_type}:`, url)
-        const response = await fetch(url, {
+
+        // Inject system prompt as first message (standard OpenAI format)
+        const finalMessages = provider.system_prompt && !messages.some(m => m.role === 'system')
+          ? [{ role: 'system', content: provider.system_prompt }, ...messages]
+          : messages
+
+        // Build headers — include x-goog-api-key for Google Gemini compatibility
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (provider.api_key) {
+          headers['Authorization'] = `Bearer ${provider.api_key}`
+          headers['x-goog-api-key'] = provider.api_key
+        }
+
+        const response = await getProxyFetch()(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
-          },
+          headers,
           body: JSON.stringify({
             model: provider.model,
-            messages,
+            messages: finalMessages,
             max_tokens: maxTokens,
             temperature: provider.temperature ?? 0.7,
-            system: provider.system_prompt || undefined,
           }),
         })
         if (!response.ok) {
@@ -724,7 +788,7 @@ export function registerHandlers(): void {
           const titleResult = await (async () => {
             if (provider.provider_type === 'anthropic') {
               const url = `${provider.base_url}/v1/messages`
-              const response = await fetch(url, {
+              const response = await getProxyFetch()(url, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -744,12 +808,14 @@ export function registerHandlers(): void {
               return { success: true, content: typeof text === 'string' ? text : '' }
             } else {
               const url = `${provider.base_url}/v1/chat/completions`
-              const response = await fetch(url, {
+              const titleHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+              if (provider.api_key) {
+                titleHeaders['Authorization'] = `Bearer ${provider.api_key}`
+                titleHeaders['x-goog-api-key'] = provider.api_key
+              }
+              const response = await getProxyFetch()(url, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {}),
-                },
+                headers: titleHeaders,
                 body: JSON.stringify({ model: provider.model, messages: titlePrompt, max_tokens: 30 }),
               })
               if (!response.ok) return { success: false }
@@ -897,6 +963,16 @@ export function registerHandlers(): void {
 
   ipcMain.handle('app:getAutoLaunch', async () => {
     return app.getLoginItemSettings().openAtLogin
+  })
+
+  // ─── Proxy ───────────────────────────────────────────────────────
+  ipcMain.handle('app:setProxy', async (_, host: string, port: number) => {
+    const proxyRule = host && port ? `http://${host}:${port}` : ''
+    await session.defaultSession.setProxy({
+      mode: proxyRule ? 'fixed_servers' : 'direct',
+      proxyRules: proxyRule,
+    })
+    console.log(`[Proxy] ${proxyRule ? 'set to ' + proxyRule : 'cleared'}`)
   })
 
   // ─── Quick Capture ──────────────────────────────────────────────

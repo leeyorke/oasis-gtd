@@ -11,6 +11,7 @@ declare global {
       createTask: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<string>
       updateTask: (id: string, updates: Partial<Task>) => Promise<void>
       deleteTask: (id: string) => Promise<void>
+      getRandomPendingTask: () => Promise<Task | null>
       getProjects: () => Promise<Project[]>
       createProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'taskCount'>) => Promise<string>
       updateProject: (id: string, updates: Partial<Project>) => Promise<void>
@@ -50,10 +51,11 @@ declare global {
       setActiveProvider: (id: string) => Promise<void>
       deleteProvider: (id: string) => Promise<void>
       getConversations: () => Promise<ChatConversation[]>
-      createConversation: (title: string, providerId: string) => Promise<string>
+      createConversation: (title: string, providerId: string, model?: string) => Promise<string>
       getMessages: (conversationId: string) => Promise<ChatMessage[]>
       deleteConversation: (id: string) => Promise<void>
       renameConversation: (id: string, title: string) => Promise<void>
+      updateConversationModel: (id: string, model: string) => Promise<void>
       sendMessage: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => Promise<{success: boolean; content?: string; error?: string}>
       // Streaming API
       sendMessageStream: (conversationId: string, messages: ChatMessage[], provider: AIProvider) => void
@@ -84,6 +86,8 @@ declare global {
       // Auto Launch
       setAutoLaunch: (enable: boolean) => Promise<void>
       getAutoLaunch: () => Promise<boolean>
+      // Proxy
+      setProxy: (host: string, port: number) => Promise<void>
       // Quick Capture
       closeQuickCapture: () => void
       registerQuickCaptureShortcut: (shortcut: string) => void

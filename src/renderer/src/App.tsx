@@ -17,6 +17,7 @@ import Start from './views/Start'
 import Thoughts from './views/Thoughts'
 import Kanban from './views/Kanban'
 import QuickCaptureWindow from './QuickCaptureWindow'
+import DailyReminder from './views/DailyReminder'
 
 // Match a KeyboardEvent against a stored shortcut string like "Ctrl+\" or "Ctrl+N"
 function matchShortcut(e: KeyboardEvent, shortcut: string): boolean {
@@ -41,7 +42,7 @@ export default function App() {
     return <QuickCaptureWindow />
   }
 
-  const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadNotes, loadHabits, loadReview, loadProviders, loadConversations, loadSettings } = useStore()
+  const { currentView, loadTasks, loadProjects, loadWaiting, loadSomeday, loadNotes, loadHabits, loadReview, loadProviders, loadConversations, loadSettings, loadLastReminderDate, checkReminderScheduled, showReminder } = useStore()
   const shortcuts = useStore(s => s.settings.shortcuts)
   const toggleSidebar = useStore(s => s.toggleSidebar)
   const setView = useStore(s => s.setView)
@@ -58,6 +59,18 @@ export default function App() {
     loadProviders()
     loadConversations()
     loadSettings()
+    loadLastReminderDate()
+  }, [])
+
+  // 8:00 AM daily reminder check — only if not dismissed today
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date()
+      if (now.getHours() === 8 && now.getMinutes() === 0) {
+        checkReminderScheduled()
+      }
+    }, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   // Global keyboard shortcuts
@@ -98,5 +111,10 @@ export default function App() {
     }
   }
 
-  return <Layout>{renderView()}</Layout>
+  return (
+    <>
+      {showReminder && <DailyReminder />}
+      <Layout>{renderView()}</Layout>
+    </>
+  )
 }

@@ -58,15 +58,27 @@ export default function Settings() {
   const [showProviderForm, setShowProviderForm] = useState(false)
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [modelTags, setModelTags] = useState<string[]>([])
+  const [modelInput, setModelInput] = useState('')
+
+  const parseModelList = (model: string): string[] => {
+    try {
+      const parsed = JSON.parse(model)
+      return Array.isArray(parsed) ? parsed : [model]
+    } catch {
+      return model ? [model] : []
+    }
+  }
 
   const handleSaveProvider = async () => {
-    if (!providerForm.name || !providerForm.base_url || !providerForm.model) return
+    const modelsJson = JSON.stringify(modelTags.filter(Boolean))
+    if (!providerForm.name || !providerForm.base_url || modelTags.length === 0) return
     await saveProvider({
       id: editingProviderId || undefined,
       name: providerForm.name!,
       provider_type: (providerForm.provider_type as AIProvider['provider_type']) || 'custom',
       base_url: providerForm.base_url!,
-      model: providerForm.model!,
+      model: modelsJson,
       api_key: providerForm.api_key || undefined,
       system_prompt: providerForm.system_prompt || '',
       temperature: providerForm.temperature ?? 0.7,
@@ -77,14 +89,30 @@ export default function Settings() {
     setEditingProviderId(null)
     setShowApiKey(false)
     setProviderForm(EMPTY_PROVIDER_FORM)
+    setModelTags([])
+    setModelInput('')
     await loadProviders()
   }
 
   const handleEditProvider = (p: AIProvider) => {
     setProviderForm({ id: p.id, name: p.name, provider_type: p.provider_type, base_url: p.base_url, model: p.model, api_key: p.api_key || '', system_prompt: p.system_prompt || '', temperature: p.temperature ?? 0.7, max_tokens: p.max_tokens ?? 2048, is_active: p.is_active })
+    setModelTags(parseModelList(p.model))
+    setModelInput('')
     setEditingProviderId(p.id)
     setShowApiKey(false)
     setShowProviderForm(true)
+  }
+
+  const addModelTag = (tag: string) => {
+    const trimmed = tag.trim()
+    if (trimmed && !modelTags.includes(trimmed)) {
+      setModelTags(prev => [...prev, trimmed])
+    }
+    setModelInput('')
+  }
+
+  const removeModelTag = (tag: string) => {
+    setModelTags(prev => prev.filter(t => t !== tag))
   }
 
   // ─── Data actions ─────────────────────────────────────────────────────────
@@ -298,10 +326,53 @@ export default function Settings() {
                   ))}
                 </div>
               </FieldGroup>
+
+              <Divider />
+
+              <FieldGroup label={t.settings_proxy}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder={t.settings_proxyHostPlaceholder}
+                    value={settings.proxy_host || ''}
+                    onChange={e => updateSetting('proxy_host', e.target.value)}
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      border: '1px solid rgba(20,28,58,0.12)',
+                      borderRadius: '0px',
+                      width: '200px',
+                      background: 'transparent',
+                      color: 'var(--ink-primary)',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ color: 'var(--ink-secondary)', fontSize: '0.75rem' }}>:</span>
+                  <input
+                    type="number"
+                    placeholder={t.settings_proxyPortPlaceholder}
+                    value={settings.proxy_port || ''}
+                    onChange={e => updateSetting('proxy_port', Number(e.target.value) || 0)}
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      border: '1px solid rgba(20,28,58,0.12)',
+                      borderRadius: '0px',
+                      width: '100px',
+                      background: 'transparent',
+                      color: 'var(--ink-primary)',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.62rem', color: 'var(--ink-secondary)', letterSpacing: '0.04em' }}>
+                  {t.settings_proxyHint}
+                </div>
+              </FieldGroup>
             </div>
           )}
-
-          {/* ── CONTEXTS ──────────────────────────────────────────── */}
           {activeSection === 'contexts' && (
             <div className="fade-in">
               <SectionTitle>{t.settings_contextsTitle}</SectionTitle>
@@ -393,7 +464,7 @@ export default function Settings() {
                         )}
                         <button
                           className="action-btn"
-                          onClick={() => editingProviderId === p.id ? (setEditingProviderId(null), setShowProviderForm(false)) : handleEditProvider(p)}
+                          onClick={() => editingProviderId === p.id ? (setEditingProviderId(null), setShowProviderForm(false), setModelTags([]), setModelInput('')) : handleEditProvider(p)}
                           title={editingProviderId === p.id ? t.settings_cancel : t.edit}
                         >
                           <Pencil size={14} />
@@ -426,7 +497,7 @@ export default function Settings() {
                           <button
                             key={preset.name}
                             className="btn-text"
-                            onClick={() => setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model }))}
+                            onClick={() => { setProviderForm(f => ({ ...f, name: preset.name, provider_type: preset.type, base_url: preset.base_url, model: preset.model })); setModelTags(preset.model ? [preset.model] : []); setModelInput('') }}
                             style={{ border: '1px solid rgba(20,28,58,0.1)', padding: '0.25rem 0.7rem', color: providerForm.name === preset.name ? 'var(--ink-primary)' : 'var(--ink-secondary)', borderColor: providerForm.name === preset.name ? 'rgba(20,28,58,0.3)' : 'rgba(20,28,58,0.1)', background: providerForm.name === preset.name ? 'rgba(20,28,58,0.04)' : 'transparent' }}
                           >
                             {preset.name}
@@ -443,7 +514,21 @@ export default function Settings() {
                     </div>
                     <div className="form-field">
                       <label className="form-label">{t.settings_model}</label>
-                      <input className="form-input" value={providerForm.model || ''} onChange={e => setProviderForm(f => ({ ...f, model: e.target.value }))} placeholder="gpt-4o / llama3" />
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', padding: '0.3rem', border: '1px solid rgba(20,28,58,0.15)', borderRadius: '6px', minHeight: '2rem', alignItems: 'center' }}>
+                        {modelTags.map(tag => (
+                          <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'rgba(20,28,58,0.06)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
+                            {tag}
+                            <button type="button" onClick={() => removeModelTag(tag)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(20,28,58,0.4)', fontSize: '0.8rem', lineHeight: 1 }}>&times;</button>
+                          </span>
+                        ))}
+                        <input
+                          style={{ border: 'none', outline: 'none', flex: 1, minWidth: '80px', fontSize: '0.75rem', padding: '0.2rem', background: 'transparent' }}
+                          value={modelInput}
+                          onChange={e => setModelInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addModelTag(modelInput) } }}
+                          placeholder={modelTags.length === 0 ? 'gpt-4o' : t.settings_addModel || '+ add model'}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="form-field">
@@ -516,7 +601,7 @@ export default function Settings() {
                     <button className="btn-primary" onClick={handleSaveProvider}>
                       {editingProviderId ? t.settings_update : t.chat_saveActivate}
                     </button>
-                    <button className="btn-text" onClick={() => { setShowProviderForm(false); setEditingProviderId(null); setShowApiKey(false) }}>{t.settings_cancel}</button>
+                    <button className="btn-text" onClick={() => { setShowProviderForm(false); setEditingProviderId(null); setShowApiKey(false); setModelTags([]); setModelInput('') }}>{t.settings_cancel}</button>
                   </div>
                 </div>
               ) : (

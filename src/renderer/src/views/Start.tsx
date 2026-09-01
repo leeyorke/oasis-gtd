@@ -74,9 +74,9 @@ export default function Start() {
               <div className="task-content">
                 <div className="task-title">{task.title}</div>
                 <div className="task-meta">
-                  <span>{task.project || 'Project'}</span>
+                  <span>{task.project || (isZh ? '项目' : 'Project')}</span>
                   <span className="meta-dot"></span>
-                  <span>{task.due || 'No due date'}</span>
+                  <span>{task.due_date || (isZh ? '无截止日期' : 'No due date')}</span>
                 </div>
               </div>
             </div>

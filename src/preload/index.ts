@@ -18,6 +18,7 @@ const api = {
   createTask: (task: unknown) => ipcRenderer.invoke('tasks:create', task),
   updateTask: (id: string, updates: unknown) => ipcRenderer.invoke('tasks:update', id, updates),
   deleteTask: (id: string) => ipcRenderer.invoke('tasks:delete', id),
+  getRandomPendingTask: () => ipcRenderer.invoke('tasks:getRandomPending'),
 
   // Projects
   getProjects: () => ipcRenderer.invoke('projects:getAll'),
@@ -77,11 +78,12 @@ const api = {
 
   // Chat
   getConversations: () => ipcRenderer.invoke('chat:getConversations'),
-  createConversation: (title: string, providerId: string) =>
-    ipcRenderer.invoke('chat:createConversation', title, providerId),
+  createConversation: (title: string, providerId: string, model?: string) =>
+    ipcRenderer.invoke('chat:createConversation', title, providerId, model),
   getMessages: (conversationId: string) => ipcRenderer.invoke('chat:getMessages', conversationId),
   deleteConversation: (id: string) => ipcRenderer.invoke('chat:deleteConversation', id),
   renameConversation: (id: string, title: string) => ipcRenderer.invoke('chat:renameConversation', id, title),
+  updateConversationModel: (id: string, model: string) => ipcRenderer.invoke('chat:updateConversationModel', id, model),
   sendMessage: (conversationId: string, messages: unknown[], provider: unknown) =>
     ipcRenderer.invoke('ai:sendMessage', conversationId, messages, provider),
 
@@ -129,6 +131,9 @@ const api = {
   // Auto Launch
   setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('app:setAutoLaunch', enable),
   getAutoLaunch: () => ipcRenderer.invoke('app:getAutoLaunch'),
+
+  // Proxy
+  setProxy: (host: string, port: number) => ipcRenderer.invoke('app:setProxy', host, port),
 
   // Quick Capture
   closeQuickCapture: () => ipcRenderer.send('quick-capture:close'),
