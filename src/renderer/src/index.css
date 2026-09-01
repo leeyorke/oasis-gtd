@@ -887,7 +887,7 @@ body {
 
 .chat-provider-model {
   font-family: var(--font-sans);
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   color: rgba(20, 28, 58, 0.45);
 }
 

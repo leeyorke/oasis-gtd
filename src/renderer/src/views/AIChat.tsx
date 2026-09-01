@@ -675,18 +675,6 @@ export default function AIChat() {
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'rgba(20,28,58,0.3)', padding: '0.5rem', fontStyle: 'italic' }}>{t.chat_noConvs}</div>
           )}
         </div>
-        <div className="chat-sidebar-footer">
-          {activeProvider ? (
-            <div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(20,28,58,0.3)', marginBottom: '0.3rem' }}>{t.chat_activeProvider}</div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'var(--ink-secondary)' }}>{activeProvider.name}</div>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.6rem', color: 'rgba(20,28,58,0.35)', marginTop: '0.1rem' }}>{activeProvider.model}</div>
-            </div>
-          ) : (
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.62rem', color: 'rgba(20,28,58,0.3)', fontStyle: 'italic' }}>{t.chat_noProvider}</div>
-          )}
-          <button className="btn-text" onClick={() => { console.log('Settings button clicked'); openModal(); }} style={{ marginTop: '0.5rem', paddingLeft: 0, display: 'block' }}>{t.chat_configure}</button>
-        </div>
       </div>
 
       {/* Chat Main Area */}
@@ -700,7 +688,13 @@ export default function AIChat() {
               <button className="chat-provider-btn">
                 {activeProvider ? (
                   <>
-                    <span>{(() => { const cur = conversations.find(c => c.id === currentConversationId); return (cur?.model || activeProvider.model).toUpperCase() })()}</span>
+                    <span style={{ textTransform: 'none' }}>{(() => {
+                      const cur = conversations.find(c => c.id === currentConversationId)
+                      const currentModel = cur?.model || activeProvider.model
+                      // Parse if it's JSON array, otherwise use as-is
+                      const models = parseModelList(currentModel)
+                      return models[0]?.toLowerCase() || 'No Model'
+                    })()}</span>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: '0.4rem', color: 'rgba(20,28,58,0.4)' }}>
                       <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -711,51 +705,42 @@ export default function AIChat() {
               </button>
               {showProviderDropdown && (
                 <div className="chat-provider-dropdown">
-                  {providers.map(p => {
+                  {providers.map((p, idx) => {
                     const models = parseModelList(p.model)
-                    const isActive = activeProvider?.id === p.id
-                    const isExpanded = expandedProviderId === p.id
+                    const currentConvModel = conversations.find(c => c.id === currentConversationId)?.model
+                    const currentProviderModel = activeProvider?.id === p.id ? (currentConvModel || parseModelList(activeProvider.model)[0]) : null
                     return (
                       <div key={p.id}>
                         <div
-                          className={`chat-provider-item ${isActive ? 'active' : ''}`}
-                          onClick={() => {
-                            if (models.length > 1) {
-                              setExpandedProviderId(isExpanded ? null : p.id)
-                            } else {
-                              handleSwitchProvider(p.id)
-                              if (currentConversationId) updateConversationModel(currentConversationId, models[0])
-                            }
-                          }}
+                          className="chat-provider-item"
+                          style={{ fontWeight: 600, cursor: 'default', background: 'transparent' }}
+                          onMouseEnter={(e) => e.stopPropagation()}
                         >
                           <div className="chat-provider-info">
-                            <div className="chat-provider-name">{p.name}</div>
-                            <div className="chat-provider-model">{models.join(', ')}</div>
+                            <div className="chat-provider-name" style={{ fontSize: '0.8rem' }}>{p.name}</div>
                           </div>
-                          {isActive && (
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--sheet-blue)' }}>
-                              <path d="M4 7L7 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
                         </div>
-                        {isExpanded && models.length > 1 && (
-                          <div style={{ paddingLeft: '0.75rem' }}>
-                            {models.map(m => (
-                              <div
-                                key={m}
-                                className={`chat-provider-item ${isActive && (conversations.find(c => c.id === currentConversationId)?.model || activeProvider?.model) === m ? 'active' : ''}`}
-                                onClick={() => {
-                                  handleSwitchProvider(p.id)
-                                  if (currentConversationId) updateConversationModel(currentConversationId, m)
-                                  setShowProviderDropdown(false)
-                                  setExpandedProviderId(null)
-                                }}
-                                style={{ fontSize: '0.68rem', padding: '0.25rem 0.75rem' }}
-                              >
-                                <div className="chat-provider-model">{m}</div>
-                              </div>
-                            ))}
+                        {models.map(m => (
+                          <div
+                            key={m}
+                            className={`chat-provider-item ${currentProviderModel === m ? 'active' : ''}`}
+                            onClick={() => {
+                              handleSwitchProvider(p.id)
+                              if (currentConversationId) updateConversationModel(currentConversationId, m)
+                              setShowProviderDropdown(false)
+                            }}
+                            style={{ paddingLeft: '1.25rem' }}
+                          >
+                            <div className="chat-provider-model">{m.toLowerCase()}</div>
+                            {currentProviderModel === m && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--sheet-blue)' }}>
+                                <path d="M4 7L7 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
                           </div>
+                        ))}
+                        {idx < providers.length - 1 && (
+                          <div style={{ borderBottom: '1px solid rgba(20,28,58,0.12)', margin: '0.0rem 0' }} />
                         )}
                       </div>
                     )
