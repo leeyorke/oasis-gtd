@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light'
+import { parseThinkBlocks } from '../utils/thinkBlock'
 
 const codeTheme = {
   ...oneLight,
@@ -165,6 +166,70 @@ interface MarkdownMessageProps {
   content: string
 }
 
+interface ThinkingBlockProps {
+  content: string
+  hasIncompleteThought: boolean
+}
+
+function ThinkingBlock({ content, hasIncompleteThought }: ThinkingBlockProps) {
+  const [expanded, setExpanded] = useState(false)
+  // 折叠时显示预览（首 80 字符），展开时显示完整内容
+  const preview = content.length > 80 ? content.slice(0, 80).trimEnd() + '…' : content
+  // 计时：记录第一次出现 thought 的时间；thought 闭合（hasIncompleteThought 从 true→false）时计算耗时
+  const startTimeRef = useRef<number | null>(null)
+  const [durationSec, setDurationSec] = useState<number | null>(null)
+  useEffect(() => {
+    if (content && startTimeRef.current === null) {
+      startTimeRef.current = Date.now()
+    }
+    // 闭合时刻：之前有 thought 正在写（hasIncompleteThought = true），现在闭合（false），且尚未记 duration
+    if (content && !hasIncompleteThought && durationSec === null) {
+      // 仅当确实有内容时记录耗时（避免空闭合）
+      const start = startTimeRef.current
+      if (start !== null) {
+        setDurationSec((Date.now() - start) / 1000)
+      }
+    }
+    // 思考被清空（用户切换了消息、stop streaming）—— 重置
+    if (!content) {
+      startTimeRef.current = null
+      setDurationSec(null)
+    }
+  }, [content, hasIncompleteThought, durationSec])
+
+  // 标签内容
+  let label: string
+  if (hasIncompleteThought) {
+    label = '思考中'
+  } else if (durationSec !== null) {
+    label = `思考用时 ${durationSec.toFixed(1)}s`
+  } else {
+    label = '思考过程'
+  }
+
+  return (
+    <div className="think-block">
+      <button
+        className="think-summary"
+        onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+        type="button"
+      >
+        <span className={`think-caret ${expanded ? 'open' : ''}`}>▸</span>
+        <span className="think-label">{label}</span>
+        {hasIncompleteThought && <span className="think-spinner" aria-hidden="true" />}
+        {!expanded && !hasIncompleteThought && preview && (
+          <span className="think-preview">{preview}</span>
+        )}
+        {!hasIncompleteThought && (
+          <span className="think-hint">{expanded ? '点击收起' : '点击展开'}</span>
+        )}
+      </button>
+      {expanded && <pre className="think-body">{content}</pre>}
+    </div>
+  )
+}
+
 function CodeBlock({ language, content }: { language: string; content: string }) {
   return (
     <SyntaxHighlighter
@@ -207,8 +272,10 @@ const CodeBlockWrapper = React.memo(function CodeBlockWrapper({ language, conten
 })
 
 const MarkdownMessage = React.memo(function MarkdownMessage({ content }: MarkdownMessageProps) {
+  const { thoughts, rest, hasIncompleteThought } = parseThinkBlocks(content)
   return (
     <div className="markdown-body">
+      {thoughts && <ThinkingBlock content={thoughts} hasIncompleteThought={hasIncompleteThought} />}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -239,7 +306,7 @@ const MarkdownMessage = React.memo(function MarkdownMessage({ content }: Markdow
           },
         }}
       >
-        {content}
+        {rest}
       </ReactMarkdown>
     </div>
   )}, (prevProps, nextProps) => prevProps.content === nextProps.content)

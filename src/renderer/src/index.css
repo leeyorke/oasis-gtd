@@ -1541,6 +1541,111 @@ body {
   opacity: 0.6;
 }
 
+/* ─── Think block (LLM reasoning / thought) ─── */
+.think-block {
+  margin: 0 0 0.8rem 0;
+  border-left: 2px solid var(--border);
+  background: rgba(20, 28, 58, 0.025);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.think-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  color: var(--muted-foreground);
+  text-align: left;
+  transition: background 0.15s ease;
+  font-size: inherit;
+  outline: none;
+}
+.think-summary:hover {
+  background: rgba(20, 28, 58, 0.04);
+}
+.think-summary:focus-visible {
+  outline: 1px solid var(--ink-secondary);
+  outline-offset: -1px;
+}
+
+.think-caret {
+  display: inline-block;
+  font-size: 0.6rem;
+  line-height: 1;
+  transition: transform 0.18s var(--ease-out, ease-out);
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.think-caret.open {
+  transform: rotate(90deg);
+}
+
+.think-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Spinner: 思考中的旋转指示 */
+.think-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(20, 28, 58, 0.12);
+  border-top-color: var(--ink-secondary);
+  border-radius: 50%;
+  animation: thinkSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes thinkSpin {
+  to { transform: rotate(360deg); }
+}
+
+.think-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.62rem;
+  color: var(--ink-secondary);
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+
+.think-hint {
+  font-size: 0.55rem;
+  color: var(--muted-foreground);
+  opacity: 0.7;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.think-body {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--ink-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-top: 1px solid var(--border);
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.25);
+}
+
 /* Chat bubble wrapper for copy button */
 .chat-bubble-wrapper {
   position: relative;

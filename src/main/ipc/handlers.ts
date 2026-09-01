@@ -1,7 +1,8 @@
 import { ipcMain, dialog, app, shell, WebContents, BrowserWindow, session } from 'electron'
 import { writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { ProxyAgent } from 'undici'
+import { summarizeTitle } from '../utils/conversationTitle'
 import {
   taskQueries,
   projectQueries,
@@ -32,6 +33,13 @@ function getProxyFetch(): typeof fetch {
 
 // Global store for AbortControllers per conversation
 const streamControllers = new Map<string, AbortController>()
+
+// Remember the last directory used for an export dialog (per session).
+// Persisted to the same disk-backed location across app restarts would require
+// app.getPath('userData') file I/O; session memory is enough to make the
+// "remember last location" UX work for a single working session, and matches
+// the user's request "上一次打开的路径".
+let lastExportDir: string | null = null
 
 // Helper: get local date string YYYY-MM-DD instead of UTC-based toISOString
 function getLocalDateString(date?: Date): string {
@@ -773,74 +781,21 @@ export function registerHandlers(): void {
       }
 
       // Auto-generate title if it's the first message
+      // 策略：直接用启发式压缩「用户的第一条消息」为短标题（默认 ≤10 字符）。
+      // 不再调 LLM 生成标题（节省 1 次 API 调用、零延迟、零成本）。
       let generatedTitle: string | undefined
       console.log(`[AI] Title check: isTitleCall=${isTitleCall} messages.length=${messages.length}`)
       if (!isTitleCall && messages.length === 1) {
         try {
-          const lang = 'en' // We'll get this from settings in a real implementation
-          const titlePrompt: Array<{role: string; content: string}> = [
-            {
-              role: 'user',
-              content: `Generate a conversation title of five words or fewer based on this exchange. Respond with only the title in the same language as the conversation. Do not use punctuation or quotation marks.\n\nUser: ${messages[messages.length - 1].content}\nAssistant: ${fullContent}`,
-            },
-          ]
-          // Use non-streaming for title generation
-          const titleResult = await (async () => {
-            if (provider.provider_type === 'anthropic') {
-              const url = `${provider.base_url}/v1/messages`
-              const response = await getProxyFetch()(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-api-key': provider.api_key || '',
-                  'anthropic-version': '2023-06-01',
-                },
-                body: JSON.stringify({
-                  model: provider.model,
-                  max_tokens: 30,
-                  messages: titlePrompt.filter(m => m.role !== 'system'),
-                }),
-              })
-              if (!response.ok) return { success: false }
-              const data = await safeJson(response)
-              const content = data?.content as Array<{text: string}> | undefined
-              const text = content?.[0]?.text
-              return { success: true, content: typeof text === 'string' ? text : '' }
-            } else {
-              const url = `${provider.base_url}/v1/chat/completions`
-              const titleHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-              if (provider.api_key) {
-                titleHeaders['Authorization'] = `Bearer ${provider.api_key}`
-                titleHeaders['x-goog-api-key'] = provider.api_key
-              }
-              const response = await getProxyFetch()(url, {
-                method: 'POST',
-                headers: titleHeaders,
-                body: JSON.stringify({ model: provider.model, messages: titlePrompt, max_tokens: 30 }),
-              })
-              if (!response.ok) return { success: false }
-              const data = await safeJson(response)
-              const choices = data?.choices as Array<{message: {content: string}}> | undefined
-              const rawContent = choices?.[0]?.message?.content
-              return { success: true, content: typeof rawContent === 'string' ? rawContent : '' }
+          const firstUserMsg = messages.find(m => m.role === 'user')
+          if (firstUserMsg) {
+            generatedTitle = summarizeTitle(firstUserMsg.content, 10)
+            if (generatedTitle) {
+              await aiQueries.renameConversation(conversationId, generatedTitle)
+              console.log(`[AI] Title: "${generatedTitle}"`)
             }
-          })()
-
-          if (titleResult.success && titleResult.content) {
-            generatedTitle = titleResult.content.trim().slice(0, 60)
-          } else {
-            // Fallback: use first few words of user message as title
-            const firstMsg = messages.find(m => m.role === 'user')
-            if (firstMsg) {
-              generatedTitle = firstMsg.content.replace(/[\n\r]+/g, ' ').slice(0, 10)
-            }
-          }
-          if (generatedTitle) {
-            await aiQueries.renameConversation(conversationId, generatedTitle)
-            console.log(`[AI] Title: "${generatedTitle}"`)
           }
         } catch (titleErr) {
-          // Title generation failing is non-critical
           console.log("[AI] Title generation failed:", titleErr instanceof Error ? titleErr.message : titleErr)
         }
       }
@@ -917,9 +872,11 @@ export function registerHandlers(): void {
     const sanitizedTitle = title.replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, '-').slice(0, 60)
     const dateStr = getLocalDateString()
 
+    // Use lastExportDir if available; fall back to Documents.
+    const baseDir = lastExportDir || app.getPath('documents')
     const result = await dialog.showSaveDialog({
       title: 'Export Conversation',
-      defaultPath: join(app.getPath('documents'), `${sanitizedTitle || 'conversation'}-${dateStr}.md`),
+      defaultPath: join(baseDir, `${sanitizedTitle || 'conversation'}-${dateStr}.md`),
       filters: [{ name: 'Markdown', extensions: ['md'] }],
     })
 
@@ -939,6 +896,8 @@ export function registerHandlers(): void {
       }
 
       writeFileSync(result.filePath, mdContent, 'utf-8')
+      // 记住这次的目录供下次使用
+      lastExportDir = dirname(result.filePath)
       return { success: true, path: result.filePath }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
