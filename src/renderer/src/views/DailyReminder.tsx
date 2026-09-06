@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore'
 export default function DailyReminder() {
   const { dismissReminder, tasks, habits, notes } = useStore()
   const [task, setTask] = useState<any>(null)
+  const [appVersion, setAppVersion] = useState<string>('0.0.0')
   const [loading, setLoading] = useState(true)
   const [fadeOut, setFadeOut] = useState(false)
 
@@ -15,6 +16,11 @@ export default function DailyReminder() {
         setTask(null)
       })
       .finally(() => setLoading(false))
+
+    // Pull app version from main process — auto-syncs with package.json
+    window.api.getAppVersion()
+      .then((v: string) => setAppVersion(v))
+      .catch((err: any) => console.error('[DailyReminder] getAppVersion failed:', err))
   }, [])
 
   const handleDismiss = useCallback(() => {
@@ -40,6 +46,8 @@ export default function DailyReminder() {
   const pendingCount = tasks?.filter((t: any) => !['done', 'archive'].includes(t.status)).length ?? 0
   const todayHabits = habits?.filter((h: any) => h.active !== 0).length ?? 0
   const notesCount = notes?.length ?? 0
+  // Max current streak across all habits — real data, replaces the previous hardcoded "14"
+  const bestStreak = habits?.reduce((max: number, h: any) => Math.max(max, h.streak ?? 0), 0) ?? 0
 
   // Date
   const now = new Date()
@@ -153,8 +161,8 @@ export default function DailyReminder() {
               <div className="dr2-stat-card">
                 <div className="dr2-stat-top-line" />
                 <div className="dr2-stat-label">连续</div>
-                <div className="dr2-stat-number">14</div>
-                <div className="dr2-stat-desc">天保持记录</div>
+                <div className="dr2-stat-number">{bestStreak}</div>
+                <div className="dr2-stat-desc">天最佳习惯连胜</div>
               </div>
             </div>
           </div>
@@ -170,7 +178,7 @@ export default function DailyReminder() {
           </nav>
           <div className="dr2-footer-right">
             <span className="dr2-hint">按任意键开始捕捉你的想法</span>
-            <span className="dr2-version">v1.0.0</span>
+            <span className="dr2-version">v{appVersion}</span>
           </div>
         </footer>
       </div>

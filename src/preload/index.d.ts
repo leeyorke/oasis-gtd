@@ -86,6 +86,8 @@ declare global {
       // Auto Launch
       setAutoLaunch: (enable: boolean) => Promise<void>
       getAutoLaunch: () => Promise<boolean>
+      // App version
+      getAppVersion: () => Promise<string>
       // Proxy
       setProxy: (host: string, port: number) => Promise<void>
       // Quick Capture

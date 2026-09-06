@@ -132,6 +132,9 @@ const api = {
   setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('app:setAutoLaunch', enable),
   getAutoLaunch: () => ipcRenderer.invoke('app:getAutoLaunch'),
 
+  // App version (read from package.json via electron app.getVersion)
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+
   // Proxy
   setProxy: (host: string, port: number) => ipcRenderer.invoke('app:setProxy', host, port),
 

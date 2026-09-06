@@ -924,6 +924,9 @@ export function registerHandlers(): void {
     return app.getLoginItemSettings().openAtLogin
   })
 
+  // Returns the version from package.json (electron-builder injects this at build time).
+  ipcMain.handle('app:getVersion', () => app.getVersion())
+
   // ─── Proxy ───────────────────────────────────────────────────────
   ipcMain.handle('app:setProxy', async (_, host: string, port: number) => {
     const proxyRule = host && port ? `http://${host}:${port}` : ''

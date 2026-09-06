@@ -49,17 +49,27 @@ export default function App() {
   const setShowAddThought = useStore(s => s.setShowAddThought)
 
   useEffect(() => {
-    loadTasks()  // Load all tasks for dashboard view
-    loadProjects()
-    loadWaiting()
-    loadSomeday()
-    loadNotes()
-    loadHabits()
-    loadReview()
-    loadProviders()
-    loadConversations()
-    loadSettings()
-    loadLastReminderDate()
+    const init = async () => {
+      // Load all data the reminder page needs FIRST so stats are accurate
+      // by the time the reminder mounts.
+      await Promise.all([
+        loadTasks(),
+        loadHabits(),
+        loadNotes(),
+      ])
+      // Then trigger the reminder (sets showReminder=true).
+      loadLastReminderDate()
+
+      // Remaining loads can happen in the background.
+      loadProjects()
+      loadWaiting()
+      loadSomeday()
+      loadReview()
+      loadProviders()
+      loadConversations()
+      loadSettings()
+    }
+    init()
   }, [])
 
   // 8:00 AM daily reminder check — only if not dismissed today
