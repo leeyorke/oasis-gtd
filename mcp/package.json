@@ -1,0 +1,7 @@
+{
+  "name": "oasis-gtd-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server that exposes read-only access to the Oasis GTD app database",
+  "type": "module"
+}

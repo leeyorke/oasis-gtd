@@ -1,4 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
+import type { McpServiceState } from '../renderer/src/types'
 
 declare global {
   interface Window {
@@ -90,6 +91,9 @@ declare global {
       getAppVersion: () => Promise<string>
       // Proxy
       setProxy: (host: string, port: number) => Promise<void>
+      // MCP agent endpoint
+      getMcpState: () => Promise<McpServiceState>
+      setMcpEnabled: (enabled: boolean) => Promise<McpServiceState>
       // Quick Capture
       closeQuickCapture: () => void
       registerQuickCaptureShortcut: (shortcut: string) => void

@@ -17,6 +17,7 @@ import {
   habitRecordQueries,
   resourceQueries,
 } from '../db/database'
+import { mcpController } from '../mcp-controller'
 
 // ─── Proxy-aware fetch for main process ───────────────────────────────
 // session.setProxy() only affects renderer; main process Node.js fetch needs undici
@@ -865,6 +866,13 @@ export function registerHandlers(): void {
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
     }
   })
+
+  // ─── MCP Agent Endpoint ─────────────────────────────────────────────────────
+  // Live state of the agent-facing HTTP endpoint (Settings → MCP section) and
+  // the runtime toggle. The service itself starts/stops with the app
+  // (src/main/index.ts → mcp-controller.ts).
+  ipcMain.handle('mcp:getState', () => mcpController.getState())
+  ipcMain.handle('mcp:setEnabled', (_, enabled: boolean) => mcpController.setEnabled(enabled))
 
   // ─── Export Conversation Markdown ───────────────────────────────────────────
   ipcMain.handle('chat:exportMarkdown', async (_, conversationId: string, title: string, messages: Array<{role: string; content: string}>) => {

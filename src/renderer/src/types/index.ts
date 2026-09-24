@@ -1,5 +1,23 @@
 export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts' | 'kanban' | 'daily-reminder'
 
+/** Live state of the agent-facing MCP HTTP endpoint (Settings → MCP section). */
+export interface McpServiceState {
+  /** User preference — false means the service stays off. */
+  enabled: boolean
+  /** Whether the endpoint is currently running (spawned child process alive). */
+  running: boolean
+  /** Port the endpoint listens on. */
+  port: number
+  /** Bearer token agents must send in the Authorization header. */
+  token: string
+  /** Reachable endpoint URLs (loopback + LAN addresses). */
+  urls: string[]
+  /** The database file being served. */
+  dbPath: string
+  /** Last startup failure (missing node, port in use, …), if any. */
+  error: string | null
+}
+
 export interface AppSettings {
   app_name: string
   review_day: number          // 0=Sun ... 6=Sat

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase, settingsQueries } from './db/database'
 import { registerHandlers } from './ipc/handlers'
+import { mcpController } from './mcp-controller'
 
 // Fix Windows console encoding — without this, Chinese (and other CJK) characters
 // appear as mojibake because the default Windows console code page is GBK/CP936.
@@ -182,6 +183,20 @@ function createQuickCaptureWindow(): void {
   }
 }
 
+/**
+ * The MCP HTTP endpoint that lets other agents read this app's data is owned by
+ * the shared controller in src/main/mcp-controller.ts:
+ *
+ * - started below on launch (after the database is ready), unless the user
+ *   turned it off (app_settings.mcp_http_enabled = '0' or the Settings toggle);
+ * - stopped in before-quit, so the endpoint's lifetime matches the app's;
+ * - togglable at runtime from the Settings view via `mcp:setEnabled` IPC.
+ *
+ * The controller spawns `node <entry> --http` on the system Node runtime (the
+ * server needs Node's built-in node:sqlite, which Electron's Node lacks) and
+ * logs the bearer token every launch, because agents need it to authenticate.
+ */
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.oasis.gtd')
 
@@ -197,6 +212,11 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers
   registerHandlers()
+
+  // Start the agent-facing MCP HTTP endpoint (read-only, LAN, token-protected)
+  void mcpController.start().catch((err) => {
+    console.error('[MCP] Failed to start agent HTTP endpoint:', err)
+  })
 
   // Apply proxy settings from DB on startup
   try {
@@ -256,6 +276,8 @@ app.on('window-all-closed', () => {
 // Ensure window is shown before quitting (helps macOS restore state)
 app.on('before-quit', () => {
   isQuitting = true
+  // Stop the agent HTTP endpoint together with the app.
+  mcpController.stop()
   if (mainWindow) {
     mainWindow.show()
   }

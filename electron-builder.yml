@@ -7,6 +7,8 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!mcp/**'
+  - '!.mcp.json'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
@@ -22,6 +24,11 @@ extraResources:
     to: icon.ico
   - from: resources/icon.png
     to: icon.png
+  # Self-contained MCP server bundle the app spawns as `node server.mjs --http`
+  # for agents on the LAN (see src/main/mcp-http.ts). Plain node cannot read
+  # files inside app.asar, so it must ship unpacked, next to the executable.
+  - from: resources/mcp
+    to: mcp
 
 win:
   target:

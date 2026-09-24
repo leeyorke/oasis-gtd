@@ -138,6 +138,10 @@ const api = {
   // Proxy
   setProxy: (host: string, port: number) => ipcRenderer.invoke('app:setProxy', host, port),
 
+  // MCP agent endpoint (Settings → MCP)
+  getMcpState: () => ipcRenderer.invoke('mcp:getState'),
+  setMcpEnabled: (enabled: boolean) => ipcRenderer.invoke('mcp:setEnabled', enabled),
+
   // Quick Capture
   closeQuickCapture: () => ipcRenderer.send('quick-capture:close'),
   registerQuickCaptureShortcut: (shortcut: string) => ipcRenderer.send('quick-capture:registerShortcut', shortcut),

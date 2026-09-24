@@ -143,6 +143,32 @@ All data is stored locally in SQLite at:
 - **macOS:** `~/Library/Application Support/oasis-gtd/oasis-gtd.db`
 - **Linux:** `~/.config/oasis-gtd/oasis-gtd.db`
 
+## MCP Server (Agent Data Access)
+
+This repo ships an [MCP](https://modelcontextprotocol.io) server (`mcp/`) that lets other agents
+read the app's data — tasks, projects, waiting-for, someday, notes, habits, AI chat history,
+resources and the review checklist. It runs over stdio, reads the same SQLite database the app uses
+(works while the app is running, thanks to WAL mode), and is strictly read-only.
+
+```bash
+npm run mcp        # start the server
+npm run test:mcp   # end-to-end smoke test
+```
+
+It is already registered for Claude Code in `.mcp.json`. Requires Node.js ≥ 22.18.
+Full documentation: [mcp/README.md](mcp/README.md).
+
+For agents on other machines, the app itself starts the endpoint on launch (and stops it on quit):
+it serves MCP Streamable HTTP on `0.0.0.0:7800` with a bearer token that is generated on first
+launch and shown in **Settings → MCP** (status, connection URLs, token, on/off switch). Requires the
+system Node ≥ 22.5 on PATH (Electron's bundled Node cannot run the server).
+
+```bash
+# manual start (same as what the app does), or rely on the app
+OASIS_MCP_TOKEN=my-secret-token node mcp/index.ts --http
+# → POST http://<局域网IP>:7800/mcp   (headers: Authorization: Bearer …, Accept: application/json, text/event-stream)
+```
+
 ## GTD Views
 
 | View | Description |

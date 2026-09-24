@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../store/useStore'
-import type { AIProvider } from '../types'
+import type { AIProvider, McpServiceState } from '../types'
 import { useT } from '../i18n/useT'
 import { Check, Pencil, Trash2 } from 'lucide-react'
 
-type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'data'
+type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'data' | 'mcp'
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI',                  type: 'openai' as const,    base_url: 'https://api.openai.com',   model: 'gpt-4o' },
@@ -25,6 +25,7 @@ export default function Settings() {
     { id: 'ai-providers', label: t.settings_aiProviders,  description: t.settings_aiProvidersDesc },
     { id: 'shortcuts',    label: t.settings_shortcuts,    description: t.settings_shortcutsDesc },
     { id: 'data',         label: t.settings_data,         description: t.settings_dataDesc },
+    { id: 'mcp',          label: t.settings_mcp,          description: t.settings_mcpDesc },
   ]
 
   // ─── Stats & DB path ──────────────────────────────────────────────────────
@@ -689,6 +690,9 @@ export default function Settings() {
             </div>
           )}
 
+          {/* ── MCP AGENT ───────────────────────────────────────── */}
+          {activeSection === 'mcp' && <McpSection />}
+
         </div>
       </div>
     </div>
@@ -726,6 +730,183 @@ function FieldHint({ children, style }: { children: React.ReactNode; style?: Rea
 
 function Divider() {
   return <div style={{ borderTop: '1px solid rgba(20,28,58,0.07)', margin: '1.8rem 0' }} />
+}
+
+// ─── MCP Agent Section ──────────────────────────────────────────────────────
+
+function McpSection() {
+  const t = useT()
+  const [state, setState] = useState<McpServiceState | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  const refresh = useCallback(() => {
+    window.api.getMcpState().then(setState).catch(() => setState(null))
+  }, [])
+
+  useEffect(refresh, [refresh])
+
+  const toggle = async (enabled: boolean) => {
+    setBusy(true)
+    try {
+      setState(await window.api.setMcpEnabled(enabled))
+      // Give the child process a moment to come up, then re-read the live state
+      // so the status dot/(port) reflect reality rather than the intent.
+      setTimeout(refresh, enabled ? 800 : 300)
+    } catch {
+      refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const copy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey(null), 1500)
+    } catch {
+      /* clipboard unavailable — the text stays selectable */
+    }
+  }
+
+  const codeBoxStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: '0.68rem',
+    color: 'var(--ink-primary)',
+    background: 'rgba(20,28,58,0.03)',
+    border: '1px solid rgba(20,28,58,0.07)',
+    padding: '0.45rem 0.7rem',
+    wordBreak: 'break-all',
+    lineHeight: 1.5,
+  }
+
+  const copyButtonStyle: React.CSSProperties = {
+    background: 'none',
+    border: '1px solid rgba(20,28,58,0.12)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: '0.55rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    color: 'var(--ink-secondary)',
+    cursor: 'pointer',
+    padding: '0.3rem 0.6rem',
+    flexShrink: 0,
+    transition: 'all 0.2s',
+  }
+
+  return (
+    <div className="fade-in">
+      <SectionTitle>{t.settings_mcp}</SectionTitle>
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', marginBottom: '1.5rem', lineHeight: 1.6, maxWidth: '480px' }}>
+        {t.mcp_desc}
+      </p>
+
+      {/* Status + toggle */}
+      <FieldGroup label={t.mcp_status}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.9rem' }}>
+          <span style={{
+            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+            background: state?.running ? '#22c55e' : 'rgba(20,28,58,0.2)',
+          }} />
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: 'var(--ink-primary)' }}>
+            {!state
+              ? 'Loading…'
+              : state.running
+                ? `${t.mcp_running} · :${state.port}`
+                : t.mcp_stopped}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {[true, false].map(val => (
+            <button
+              key={String(val)}
+              onClick={() => toggle(val)}
+              disabled={busy || state?.enabled === val}
+              style={{
+                background: state?.enabled === val ? 'var(--ink-primary)' : 'transparent',
+                color: state?.enabled === val ? 'var(--ink-light)' : 'var(--ink-secondary)',
+                border: '1px solid',
+                borderColor: state?.enabled === val ? 'var(--ink-primary)' : 'rgba(20,28,58,0.12)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '0.62rem',
+                padding: '0.35rem 0.9rem',
+                cursor: busy ? 'default' : 'pointer',
+                opacity: busy && state?.enabled === val ? 0.6 : 1,
+                transition: 'all 0.2s',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}
+            >
+              {val ? t.on : t.off}
+            </button>
+          ))}
+        </div>
+        {state && !state.enabled && <FieldHint>{t.mcp_offHint}</FieldHint>}
+        {state?.error && (
+          <FieldHint style={{ color: '#a83232' }}>{t.mcp_errorPrefix}: {state.error}</FieldHint>
+        )}
+        <FieldHint>{t.mcp_lifecycle}</FieldHint>
+      </FieldGroup>
+
+      {state?.running && (
+        <>
+          <Divider />
+
+          <FieldGroup label={t.mcp_endpoints}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {state.urls.map(url => (
+                <div key={url} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <code style={{ ...codeBoxStyle, flex: 1 }}>{url}</code>
+                  <button
+                    onClick={() => copy(url, url)}
+                    style={copyButtonStyle}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(20,28,58,0.3)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(20,28,58,0.12)')}
+                  >
+                    {copiedKey === url ? t.mcp_copied : t.mcp_copy}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <FieldHint>{t.mcp_endpointsHint}</FieldHint>
+            {/* Windows blocks inbound connections to unlisted ports by default. */}
+            {navigator.platform.toLowerCase().includes('win') && (
+              <FieldHint>
+                {t.mcp_firewallHint}
+                <code style={{ fontSize: '0.6rem' }}>
+                  New-NetFirewallRule -DisplayName "Oasis MCP" -Direction Inbound -Protocol TCP -LocalPort {state.port} -Action Allow
+                </code>
+              </FieldHint>
+            )}
+          </FieldGroup>
+
+          <Divider />
+
+          <FieldGroup label={t.mcp_token}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <code style={{ ...codeBoxStyle, flex: 1 }}>{state.token}</code>
+              <button
+                onClick={() => copy(state.token, 'token')}
+                style={copyButtonStyle}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(20,28,58,0.3)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(20,28,58,0.12)')}
+              >
+                {copiedKey === 'token' ? t.mcp_copied : t.mcp_copy}
+              </button>
+            </div>
+            <FieldHint>{t.mcp_tokenHint}</FieldHint>
+          </FieldGroup>
+
+          <Divider />
+
+          <FieldGroup label={t.mcp_dbPath}>
+            <div style={{ ...codeBoxStyle }}>{state.dbPath || '—'}</div>
+          </FieldGroup>
+        </>
+      )}
+    </div>
+  )
 }
 
 // ─── Shortcuts Section ─────────────────────────────────────────────────────

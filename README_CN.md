@@ -92,6 +92,27 @@ Oasis 支持多种 AI 提供商用于 AI 助手视图：
 - **macOS:** `~/Library/Application Support/oasis-gtd/oasis-gtd.db`
 - **Linux:** `~/.config/oasis-gtd/oasis-gtd.db`
 
+## MCP 服务器（Agent 数据访问）
+
+本仓库自带一个 [MCP](https://modelcontextprotocol.io) 服务器（`mcp/`），让其他 agent 可以读取本应用的数据——任务、项目、等待中、某天/也许、笔记、习惯、AI 聊天记录、参考资料和每周回顾清单。它通过 stdio 运行，读取应用正在使用的同一个 SQLite 数据库（WAL 模式下应用运行时也能读取），并且严格只读。
+
+```bash
+npm run mcp        # 启动服务器
+npm run test:mcp   # 端到端冒烟测试
+```
+
+已在 `.mcp.json` 中为 Claude Code 注册。需要 Node.js ≥ 22.18。
+完整文档：[mcp/README.md](mcp/README.md)。
+
+其他机器上的 agent 可通过 HTTP 模式访问：**app 启动时会自动拉起该服务，退出时自动关闭**（MCP Streamable HTTP，Bearer token 认证，只读，默认监听 `0.0.0.0:7800`）。token 在首次启动时自动生成，在 **Settings → MCP** 中可查看状态、连接地址、token 并随时开关。需要系统 Node ≥ 22.5（Electron 自带的 Node 跑不了该服务）。
+
+```bash
+# 手动启动（与 app 自动拉起等价）
+OASIS_MCP_TOKEN=my-secret-token node mcp/index.ts --http
+# → POST http://<局域网IP>:7800/mcp
+#   请求头：Authorization: Bearer …，Accept: application/json, text/event-stream
+```
+
 ## GTD 视图
 
 | 视图 | 描述 |
