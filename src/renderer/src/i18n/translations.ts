@@ -283,6 +283,8 @@ const translations = {
     settings_aiProvidersDesc: 'Configure LLM endpoints',
     settings_data:      'Data',
     settings_dataDesc:  'Export, clean up & database info',
+    settings_network:   'Network',
+    settings_networkDesc: 'Proxy & connection settings',
     settings_mcp:       'MCP Agent',
     settings_mcpDesc:   'Read-only data access for other agents',
     // MCP section
@@ -313,6 +315,7 @@ const translations = {
     settings_language:  'Interface Language',
     settings_langEn:    'English',
     settings_langZh:    '简体中文',
+    // Network section
     settings_proxy:     'Proxy',
     settings_proxyHint: 'Format: 127.0.0.1:7890. Leave empty to disable. Useful for accessing Google APIs.',
     settings_proxyHostPlaceholder: 'Host, e.g. 127.0.0.1',
@@ -662,6 +665,8 @@ const translations = {
     settings_aiProvidersDesc: '配置 LLM 端点',
     settings_data:      '数据',
     settings_dataDesc:  '导出、清理与数据库信息',
+    settings_network:   '网络',
+    settings_networkDesc: '代理与连接设置',
     settings_mcp:       'MCP 智能体',
     settings_mcpDesc:   '供其他 agent 只读访问数据',
     // MCP section
@@ -692,6 +697,7 @@ const translations = {
     settings_language:  '界面语言',
     settings_langEn:    'English',
     settings_langZh:    '简体中文',
+    // Network section
     settings_proxy:     '代理设置',
     settings_proxyHint: '格式：127.0.0.1:7890，留空则不使用代理。访问 Google API 等场景需要配置。',
     settings_proxyHostPlaceholder: '地址，如 127.0.0.1',

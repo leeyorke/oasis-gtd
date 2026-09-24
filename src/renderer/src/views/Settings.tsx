@@ -4,7 +4,7 @@ import type { AIProvider, McpServiceState } from '../types'
 import { useT } from '../i18n/useT'
 import { Check, Pencil, Trash2 } from 'lucide-react'
 
-type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'data' | 'mcp'
+type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'network' | 'data' | 'mcp'
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI',                  type: 'openai' as const,    base_url: 'https://api.openai.com',   model: 'gpt-4o' },
@@ -24,6 +24,7 @@ export default function Settings() {
     { id: 'contexts',     label: t.settings_contexts,     description: t.settings_contextsDesc },
     { id: 'ai-providers', label: t.settings_aiProviders,  description: t.settings_aiProvidersDesc },
     { id: 'shortcuts',    label: t.settings_shortcuts,    description: t.settings_shortcutsDesc },
+    { id: 'network',      label: t.settings_network,      description: t.settings_networkDesc },
     { id: 'data',         label: t.settings_data,         description: t.settings_dataDesc },
     { id: 'mcp',          label: t.settings_mcp,          description: t.settings_mcpDesc },
   ]
@@ -327,51 +328,6 @@ export default function Settings() {
                   ))}
                 </div>
               </FieldGroup>
-
-              <Divider />
-
-              <FieldGroup label={t.settings_proxy}>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    placeholder={t.settings_proxyHostPlaceholder}
-                    value={settings.proxy_host || ''}
-                    onChange={e => updateSetting('proxy_host', e.target.value)}
-                    style={{
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: '0.75rem',
-                      padding: '0.4rem 0.75rem',
-                      border: '1px solid rgba(20,28,58,0.12)',
-                      borderRadius: '0px',
-                      width: '200px',
-                      background: 'transparent',
-                      color: 'var(--ink-primary)',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ color: 'var(--ink-secondary)', fontSize: '0.75rem' }}>:</span>
-                  <input
-                    type="number"
-                    placeholder={t.settings_proxyPortPlaceholder}
-                    value={settings.proxy_port || ''}
-                    onChange={e => updateSetting('proxy_port', Number(e.target.value) || 0)}
-                    style={{
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: '0.75rem',
-                      padding: '0.4rem 0.75rem',
-                      border: '1px solid rgba(20,28,58,0.12)',
-                      borderRadius: '0px',
-                      width: '100px',
-                      background: 'transparent',
-                      color: 'var(--ink-primary)',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.62rem', color: 'var(--ink-secondary)', letterSpacing: '0.04em' }}>
-                  {t.settings_proxyHint}
-                </div>
-              </FieldGroup>
             </div>
           )}
           {activeSection === 'contexts' && (
@@ -610,6 +566,9 @@ export default function Settings() {
 
           {/* ── SHORTCUTS ───────────────────────────────────────────── */}
           {activeSection === 'shortcuts' && <ShortcutsSection />}
+
+          {/* ── NETWORK ─────────────────────────────────────────────── */}
+          {activeSection === 'network' && <NetworkSection />}
 
           {/* ── DATA ──────────────────────────────────────────────── */}
           {activeSection === 'data' && (
@@ -1000,6 +959,54 @@ function ShortcutsSection() {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─── Network Section ───────────────────────────────────────────────────────
+
+function NetworkSection() {
+  const { settings, updateSetting } = useStore()
+  const t = useT()
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: '0.75rem',
+    padding: '0.4rem 0.75rem',
+    border: '1px solid rgba(20,28,58,0.12)',
+    borderRadius: '0px',
+    background: 'transparent',
+    color: 'var(--ink-primary)',
+    outline: 'none',
+  }
+
+  return (
+    <div className="fade-in">
+      <SectionTitle>{t.settings_network}</SectionTitle>
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.72rem', color: 'var(--ink-secondary)', marginBottom: '1.5rem', lineHeight: 1.6, maxWidth: '480px' }}>
+        {t.settings_networkDesc}
+      </p>
+
+      <FieldGroup label={t.settings_proxy}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder={t.settings_proxyHostPlaceholder}
+            value={settings.proxy_host || ''}
+            onChange={e => updateSetting('proxy_host', e.target.value)}
+            style={{ ...inputStyle, width: '200px' }}
+          />
+          <span style={{ color: 'var(--ink-secondary)', fontSize: '0.75rem' }}>:</span>
+          <input
+            type="number"
+            placeholder={t.settings_proxyPortPlaceholder}
+            value={settings.proxy_port || ''}
+            onChange={e => updateSetting('proxy_port', Number(e.target.value) || 0)}
+            style={{ ...inputStyle, width: '100px' }}
+          />
+        </div>
+        <FieldHint>{t.settings_proxyHint}</FieldHint>
+      </FieldGroup>
     </div>
   )
 }
