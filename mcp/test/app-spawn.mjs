@@ -17,7 +17,7 @@
  * Requires Node.js >= 22.18 and esbuild (devDependency).
  */
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -345,6 +345,35 @@ async function main() {
     reloadedState.running === true && reloaded.isRunning(),
     reloadedState.error ?? '')
   reloaded.stop()
+
+  // Node resolution: a packaged GUI app has no shell PATH, so the controller
+  // resolves the system node itself (PATH → registry → known locations) and
+  // honours an explicit mcp_http_node_path override.
+  const { resolveNodeExecutable } = await import('../../src/main/mcp-http.ts')
+  const resolved = resolveNodeExecutable(null)
+  check('manager: resolves a node executable on this machine',
+    typeof resolved.path === 'string' && existsSync(resolved.path),
+    resolved.path ?? '')
+  check('manager: bogus node override → not found',
+    resolveNodeExecutable('C:\\definitely\\not\\node.exe').path === null)
+
+  const overridePort = await freePort()
+  const overridden = createMcpController({
+    getSetting: (key) => {
+      if (key === 'mcp_http_port') return String(overridePort)
+      if (key === 'mcp_http_node_path') return process.execPath
+      return null
+    },
+    setSetting: () => undefined,
+    dbPath: () => fixturePath,
+    entry: { script: devEntry, cwd: repoRoot },
+    onLog: (line) => logs.push(line)
+  })
+  const overrideState = await overridden.start()
+  check('manager: mcp_http_node_path override honored', overrideState.nodePath === process.execPath
+    && overrideState.running === true, overrideState.error ?? '')
+  check('manager: override endpoint becomes ready', await waitForHealth(overridePort))
+  overridden.stop()
 
   await removeDir(workDir)
 

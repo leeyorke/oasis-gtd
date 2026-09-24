@@ -903,6 +903,13 @@ function McpSection() {
           <FieldGroup label={t.mcp_dbPath}>
             <div style={{ ...codeBoxStyle }}>{state.dbPath || '—'}</div>
           </FieldGroup>
+
+          <FieldGroup label={t.mcp_node}>
+            <div style={{ ...codeBoxStyle, color: state.nodePath ? undefined : '#a83232' }}>
+              {state.nodePath ?? t.mcp_nodeMissing}
+            </div>
+            <FieldHint>{t.mcp_nodeHint}</FieldHint>
+          </FieldGroup>
         </>
       )}
     </div>

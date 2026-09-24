@@ -221,7 +221,15 @@ Backed by the `mcp:getState` / `mcp:setEnabled` IPC handlers in
 |-----|---------|---------|
 | `mcp_http_enabled` | enabled | The Settings toggle; `0` means the service stays off |
 | `mcp_http_port` | `7800` | Port for the endpoint (applied at start) |
-| `mcp_http_token` | auto-generated | Bearer token (base64url, 24 random bytes). Generated on first launch and kept stable across restarts. Shown in Settings → MCP and in the app log at every launch |
+| `mcp_http_token` | auto-generated | Bearer token (base64url, 24 random bytes). Generated on first launch and kept stable across restarts |
+| `mcp_http_node_path` | auto-detected | Absolute path to the system Node.js (≥ 22.5) runtime. Auto-resolved (PATH → registry → common install locations); set this when detection picks the wrong node or finds none |
+
+The system Node runtime is resolved explicitly because a **packaged app launched
+from Explorer does not inherit the shell's PATH** — that is the classic
+`spawn node ENOENT` failure with version-manager installs (nvm, nvm4w, fnm,
+volta). The app probes the current PATH, then the PATH recorded in the Windows
+registry (fresh even for long-running desktop sessions), then well-known install
+roots; the resolved path is shown in Settings → MCP.
 
 The exact database file the app uses is passed to the server (`OASIS_DB_PATH`),
 so agents always see the same data as the app — live, read-only.
@@ -346,6 +354,7 @@ traced to network layer, HTTP layer, or auth layer.
 | Symptom | Cause / fix |
 |---------|-------------|
 | `Could not find an Oasis GTD database` | The app has never run on this profile, or the DB lives elsewhere — set `OASIS_DB_PATH`. |
+| `spawn node ENOENT` / `Node.js >= 22.5 was not found` | The system Node was not on the app's PATH (typical for a packaged GUI app with an nvm-style install). The app now resolves it via PATH → registry → known locations; if it still fails, pin it: set `app_settings.mcp_http_node_path` to the absolute node.exe path. The resolved path is shown in Settings → MCP. |
 | `SyntaxError: Invalid or unexpected token` / type errors at startup | Node too old. Use Node ≥ 22.18 (or `node --experimental-strip-types`). |
 | Serves the wrong database | Both `oasis-gtd-dev.db` and `oasis-gtd.db` exist; pin one with `OASIS_PROFILE=dev\|packaged` or `OASIS_DB_PATH`. |
 | `unable to open database file` | Read-only WAL open needs the `-shm` sidecar; the server retries with a read-write handle. If both fail, the file is locked or missing. |

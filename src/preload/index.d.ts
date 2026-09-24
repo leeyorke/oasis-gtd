@@ -93,8 +93,7 @@ declare global {
       setProxy: (host: string, port: number) => Promise<void>
       // MCP agent endpoint
       getMcpState: () => Promise<McpServiceState>
-      setMcpEnabled: (enabled: boolean) => Promise<McpServiceState>
-      // Quick Capture
+      setMcpEnabled: (enabled: boolean) => Promise<McpServiceState>      // Quick Capture
       closeQuickCapture: () => void
       registerQuickCaptureShortcut: (shortcut: string) => void
     }

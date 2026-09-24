@@ -14,6 +14,8 @@ export interface McpServiceState {
   urls: string[]
   /** The database file being served. */
   dbPath: string
+  /** Absolute path of the system Node runtime used for the child process (null = not found). */
+  nodePath: string | null
   /** Last startup failure (missing node, port in use, …), if any. */
   error: string | null
 }

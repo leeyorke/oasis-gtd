@@ -301,6 +301,9 @@ const translations = {
     mcp_copy:           'Copy',
     mcp_copied:         'Copied',
     mcp_firewallHint:   'Other machines cannot connect? Windows Firewall blocks unlisted inbound ports by default — run this in an administrator PowerShell:',
+    mcp_node:           'Node Runtime',
+    mcp_nodeMissing:    'not found — the endpoint cannot start',
+    mcp_nodeHint:       'The system Node.js (≥ 22.5) that runs the MCP server. Resolved automatically (PATH → registry → common install locations); pin a specific one with app_settings.mcp_http_node_path.',
     // General section
     settings_appName:   'App Name',
     settings_reviewDay: 'Weekly Review Day',
@@ -677,6 +680,9 @@ const translations = {
     mcp_copy:           '复制',
     mcp_copied:         '已复制',
     mcp_firewallHint:   '其他机器连不上？Windows 防火墙默认拦截未放行的入站端口——在管理员 PowerShell 里执行：',
+    mcp_node:           'Node 运行时',
+    mcp_nodeMissing:    '未找到 —— 服务无法启动',
+    mcp_nodeHint:       '运行 MCP 服务的系统 Node.js（≥ 22.5）。自动解析（PATH → 注册表 → 常见安装位置）；可在 app_settings.mcp_http_node_path 指定。',
     // General section
     settings_appName:   '应用名称',
     settings_reviewDay: '每周回顾日',
