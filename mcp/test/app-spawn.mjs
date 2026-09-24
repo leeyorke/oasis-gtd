@@ -17,7 +17,7 @@
  * Requires Node.js >= 22.18 and esbuild (devDependency).
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -238,7 +238,7 @@ async function main() {
     getSetting: (key) => settings.get(key) ?? null,
     setSetting: (key, value) => settings.set(key, value),
     dbPath: () => fixturePath,
-    entry: { script: devEntry, cwd: repoRoot },
+    entryScript: devEntry,
     onLog: (line) => logs.push(line)
   })
 
@@ -247,7 +247,7 @@ async function main() {
     getSetting: (key) => (key === 'mcp_http_enabled' ? '0' : null),
     setSetting: () => undefined,
     dbPath: () => fixturePath,
-    entry: { script: devEntry, cwd: repoRoot }
+    entryScript: devEntry
   })
   await disabled.start()
   check('manager: disabled preference → no child spawned', disabled.getState().running === false
@@ -317,7 +317,7 @@ async function main() {
     getSetting: (key) => (key === 'mcp_http_port' ? String(squatterPort) : null),
     setSetting: () => undefined,
     dbPath: () => fixturePath,
-    entry: { script: devEntry, cwd: repoRoot },
+    entryScript: devEntry,
     onLog: (line) => logs.push(line)
   })
   const blockedState = await blocked.start()
@@ -335,7 +335,7 @@ async function main() {
     getSetting: (key) => (key === 'mcp_http_port' ? String(leftoverPort) : null),
     setSetting: () => undefined,
     dbPath: () => fixturePath,
-    entry: { script: devEntry, cwd: repoRoot },
+    entryScript: devEntry,
     onLog: (line) => logs.push(line)
   })
   const reloadedState = await reloaded.start()
@@ -354,8 +354,9 @@ async function main() {
   check('manager: resolves a node executable on this machine',
     typeof resolved.path === 'string' && existsSync(resolved.path),
     resolved.path ?? '')
-  check('manager: bogus node override → not found',
-    resolveNodeExecutable('C:\\definitely\\not\\node.exe').path === null)
+  check('manager: bogus node override → ignored, auto-discovery used',
+    resolveNodeExecutable('C:\\definitely\\not\\node.exe').source !== 'mcp_http_node_path'
+    && resolveNodeExecutable('C:\\definitely\\not\\node.exe').path !== null)
 
   const overridePort = await freePort()
   const overridden = createMcpController({
@@ -366,7 +367,7 @@ async function main() {
     },
     setSetting: () => undefined,
     dbPath: () => fixturePath,
-    entry: { script: devEntry, cwd: repoRoot },
+    entryScript: devEntry,
     onLog: (line) => logs.push(line)
   })
   const overrideState = await overridden.start()
@@ -374,6 +375,31 @@ async function main() {
     && overrideState.running === true, overrideState.error ?? '')
   check('manager: override endpoint becomes ready', await waitForHealth(overridePort))
   overridden.stop()
+
+  // A pinned runtime that cannot actually be launched must fall back to the
+  // auto-discovered one instead of giving up (spawn can even throw synchronously
+  // for a file that exists but is not a valid executable).
+  const fakeNodeDir = join(workDir, 'fake-node')
+  mkdirSync(fakeNodeDir, { recursive: true })
+  const fakeNode = join(fakeNodeDir, 'node.exe')
+  writeFileSync(fakeNode, 'this is not a valid executable')
+  const fallbackPort = await freePort()
+  const fallbackController = createMcpController({
+    getSetting: (key) => {
+      if (key === 'mcp_http_port') return String(fallbackPort)
+      if (key === 'mcp_http_node_path') return fakeNode
+      return null
+    },
+    setSetting: () => undefined,
+    dbPath: () => fixturePath,
+    entryScript: devEntry,
+    onLog: (line) => logs.push(line)
+  })
+  const fallbackState = await fallbackController.start()
+  check('manager: unspawnable pinned node falls back to auto-discovered node',
+    fallbackState.running === true, fallbackState.error ?? '')
+  check('manager: fallback endpoint becomes ready', await waitForHealth(fallbackPort))
+  fallbackController.stop()
 
   await removeDir(workDir)
 

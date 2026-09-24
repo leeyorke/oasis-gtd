@@ -224,12 +224,26 @@ Backed by the `mcp:getState` / `mcp:setEnabled` IPC handlers in
 | `mcp_http_token` | auto-generated | Bearer token (base64url, 24 random bytes). Generated on first launch and kept stable across restarts |
 | `mcp_http_node_path` | auto-detected | Absolute path to the system Node.js (≥ 22.5) runtime. Auto-resolved (PATH → registry → common install locations); set this when detection picks the wrong node or finds none |
 
-The system Node runtime is resolved explicitly because a **packaged app launched
-from Explorer does not inherit the shell's PATH** — that is the classic
-`spawn node ENOENT` failure with version-manager installs (nvm, nvm4w, fnm,
-volta). The app probes the current PATH, then the PATH recorded in the Windows
-registry (fresh even for long-running desktop sessions), then well-known install
-roots; the resolved path is shown in Settings → MCP.
+> **The token is per-profile.** `npm run dev` and the packaged build use *different*
+> databases (`oasis-gtd-dev.db` vs `oasis-gtd.db`), so each has its own
+> `mcp_http_token`. Always copy the token from the app you are actually running
+> (Settings → MCP → Bearer Token, or its startup log) — reusing the dev token
+> against a packaged app (or vice versa) yields `401 Unauthorized`.
+
+The system Node runtime is resolved explicitly — a **packaged app launched from
+Explorer does not inherit the shell's PATH** (the classic `spawn node ENOENT`
+failure with version-manager installs such as nvm/nvm4w), and `existsSync`
+passing does not mean `CreateProcess` can launch the file. The resolver therefore
+probes PATH → the Windows registry (fresh even for long-running desktop
+sessions) → common install roots → each candidate's realpath (nvm4w symlinks),
+**verifies every candidate by actually running it** (`node -v`), and at spawn
+time retries the next candidate when one fails to launch (synchronous throws
+included). The resolved path is shown in Settings → MCP. Two further gotchas
+that bit in production and are handled here: the child is spawned **without a
+`cwd`** (a packaged app's `__dirname` lives inside `app.asar` — a file — and a
+cwd that is not a directory makes CreateProcess fail with an ENOENT that blames
+node.exe), and a pinned `mcp_http_node_path` is a *preference*, not a hard
+requirement: if it cannot be launched, auto-discovery takes over.
 
 The exact database file the app uses is passed to the server (`OASIS_DB_PATH`),
 so agents always see the same data as the app — live, read-only.
@@ -354,8 +368,9 @@ traced to network layer, HTTP layer, or auth layer.
 | Symptom | Cause / fix |
 |---------|-------------|
 | `Could not find an Oasis GTD database` | The app has never run on this profile, or the DB lives elsewhere — set `OASIS_DB_PATH`. |
-| `spawn node ENOENT` / `Node.js >= 22.5 was not found` | The system Node was not on the app's PATH (typical for a packaged GUI app with an nvm-style install). The app now resolves it via PATH → registry → known locations; if it still fails, pin it: set `app_settings.mcp_http_node_path` to the absolute node.exe path. The resolved path is shown in Settings → MCP. |
-| `could not be launched (broken symlink, antivirus interception, or permissions?)` | The candidate executable was found but could not actually be started — common with nvm4w's symlinked `nodejs` directory (exists, but CreateProcess fails in some process contexts). The resolver now **verifies each candidate by running it** and falls back to the symlink's real target, the per-version nvm directories, and other locations; pinning `app_settings.mcp_http_node_path` to the real version directory (e.g. `…\nvm\v22.23.2\node.exe`) also works. |
+| `spawn <path> ENOENT` in the packaged build | Historically caused by the child being spawned with `cwd` pointing inside `app.asar` (a file, not a directory) — CreateProcess then reports ENOENT against node.exe. Fixed by not passing a cwd. If you still see it: the error names the runtime that could not be launched, each attempt is logged (`could not launch …`), and the resolver retries the remaining candidates. Pin a known-good absolute path with `app_settings.mcp_http_node_path` (e.g. the real version directory of an nvm install) if you want to force one. |
+| `failed to start any node runtime. Attempts: …` | Every candidate failed to launch — the log lists each attempt and its error. Usually a broken pin, an antivirus blocking node.exe, or permissions. |
+| `Node.js >= 22.5 was not found` | No usable node on PATH, in the registry, or in common install locations — install Node.js ≥ 22.5 or pin `app_settings.mcp_http_node_path`. |
 | `SyntaxError: Invalid or unexpected token` / type errors at startup | Node too old. Use Node ≥ 22.18 (or `node --experimental-strip-types`). |
 | Serves the wrong database | Both `oasis-gtd-dev.db` and `oasis-gtd.db` exist; pin one with `OASIS_PROFILE=dev\|packaged` or `OASIS_DB_PATH`. |
 | `unable to open database file` | Read-only WAL open needs the `-shm` sidecar; the server retries with a read-write handle. If both fail, the file is locked or missing. |

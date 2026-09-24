@@ -20,6 +20,6 @@ export const mcpController: McpController = createMcpController({
   getSetting: (key) => settingsQueries.get(key),
   setSetting: (key, value) => settingsQueries.set(key, value),
   dbPath: () => dataQueries.getDbPath(),
-  entry: { script: entryScript, cwd: join(__dirname, '../../') },
+  entryScript,
   onLog: (line) => console.log(line)
 })

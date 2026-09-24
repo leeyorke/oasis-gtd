@@ -41,8 +41,8 @@ export interface McpControllerDeps {
   setSetting: (key: string, value: string) => void
   /** The exact database file the app itself uses. */
   dbPath: () => string
-  /** Entry script for the child process (mcp/index.ts in dev, server.cjs when packaged). */
-  entry: { script: string; cwd: string }
+  /** Absolute path to the MCP server entry (mcp/index.ts in dev, server.cjs when packaged). */
+  entryScript: string
   /** Receives every log line the MCP server writes to stderr. */
   onLog?: (line: string) => void
 }
@@ -193,6 +193,12 @@ export interface NodeResolution {
   source: string
 }
 
+/** A node executable known to exist AND to run (used for spawning). */
+export interface NodeCandidate {
+  path: string
+  source: string
+}
+
 /** Existence is not enough: a reparse point (nvm4w symlink) can pass existsSync yet fail CreateProcess. Verify by running it. */
 function canExecute(exe: string): boolean {
   try {
@@ -256,19 +262,38 @@ function collectCandidateDirs(): Array<{ dir: string; source: string }> {
   return dirs
 }
 
-export function resolveNodeExecutable(override?: string | null): NodeResolution {
-  if (override && override.trim() !== '') {
-    const trimmed = override.trim()
-    return existsSync(trimmed)
-      ? { path: trimmed, source: 'mcp_http_node_path' }
-      : { path: null, source: `mcp_http_node_path (${trimmed} does not exist)` }
+/** Every candidate node executable, best first: the pinned one, then auto-discovered. */
+export function nodeCandidates(override?: string | null): NodeCandidate[] {
+  const candidates: NodeCandidate[] = []
+  const push = (path: string, source: string): void => {
+    if (!candidates.some((candidate) => candidate.path.toLowerCase() === path.toLowerCase())) {
+      candidates.push({ path, source })
+    }
+  }
+
+  // A pinned runtime is tried FIRST but never exclusively: if it cannot be
+  // launched (bad pin, stale symlink, …) the auto-discovered ones take over.
+  if (override && override.trim() !== '' && existsSync(override.trim())) {
+    push(override.trim(), 'mcp_http_node_path')
   }
 
   for (const { dir, source } of collectCandidateDirs()) {
     const exe =
       basename(dir).toLowerCase() === nodeExeName && existsSync(dir) ? dir : join(dir, nodeExeName)
     if (!existsSync(exe)) continue
-    if (canExecute(exe)) return { path: exe, source }
+    // Existence is not enough: a reparse point (nvm4w symlink) can pass
+    // existsSync yet fail CreateProcess — verify by actually running it.
+    if (canExecute(exe)) push(exe, source)
+  }
+  return candidates
+}
+
+/** The preferred candidate, for display (null when nothing usable was found). */
+export function resolveNodeExecutable(override?: string | null): NodeResolution {
+  const [first] = nodeCandidates(override)
+  if (first) return { path: first.path, source: first.source }
+  if (override && override.trim() !== '') {
+    return { path: null, source: `mcp_http_node_path (${override.trim()} does not exist)` }
   }
   return { path: null, source: '' }
 }
@@ -366,18 +391,22 @@ export function createMcpController(deps: McpControllerDeps): McpController {
     error = null
 
     // The MCP server needs Node ≥ 22.5, which Electron's own Node (20.x) does
-    // not provide — spawn the system node, resolved to an absolute path so it
-    // also works when the packaged app is launched without a shell PATH.
-    const node = resolveNodeExecutable(deps.getSetting(MCP_SETTING_NODE_PATH))
-    if (!node.path) {
+    // not provide — spawn the system node. Resolution probes PATH → the Windows
+    // registry (packaged GUI apps do not inherit the shell PATH) → common
+    // install locations, verifying each candidate by actually running it.
+    const candidates = nodeCandidates(deps.getSetting(MCP_SETTING_NODE_PATH))
+    if (candidates.length === 0) {
       error =
         `Node.js >= 22.5 was not found (searched PATH, the registry and common install ` +
         `locations). Install Node.js, or pin the executable in app_settings.${MCP_SETTING_NODE_PATH}.`
       deps.onLog?.(`[MCP] ${error}`)
       return getState()
     }
-    if (node.source !== 'PATH') {
-      deps.onLog?.(`[MCP] node runtime: ${node.path} (found via ${node.source})`)
+    if (candidates[0].source !== 'PATH') {
+      deps.onLog?.(
+        `[MCP] node runtime: ${candidates[0].path} (found via ${candidates[0].source}` +
+          (candidates.length > 1 ? `, ${candidates.length - 1} fallback(s)` : '') + ')'
+      )
     }
 
     // Guard 1: a main-process reload (electron-vite dev) re-runs start() with
@@ -397,20 +426,56 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       return getState()
     }
 
-    const spawned = spawn(node.path, [deps.entry.script, '--http'], {
-      cwd: deps.entry.cwd,
-      env: {
-        ...process.env,
-        OASIS_DB_PATH: deps.dbPath(),
-        OASIS_MCP_TOKEN: token,
-        OASIS_MCP_PORT: String(port),
-        // LAN-accessible by design; the bearer token is the access control.
-        OASIS_MCP_HOST: '0.0.0.0'
-      },
-      // stdout is unused in HTTP mode; the server logs to stderr.
-      stdio: ['ignore', 'ignore', 'pipe'],
-      windowsHide: true
-    })
+    // Spawn, trying the next candidate if the process cannot be created.
+    // cwd is deliberately NOT passed: in a packaged app __dirname lives inside
+    // app.asar (a file), and a cwd that is not a directory makes CreateProcess
+    // fail with an ENOENT that blames the node executable. Every path here is
+    // absolute, so the child does not need a working directory.
+    let spawned: ChildProcess | null = null
+    const attempts: string[] = []
+    for (const candidate of candidates) {
+      let attempt: ChildProcess
+      try {
+        attempt = spawn(candidate.path, [deps.entryScript, '--http'], {
+          env: {
+            ...process.env,
+            OASIS_DB_PATH: deps.dbPath(),
+            OASIS_MCP_TOKEN: token,
+            OASIS_MCP_PORT: String(port),
+            // LAN-accessible by design; the bearer token is the access control.
+            OASIS_MCP_HOST: '0.0.0.0'
+          },
+          // stdout is unused in HTTP mode; the server logs to stderr.
+          stdio: ['ignore', 'ignore', 'pipe'],
+          windowsHide: true
+        })
+      } catch (err) {
+        // spawn() throws synchronously for some failures (e.g. a file that
+        // exists but is not a valid executable → ERROR_BAD_EXE_FORMAT).
+        const message = err instanceof Error ? err.message : String(err)
+        attempts.push(`${candidate.path} → ${message}`)
+        deps.onLog?.(`[MCP] could not launch ${candidate.path}: ${message}`)
+        continue
+      }
+      const failure = await new Promise<Error | null>((resolve) => {
+        attempt.once('error', (err: Error) => resolve(err))
+        attempt.once('spawn', () => resolve(null))
+      })
+      if (!failure) {
+        spawned = attempt
+        break
+      }
+      attempts.push(`${candidate.path} → ${failure.message}`)
+      deps.onLog?.(`[MCP] could not launch ${candidate.path}: ${failure.message}`)
+    }
+
+    if (!spawned) {
+      error =
+        `failed to start any node runtime. Attempts: ${attempts.join('; ')}. ` +
+        `Pin a working node in app_settings.${MCP_SETTING_NODE_PATH}.`
+      deps.onLog?.(`[MCP] ${error}`)
+      return getState()
+    }
 
     let stderrTail = ''
     spawned.stderr?.setEncoding('utf8')
@@ -422,13 +487,7 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       if (stderrTail.length > 4000) stderrTail = stderrTail.slice(-4000)
     })
     spawned.on('error', (err: Error) => {
-      const code = (err as NodeJS.ErrnoException).code
-      error =
-        code === 'ENOENT'
-          ? `failed to start: ${err.message} — the resolved runtime (${node.path}) could not be launched ` +
-            '(broken symlink, antivirus interception, or permissions?). Pin a working node in ' +
-            `app_settings.${MCP_SETTING_NODE_PATH}.`
-          : `failed to start: ${err.message}`
+      error = `failed to start: ${err.message}`
       if (child === spawned) child = null
     })
     spawned.on('exit', (code: number | null) => {
@@ -438,7 +497,7 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       }
       if (code !== 0 && code !== null) {
         error =
-          `exited with code ${code} (port ${port} in use, or Node.js missing). ` +
+          `exited with code ${code} (port ${port} in use, or the server crashed). ` +
           `Last output: ${stderrTail.split(/\r?\n/).filter(Boolean).slice(-3).join(' | ').slice(0, 300)}`
       }
     })
