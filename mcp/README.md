@@ -220,7 +220,7 @@ Backed by the `mcp:getState` / `mcp:setEnabled` IPC handlers in
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `mcp_http_enabled` | enabled | The Settings toggle; `0` means the service stays off |
-| `mcp_http_port` | `7800` | Port for the endpoint (applied at start) |
+| `mcp_http_port` | `7800` packaged / `7801` dev | Port for the endpoint. Dev builds default to 7801 so a dev app and an installed build can run side by side |
 | `mcp_http_token` | auto-generated | Bearer token (base64url, 24 random bytes). Generated on first launch and kept stable across restarts |
 | `mcp_http_node_path` | auto-detected | Absolute path to the system Node.js (≥ 22.5) runtime. Auto-resolved (PATH → registry → common install locations); set this when detection picks the wrong node or finds none |
 

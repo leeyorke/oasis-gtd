@@ -43,6 +43,8 @@ export interface McpControllerDeps {
   dbPath: () => string
   /** Absolute path to the MCP server entry (mcp/index.ts in dev, server.cjs when packaged). */
   entryScript: string
+  /** Port used when `mcp_http_port` is not set (packaged: 7800, dev: 7801). */
+  defaultPort?: number
   /** Receives every log line the MCP server writes to stderr. */
   onLog?: (line: string) => void
 }
@@ -78,7 +80,10 @@ export interface McpController {
   isRunning: () => boolean
 }
 
+/** Default port for the packaged build. */
 export const MCP_HTTP_DEFAULT_PORT = 7800
+/** Default port for `electron-vite dev` (dev and packaged instances can coexist). */
+export const MCP_HTTP_DEFAULT_PORT_DEV = 7801
 
 export const MCP_SETTING_ENABLED = 'mcp_http_enabled'
 export const MCP_SETTING_PORT = 'mcp_http_port'
@@ -313,10 +318,11 @@ function endpointUrls(port: number): string[] {
 }
 
 function resolvePort(deps: McpControllerDeps): number {
+  const fallback = deps.defaultPort ?? MCP_HTTP_DEFAULT_PORT
   const raw = deps.getSetting(MCP_SETTING_PORT)
-  if (!raw) return MCP_HTTP_DEFAULT_PORT
+  if (!raw) return fallback
   const port = Number.parseInt(raw, 10)
-  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : MCP_HTTP_DEFAULT_PORT
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : fallback
 }
 
 function resolveToken(deps: McpControllerDeps): string {

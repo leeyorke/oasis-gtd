@@ -401,6 +401,23 @@ async function main() {
   check('manager: fallback endpoint becomes ready', await waitForHealth(fallbackPort))
   fallbackController.stop()
 
+  // Default port is injectable: dev instances use 7801 so a dev app and an
+  // installed build can run side by side (packaged keeps the default 7800).
+  const makeController = (defaultPort, portSetting) => createMcpController({
+    getSetting: (key) => (portSetting && key === 'mcp_http_port' ? portSetting : null),
+    setSetting: () => undefined,
+    dbPath: () => fixturePath,
+    entryScript: devEntry,
+    ...(defaultPort ? { defaultPort } : {}),
+    onLog: (line) => logs.push(line)
+  })
+  check('manager: defaultPort honored (dev → 7801)', makeController(7801).getState().port === 7801)
+  check('manager: packaged default stays 7800', makeController(undefined).getState().port === 7800)
+  check('manager: explicit mcp_http_port wins over defaultPort',
+    makeController(7801, '7878').getState().port === 7878)
+  check('manager: urls follow the resolved default port',
+    makeController(7801).getState().urls.some((url) => url.endsWith(':7801/mcp')))
+
   await removeDir(workDir)
 
   console.log(`\n${checks - failures.length}/${checks} checks passed`)
