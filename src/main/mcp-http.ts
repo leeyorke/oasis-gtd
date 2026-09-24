@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { connect } from 'node:net'
 import { homedir, networkInterfaces } from 'node:os'
 import { basename, delimiter, join } from 'node:path'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, realpathSync } from 'node:fs'
 
 /**
  * Manages the agent-facing MCP HTTP server as a child process of the app.
@@ -193,33 +193,82 @@ export interface NodeResolution {
   source: string
 }
 
-export function resolveNodeExecutable(override?: string | null): NodeResolution {
-  if (override && override.trim() !== '') {
-    return existsSync(override)
-      ? { path: override, source: 'mcp_http_node_path' }
-      : { path: null, source: `mcp_http_node_path (${override} does not exist)` }
+/** Existence is not enough: a reparse point (nvm4w symlink) can pass existsSync yet fail CreateProcess. Verify by running it. */
+function canExecute(exe: string): boolean {
+  try {
+    const result = spawnSync(exe, ['-v'], {
+      timeout: 5000,
+      windowsHide: true,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    return result.status === 0 && typeof result.stdout === 'string' && result.stdout.trim().length > 0
+  } catch {
+    return false
+  }
+}
+
+/** Every directory that might contain node, most specific first. */
+function collectCandidateDirs(): Array<{ dir: string; source: string }> {
+  const dirs: Array<{ dir: string; source: string }> = []
+  const add = (dir: string | undefined | null, source: string): void => {
+    if (!dir || dir.trim() === '') return
+    const clean = dir.trim().replace(/^"|"$/g, '')
+    if (!dirs.some((entry) => entry.dir.toLowerCase() === clean.toLowerCase())) {
+      dirs.push({ dir: clean, source })
+    }
   }
 
-  const candidates: Array<{ dir: string; source: string }> = []
-  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) {
-    if (dir.trim() !== '') candidates.push({ dir, source: 'PATH' })
-  }
+  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) add(dir, 'PATH')
+
   if (isWindows) {
     const vars = registryEnvironment()
     const pathValue = vars.get('PATH')
     if (pathValue) {
-      for (const dir of expandVars(pathValue, vars).split(';')) {
-        if (dir.trim() !== '') candidates.push({ dir, source: 'registry PATH' })
+      for (const dir of expandVars(pathValue, vars).split(';')) add(dir, 'registry PATH')
+    }
+    // nvm4w: NVM_HOME holds the per-version directories, NVM_SYMLINK the active one.
+    const nvmHome = expandVars(vars.get('NVM_HOME') ?? '', vars)
+    if (nvmHome) {
+      add(nvmHome, 'NVM_HOME')
+      try {
+        for (const entry of readdirSync(nvmHome, { withFileTypes: true })) {
+          if (entry.isDirectory()) add(join(nvmHome, entry.name), 'NVM_HOME version')
+        }
+      } catch {
+        /* NVM_HOME missing */
       }
     }
+    add(expandVars(vars.get('NVM_SYMLINK') ?? '', vars), 'NVM_SYMLINK')
   }
-  for (const dir of wellKnownNodeDirs()) candidates.push({ dir, source: 'known location' })
 
-  for (const { dir, source } of candidates) {
-    const exe = basename(dir).toLowerCase() === nodeExeName && existsSync(dir)
-      ? dir
-      : join(dir, nodeExeName)
-    if (existsSync(exe)) return { path: exe, source }
+  for (const dir of wellKnownNodeDirs()) add(dir, 'known location')
+
+  // Reparse-point fallback: even when the symlinked directory is readable, the
+  // launching process may not be able to follow it — probe the real target too.
+  for (const { dir, source } of [...dirs]) {
+    try {
+      add(realpathSync(dir), `${source} (resolved)`)
+    } catch {
+      /* not a reparse point or missing */
+    }
+  }
+  return dirs
+}
+
+export function resolveNodeExecutable(override?: string | null): NodeResolution {
+  if (override && override.trim() !== '') {
+    const trimmed = override.trim()
+    return existsSync(trimmed)
+      ? { path: trimmed, source: 'mcp_http_node_path' }
+      : { path: null, source: `mcp_http_node_path (${trimmed} does not exist)` }
+  }
+
+  for (const { dir, source } of collectCandidateDirs()) {
+    const exe =
+      basename(dir).toLowerCase() === nodeExeName && existsSync(dir) ? dir : join(dir, nodeExeName)
+    if (!existsSync(exe)) continue
+    if (canExecute(exe)) return { path: exe, source }
   }
   return { path: null, source: '' }
 }
@@ -373,7 +422,13 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       if (stderrTail.length > 4000) stderrTail = stderrTail.slice(-4000)
     })
     spawned.on('error', (err: Error) => {
-      error = `failed to start: ${err.message} (is Node.js installed and on PATH?)`
+      const code = (err as NodeJS.ErrnoException).code
+      error =
+        code === 'ENOENT'
+          ? `failed to start: ${err.message} — the resolved runtime (${node.path}) could not be launched ` +
+            '(broken symlink, antivirus interception, or permissions?). Pin a working node in ' +
+            `app_settings.${MCP_SETTING_NODE_PATH}.`
+          : `failed to start: ${err.message}`
       if (child === spawned) child = null
     })
     spawned.on('exit', (code: number | null) => {
