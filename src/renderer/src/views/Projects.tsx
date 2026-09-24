@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useT } from '../i18n/useT'
 import AddTaskModal from '../components/AddTaskModal'
 import { Task } from '../types'
+import { computeProjectStats, getProjectStat } from '../utils/projectStats'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 export default function Projects() {
@@ -20,6 +21,10 @@ export default function Projects() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null
   const projectTasks = tasks.filter(tk => tk.project_id === selectedProjectId)
+
+  // 项目卡片统计必须基于全量 tasks：列表视图没有选中任何项目，
+  // 若先按 selectedProjectId 过滤出子集再统计，每张卡片都会恒显 0 tasks / 0%。
+  const projectStats = useMemo(() => computeProjectStats(tasks), [tasks])
 
   const handleCreateProject = async () => {
     if (!newTitle.trim()) return
@@ -83,9 +88,7 @@ export default function Projects() {
           </div>
         ) : (
           projects.map((project) => {
-            const taskCount = projectTasks.filter(t => t.project_id === project.id).length
-            const doneCount = projectTasks.filter(t => t.project_id === project.id && t.status === 'done').length
-            const progress = taskCount > 0 ? Math.round((doneCount / taskCount) * 100) : 0
+            const { total: taskCount, progress } = getProjectStat(projectStats, project.id)
 
             return (
               <div

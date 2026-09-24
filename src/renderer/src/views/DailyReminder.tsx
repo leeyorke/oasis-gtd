@@ -125,7 +125,17 @@ export default function DailyReminder() {
                 <div className="dr2-task-footer">
                   <div className="dr2-task-meta">
                     <div className="dr2-task-source">
-                      {task?.context ? `@${task.context}` : '@NEXT ACTION'}
+                      {task?.context
+                        ? `@${task.context}`
+                        : task?.status === 'schedule'
+                          ? '@日程'
+                          : task?.status === 'next'
+                            ? '@NEXT ACTION'
+                            : task?.status === 'waiting'
+                              ? '@等待中'
+                              : task?.status === 'someday'
+                                ? '@将来也许'
+                                : '@收件箱'}
                     </div>
                     <div className="dr2-task-date">{dateStr}</div>
                   </div>
