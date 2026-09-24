@@ -18,6 +18,7 @@ export default function Settings() {
   const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack } = useStore()
   const t = useT()
   const [activeSection, setActiveSection] = useState<Section>('general')
+  const [appVersion, setAppVersion] = useState('')
 
   const SECTIONS: { id: Section; label: string; description: string }[] = [
     { id: 'general',      label: t.settings_general,      description: t.settings_generalDesc },
@@ -38,6 +39,11 @@ export default function Settings() {
   useEffect(() => {
     window.api.getStats().then(s => setStats(s as unknown as Record<string, number>))
     window.api.getDbPath().then(p => setDbPath(p))
+    // Version comes from the main process (app.getVersion) so it always matches
+    // the packaged build / package.json — no manual bumping here.
+    window.api.getAppVersion()
+      .then(v => setAppVersion(v))
+      .catch(err => console.error('[Settings] getAppVersion failed:', err))
   }, [])
 
   // ─── Context editing ──────────────────────────────────────────────────────
@@ -195,9 +201,9 @@ export default function Settings() {
             </button>
           ))}
 
-          {/* Version info */}
+          {/* Version info — synced with the installed package version */}
           <div style={{ marginTop: 'auto', fontFamily: 'var(--font-sans)', fontSize: '0.55rem', color: 'rgba(20,28,58,0.25)', letterSpacing: '0.08em', lineHeight: 1.7 }}>
-            Oasis GTD<br />v0.1.0-alpha<br />Electron · React · SQLite
+            Oasis GTD<br />v{appVersion || '…'}<br />Electron · React · SQLite
           </div>
         </div>
 
