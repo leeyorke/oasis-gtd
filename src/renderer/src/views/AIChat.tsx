@@ -541,6 +541,12 @@ export default function AIChat() {
     await newConversation()
   }
 
+  // Reset scroll state whenever the conversation changes (new conversation or switching chats)
+  useEffect(() => {
+    setIsAtBottom(true)
+    setShowScrollButton(false)
+  }, [currentConversationId])
+
   const openModal = () => { setProviderForm(EMPTY_FORM); setEditingId(null); setShowApiKey(false); setShowSettings(true) }
   const closeModal = () => {
     console.log('Close modal clicked');
