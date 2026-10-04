@@ -1,0 +1,52 @@
+# ─── 行尾 ──────────────────────────────────────────────────────────────────
+# 仓库内一律存 LF，检出时按平台原生换行符还原。
+# 写进仓库而不是靠每个人本地的 core.autocrlf：否则 Windows 开发者的
+# autocrlf=false 与 macOS 的 autocrlf=true 会在同一批文件上产生全量改写，
+# 让 diff 和 blame 彻底失去可读性。
+* text=auto
+
+# 这些必须是 LF：shebang 或脚本里混入 CRLF 会让 Linux/macOS 上的
+# electron-builder 打包直接解析失败。
+*.sh   text eol=lf
+*.bash text eol=lf
+*.zsh  text eol=lf
+
+# ─── 二进制 ────────────────────────────────────────────────────────────────
+# binary 等价于 -diff -merge -text：Git 不做换行符转换、不做文本 diff。
+# 图标、字体、SQLite 库一旦被换行符转换污染是静默损坏，diff 里看不出来。
+*.ico     binary
+*.icns    binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.webp    binary
+*.bmp     binary
+
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.otf     binary
+*.eot     binary
+
+*.db      binary
+*.sqlite  binary
+*.sqlite3 binary
+
+# better-sqlite3 的原生模块与打包产物
+*.node    binary
+*.asar    binary
+*.exe     binary
+*.dll     binary
+*.so      binary
+*.dylib   binary
+
+*.zip     binary
+*.gz      binary
+*.7z      binary
+*.pdf     binary
+
+# ─── 锁文件 ────────────────────────────────────────────────────────────────
+# 不参与换行符归一化的分歧，冲突时保持「谁改谁的都算合法」，避免所有分支
+# 合并时都产生整文件冲突。
+package-lock.json merge=binary
