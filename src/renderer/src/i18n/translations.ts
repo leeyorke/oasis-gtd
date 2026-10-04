@@ -13,6 +13,7 @@ const translations = {
     nav_aiChat:         'AI Assistant',
     nav_settings:       'Settings',
     nav_kanban:         'Kanban',
+    nav_pomodoro:       'Pomodoro',
     nav_meta_actions:   'Actions',
     nav_meta_projects:  'Projects',
     nav_meta_waiting:   'Waiting',
@@ -307,7 +308,6 @@ const translations = {
     mcp_nodeMissing:    'not found — the endpoint cannot start',
     mcp_nodeHint:       'The system Node.js (≥ 22.5) that runs the MCP server. Resolved automatically (PATH → registry → common install locations); pin a specific one with app_settings.mcp_http_node_path.',
     // General section
-    settings_appName:   'App Name',
     settings_reviewDay: 'Weekly Review Day',
     settings_captureStatus: 'Default Capture Status',
     settings_autoLaunch: 'Launch at Startup',
@@ -395,6 +395,7 @@ const translations = {
     nav_aiChat:         'AI 助手',
     nav_settings:       '设置',
     nav_kanban:         '看板',
+    nav_pomodoro:       '番茄钟',
     nav_meta_actions:   '行动',
     nav_meta_projects:  '项目',
     nav_meta_waiting:   '等待',
@@ -689,7 +690,6 @@ const translations = {
     mcp_nodeMissing:    '未找到 —— 服务无法启动',
     mcp_nodeHint:       '运行 MCP 服务的系统 Node.js（≥ 22.5）。自动解析（PATH → 注册表 → 常见安装位置）；可在 app_settings.mcp_http_node_path 指定。',
     // General section
-    settings_appName:   '应用名称',
     settings_reviewDay: '每周回顾日',
     settings_captureStatus: '默认捕捉状态',
     settings_autoLaunch: '开机自启动',

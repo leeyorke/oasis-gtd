@@ -99,6 +99,16 @@ CREATE TABLE resources (
   description TEXT, file_size TEXT, url TEXT, tags TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE focus_sessions (
+  id TEXT PRIMARY KEY,
+  task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+  task_title TEXT, context TEXT,
+  duration_minutes INTEGER NOT NULL DEFAULT 25,
+  focused_seconds INTEGER NOT NULL DEFAULT 0,
+  record_date TEXT NOT NULL,
+  started_at TEXT NOT NULL, ended_at TEXT,
+  completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1))
+);
 `
 
 const SECRET = 'SUPER-SECRET-API-KEY-7f3a9'
@@ -120,7 +130,8 @@ const IDS = {
   habit: '66666666-6666-6666-6666-666666666666',
   habitSimple: '66666666-6666-6666-6666-666666666667',
   conversation: '77777777-7777-7777-7777-777777777777',
-  resource: '88888888-8888-8888-8888-888888888888'
+  resource: '88888888-8888-8888-8888-888888888888',
+  focusSession: 'eeeeeeee-0000-0000-0000-000000000001'
 }
 
 function buildFixtureDb(filePath) {
@@ -224,6 +235,14 @@ function buildFixtureDb(filePath) {
     IDS.resource, 'GTD book notes', 'document', 'Summary of Getting Things Done',
     null, JSON.stringify(['gtd']), isoAgo(7), isoAgo(7)
   )
+  // Pomodoro history: one completed pomodoro today, a partial session yesterday.
+  const focusInsert =
+    'INSERT INTO focus_sessions (id,task_id,task_title,context,duration_minutes,focused_seconds,record_date,started_at,ended_at,completed) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?)'
+  run(focusInsert, IDS.focusSession, IDS.taskNext, 'Draft homepage copy', '@Computer',
+    25, 1500, today, isoNow, isoNow, 1)
+  run(focusInsert, 'eeeeeeee-0000-0000-0000-000000000002', IDS.taskNext, 'Draft homepage copy', '@Computer',
+    25, 420, dateAgo(1), isoAgo(1), isoAgo(1), 0)
   db.close()
 }
 
@@ -507,7 +526,7 @@ async function testHttpMode(fixturePath) {
 
     const toolsRes = await postMcp(port, { jsonrpc: '2.0', id: 2, method: 'tools/list' })
     const toolsJson = await parseMcpResponse(toolsRes)
-    check('http: tools/list → 18 tools', (toolsJson.result?.tools ?? []).length === 18)
+    check('http: tools/list → 19 tools', (toolsJson.result?.tools ?? []).length === 19)
 
     const overviewRes = await postMcp(port, {
       jsonrpc: '2.0',
@@ -632,7 +651,7 @@ async function main() {
       'list_projects', 'get_project', 'list_waiting_items', 'list_someday_items',
       'list_notes', 'search_notes', 'list_habits', 'get_habit',
       'list_conversations', 'get_conversation', 'list_resources',
-      'get_review_checklist', 'export_gtd_data'
+      'get_review_checklist', 'list_focus_sessions', 'export_gtd_data'
     ]
     for (const name of expectedTools) {
       check(`tool registered: ${name}`, toolNames.includes(name))
@@ -709,6 +728,13 @@ async function main() {
     const habit = await callTool(client, 'get_habit', { id: IDS.habit, days: 30 })
     check('get_habit records', habit.recent_records.length === 2
       && habit.habit.total_sessions === 11)
+
+    const focus = await callTool(client, 'list_focus_sessions', { days: 7 })
+    check('list_focus_sessions includes partial time', focus.sessions.length === 2
+      && focus.sessions[0].focused_seconds === 1500 && focus.sessions[0].completed === 1
+      && focus.sessions[0].task_title === 'Draft homepage copy')
+    check('list_focus_sessions daily summary', focus.summary.total_seconds === 1920
+      && focus.summary.total_sessions === 1 && focus.summary.days.length === 2)
 
     const conversations = await callTool(client, 'list_conversations')
     check('list_conversations message counts', conversations.conversations.length === 1

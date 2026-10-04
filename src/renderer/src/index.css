@@ -2,6 +2,56 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* ─── Phosphor icons ─────────────────────────────────────────────────────── */
+/* Bundled locally, never from a CDN, so the app keeps working offline.
+   Only the woff2 build is declared: the vendor stylesheet also pulls in the
+   woff/ttf/svg sources (~3.6 MB for one glyph) that Chromium never uses. */
+@font-face {
+  font-family: 'Phosphor-Fill';
+  src: url('@phosphor-icons/web/fill/Phosphor-Fill.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Phosphor';
+  src: url('@phosphor-icons/web/regular/Phosphor.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+.ph-fill,
+.ph {
+  speak: never;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* use !important to prevent issues with browser extensions that change fonts */
+.ph-fill {
+  font-family: 'Phosphor-Fill' !important;
+}
+
+.ph {
+  font-family: 'Phosphor' !important;
+}
+
+.ph-fill.ph-plant::before {
+  content: '\ebae';
+}
+
+.ph.ph-tray::before {
+  content: '\e4aa';
+}
+
 :root {
   --canvas: #e9e6e2;
   --sheet-main: #EBE7E0;
@@ -70,14 +120,22 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding-top: 2vh;
-  padding-bottom: 1vh;
+  /* Stretch the rail over .workspace's vertical padding (4vh top + 4vh bottom)
+     so the divider runs the full window height and the brand row tucks under
+     the 32px titlebar drag strip. Both margins must be negative — cancelling
+     only the top leaves the bottom 4vh of the border box uncovered.
+     The matching +4vh of padding-bottom keeps the settings button exactly where
+     it was, so the border grows without moving any content. */
+  margin-top: -4vh;
+  margin-bottom: -4vh;
+  padding-top: 32px;
+  padding-bottom: calc(4vh + 1vh);
   padding-left: 0;
   z-index: 10;
   width: 180px;
   transition: width 0.3s ease, padding-left 0.3s ease;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid #bab7b2;
 }
 
 .nav-sidebar.collapsed {
@@ -110,6 +168,11 @@ body {
   transition: width 0.3s ease, opacity 0.3s ease;
   width: 32px;
   flex-shrink: 0;
+}
+
+/* Phosphor's .ph-fill carries no intrinsic size — size the brand mark here. */
+.logo-icon .ph-plant {
+  font-size: 26px;
 }
 
 .nav-sidebar.collapsed .logo-icon {
@@ -200,6 +263,201 @@ body {
   opacity: 0;
   max-width: 0;
   margin-left: 0;
+}
+
+/* ─── Collapsible GTD group ───────────────────────────────────────────────── */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  /* Positioning context for the collapsed-rail flyout. */
+  position: relative;
+  /* The collapsed rail zeroes this margin. Without a transition the 12px it
+     removes snaps instantly while the width below eases, so the group icon
+     lurches instead of moving with the rest of the column. */
+  transition: margin-top 0.3s ease;
+}
+
+.nav-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 140px;
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--nav-text);
+  border-radius: var(--radius-sm);
+  /* Must mirror .nav-link's width/padding-left transition — without it the
+     collapsed-state icon snaps 5px sideways instead of gliding with its
+     neighbours. */
+  transition: color 0.2s ease, background 0.2s ease, width 0.3s ease, padding-left 0.3s ease;
+}
+
+.nav-group-header:hover {
+  color: var(--nav-text-active);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* A child view is active — surface that on the group header too. The tray icon
+   and label inherit the colour, so only the button needs the state. */
+.nav-group-header.active {
+  color: var(--nav-text-active);
+}
+
+/* Aligns the "GTD" caption with the text column of the sibling links. */
+.nav-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Matches the 18px lucide icons used by the sibling nav links (Tailwind's text-lg). */
+.nav-group-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.nav-group-chevron {
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease-out);
+}
+
+.nav-group-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Nested list: indented under a thin guide rail. */
+.nav-group-items {
+  margin-left: 12px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+
+.nav-group-items .nav-link {
+  width: 114px;
+  padding-left: 0;
+}
+
+.nav-links-tail {
+  margin-top: 0.75rem;
+  /* Same reason as .nav-group — animates the collapsed-state spacing change. */
+  transition: margin-top 0.3s ease;
+}
+
+/* ─── Collapsed rail: icon-only trigger + hover flyout ──────────────────── */
+.nav-sidebar.collapsed .nav-group,
+.nav-sidebar.collapsed .nav-links-tail {
+  margin-top: 0;
+}
+
+.nav-sidebar.collapsed .nav-group-header {
+  width: 34px;
+  padding-left: 7px;
+  justify-content: flex-start;
+}
+
+/* Icon-only: the label and chevron give way, matching the sibling nav links. */
+.nav-sidebar.collapsed .nav-group-label,
+.nav-sidebar.collapsed .nav-group-chevron {
+  display: none;
+}
+
+.nav-flyout {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 0;
+  min-width: 170px;
+  padding: 6px;
+  background-color: #fbfaf8;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  z-index: 120;
+  animation: nav-flyout-in 0.16s var(--ease-out);
+}
+
+@keyframes nav-flyout-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.nav-flyout .nav-link {
+  width: 100%;
+}
+
+/* The collapsed rail hides labels via `.nav-sidebar.collapsed .nav-link-text`,
+   which also reaches the flyout because the flyout lives inside that sidebar.
+   These rules re-assert the full-size row for flyout entries. */
+.nav-sidebar.collapsed .nav-flyout .nav-link {
+  width: 100%;
+  padding-left: 12px;
+}
+
+.nav-sidebar.collapsed .nav-flyout .nav-link-text {
+  opacity: 1;
+  max-width: 200px;
+  margin-left: 12px;
+}
+
+/* ─── Collapsed rail: hover tooltips ────────────────────────────────────── */
+/* The <li> is the positioning context: it stretches to the full rail width, so
+   every tooltip starts at the rail's right edge regardless of icon position. */
+.nav-sidebar.collapsed .nav-links > li {
+  position: relative;
+}
+
+/* The base rule clips to a 34px box so the hidden label stays out of sight;
+   the tooltip is drawn outside that box. */
+.nav-sidebar.collapsed .nav-link {
+  overflow: visible;
+}
+
+.nav-sidebar.collapsed .nav-link::after,
+.nav-sidebar.collapsed .nav-group-header::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 130;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background-color: var(--foreground);
+  color: var(--primary-foreground);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  /* Short delay so sweeping across the rail doesn't flash every tooltip. */
+  transition: opacity 0.15s ease 0.2s;
+}
+
+.nav-sidebar.collapsed .nav-link:hover::after,
+.nav-sidebar.collapsed .nav-group-header:hover::after {
+  opacity: 1;
+}
+
+/* Flyout rows already carry their label — suppress the duplicate tooltip.
+   The trigger's own tooltip is hidden the same way: the flyout covers it. */
+.nav-sidebar.collapsed .nav-flyout .nav-link::after {
+  content: none;
+}
+
+.nav-sidebar.collapsed .nav-group:hover > .nav-group-header::after {
+  opacity: 0;
 }
 
 .nav-meta {
@@ -995,7 +1253,7 @@ body {
 
 .chat-input-area {
   padding-top: 1.5rem;
-  border-top: 1px solid rgba(20, 28, 58, 0.08);
+  /* border-top: 1px solid rgba(20, 28, 58, 0.08); */
   display: flex;
   gap: 1rem;
   align-items: flex-end;
@@ -5219,3 +5477,495 @@ body {
   color: var(--foreground);
 }
 
+
+/* ─── Pomodoro (番茄钟) ──────────────────────────────────────────────────── */
+.pomodoro-page {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.pomodoro-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 28px;
+}
+
+.pomodoro-tab {
+  padding: 7px 22px;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-family: inherit;
+  letter-spacing: 1px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.25s var(--ease-out), color 0.25s var(--ease-out);
+}
+
+.pomodoro-tab:hover {
+  color: var(--foreground);
+}
+
+.pomodoro-tab.active {
+  background-color: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.pomodoro-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* ─── Focus tab ────────────────────────────────────────────────────────── */
+.pomodoro-focus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 32px;
+}
+
+.pomodoro-timer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pomodoro-ring {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pomodoro-ring svg circle:last-child {
+  transition: stroke-dashoffset 0.4s linear;
+}
+
+.pomodoro-ring.running svg circle:last-child {
+  stroke: var(--foreground);
+}
+
+.pomodoro-clock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoro-duration-label {
+  margin-top: 28px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.pomodoro-duration-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.pomodoro-preset,
+.pomodoro-step-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pomodoro-preset:hover:not(:disabled),
+.pomodoro-step-btn:hover:not(:disabled) {
+  color: var(--foreground);
+  background-color: var(--card);
+}
+
+.pomodoro-preset.active {
+  background-color: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.pomodoro-step-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--border);
+  font-size: 15px;
+  border-radius: 50%;
+}
+
+.pomodoro-step-btn:disabled,
+.pomodoro-preset:disabled,
+.pomodoro-icon-btn:disabled,
+.pomodoro-task-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pomodoro-current-task {
+  margin-top: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+  padding: 10px 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--card);
+}
+
+.pomodoro-task-dot {
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+
+.pomodoro-task-title {
+  font-size: 13px;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pomodoro-task-context,
+.pomodoro-task-empty {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pomodoro-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.pomodoro-icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.pomodoro-icon-btn:hover:not(:disabled) {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.pomodoro-primary-btn {
+  min-width: 132px;
+  padding: 15px 34px;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--foreground);
+  color: var(--primary-foreground);
+  font-size: 13px;
+  font-family: inherit;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  box-shadow: var(--shadow-lift);
+  transition: transform 0.2s var(--ease-out), opacity 0.2s ease;
+}
+
+.pomodoro-primary-btn:hover {
+  transform: translateY(-1px);
+}
+
+.pomodoro-primary-btn:active {
+  transform: translateY(0);
+}
+
+/* ─── Task picker ──────────────────────────────────────────────────────── */
+.pomodoro-task-picker {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 56px;
+}
+
+.pomodoro-section-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.pomodoro-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--card);
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+}
+
+.pomodoro-search:focus-within {
+  border-color: var(--foreground);
+}
+
+.pomodoro-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--foreground);
+}
+
+.pomodoro-task-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.pomodoro-task-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.pomodoro-task-item:hover:not(:disabled) {
+  border-color: var(--foreground);
+}
+
+.pomodoro-task-item.active {
+  border-color: var(--foreground);
+}
+
+.pomodoro-task-item-title {
+  font-size: 13px;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pomodoro-task-item-context {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pomodoro-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.pomodoro-summary {
+  margin-top: 32px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+}
+
+/* ─── Stats tab ────────────────────────────────────────────────────────── */
+.pomodoro-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 32px;
+}
+
+.pomodoro-stat-row {
+  display: grid;
+  gap: 18px;
+}
+
+.pomodoro-stat-row.two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.pomodoro-stat-row.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.pomodoro-stat-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-lift);
+}
+
+.pomodoro-stat-card.compact {
+  text-align: center;
+  padding: 22px 20px;
+}
+
+.pomodoro-stat-card.compact .pomodoro-stat-title {
+  justify-content: center;
+}
+
+.pomodoro-stat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  margin-bottom: 18px;
+}
+
+.pomodoro-goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pomodoro-goal-value {
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--foreground);
+}
+
+.pomodoro-goal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pomodoro-today-value {
+  font-size: 15px;
+  color: var(--foreground);
+  margin-bottom: 16px;
+}
+
+.pomodoro-progress {
+  height: 10px;
+  border-radius: 999px;
+  background-color: var(--border);
+  overflow: hidden;
+}
+
+.pomodoro-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background-color: var(--foreground);
+  transition: width 0.4s var(--ease-out);
+}
+
+.pomodoro-progress-hint {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.pomodoro-stat-value {
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--foreground);
+}
+
+/* 7-day distribution chart */
+.pomodoro-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 220px;
+  padding-top: 8px;
+}
+
+.pomodoro-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.pomodoro-chart-value {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.pomodoro-chart-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.pomodoro-chart-bar {
+  width: 100%;
+  max-width: 56px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background-color: var(--border);
+  transition: height 0.4s var(--ease-out);
+}
+
+.pomodoro-chart-col.today .pomodoro-chart-bar {
+  background-color: var(--foreground);
+}
+
+.pomodoro-chart-col.today .pomodoro-chart-label {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.pomodoro-chart-label {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}

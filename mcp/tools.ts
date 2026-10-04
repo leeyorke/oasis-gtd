@@ -22,12 +22,14 @@ import {
   exportAll,
   getConversation,
   getDbInfoData,
+  getFocusSummary,
   getHabit,
   getOverview,
   getProject,
   getReviewChecklist,
   getTask,
   listConversations,
+  listFocusSessions,
   listHabits,
   listNotes,
   listProjects,
@@ -369,6 +371,28 @@ export function registerTools(server: McpServer, db: DatabaseSync, info: DbInfo)
       annotations: READ_ONLY_ANNOTATIONS
     },
     async ({ type, limit }) => ok({ resources: listResources(db, type, limit) })
+  )
+
+  // ── Pomodoro focus ─────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'list_focus_sessions',
+    {
+      title: 'List Focus Sessions',
+      description:
+        'Pomodoro focus sessions with the task they were run against, how long the user actually focused ' +
+        '(focused_seconds, in seconds — partial sessions included) and whether the pomodoro completed. ' +
+        'Also returns per-day totals for the same window.',
+      inputSchema: {
+        days: z.number().int().min(1).max(365).default(30).describe('Days of history to include'),
+        limit: limitSchema
+      },
+      annotations: READ_ONLY_ANNOTATIONS
+    },
+    async ({ days, limit }) => ok({
+      sessions: listFocusSessions(db, days, limit),
+      summary: getFocusSummary(db, days)
+    })
   )
 
   // ── Weekly review ──────────────────────────────────────────────────────────

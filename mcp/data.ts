@@ -169,6 +169,12 @@ function clampLimit(limit: number | undefined): number {
   return Math.min(Math.max(Math.trunc(limit), 1), MAX_LIMIT)
 }
 
+/** Clamps a day-window to 1–365; `null` means "no window filter". */
+function clampDays(days: number | undefined, defaultDays = 30): number | null {
+  if (days === undefined) return defaultDays
+  return Math.min(Math.max(Math.trunc(days), 1), 365)
+}
+
 function parseStringArray(value: unknown): string[] | null {
   if (typeof value !== 'string' || value.trim() === '') return null
   try {
@@ -630,6 +636,56 @@ export function listResources(db: DatabaseSync, type?: ResourceType, limit?: num
   return rows.map((row) => ({ ...row, tags: parseStringArray(row.tags) }))
 }
 
+// ─── Focus sessions (Pomodoro) ───────────────────────────────────────────────
+
+export interface FocusSessionRow {
+  id: string
+  task_id: string | null
+  task_title: string | null
+  context: string | null
+  duration_minutes: number
+  focused_seconds: number
+  record_date: string
+  started_at: string
+  ended_at: string | null
+  completed: number
+}
+
+/** One day's focus totals (all sessions — partial time counts too). */
+export interface FocusDayTotal {
+  date: string
+  seconds: number
+  sessions: number
+}
+
+export function listFocusSessions(db: DatabaseSync, days?: number, limit?: number): FocusSessionRow[] {
+  const window = clampDays(days)!
+  return queryAll<FocusSessionRow>(
+    db,
+    `SELECT * FROM focus_sessions WHERE record_date >= date('now', ?)
+     ORDER BY started_at DESC LIMIT ?`,
+    [`-${window} days`, clampLimit(limit)]
+  )
+}
+
+export function getFocusSummary(db: DatabaseSync, days = 30): { window_days: number; total_seconds: number; total_sessions: number; days: FocusDayTotal[] } {
+  const window = clampDays(days)!
+  const rows = queryAll<FocusDayTotal>(
+    db,
+    `SELECT record_date AS date, SUM(focused_seconds) AS seconds, SUM(completed) AS sessions
+     FROM focus_sessions
+     WHERE record_date >= date('now', ?)
+     GROUP BY record_date ORDER BY record_date ASC`,
+    [`-${window} days`]
+  )
+  return {
+    window_days: window,
+    total_seconds: rows.reduce((sum, r) => sum + (r.seconds ?? 0), 0),
+    total_sessions: rows.reduce((sum, r) => sum + (r.sessions ?? 0), 0),
+    days: rows
+  }
+}
+
 // ─── Review checklist ────────────────────────────────────────────────────────
 
 export function getReviewChecklist(db: DatabaseSync, includeCompleted = true): ReviewRow[] {
@@ -665,6 +721,7 @@ export interface FullExport {
   resources: ResourceRow[]
   review_checklist: ReviewRow[]
   conversations: ConversationRow[]
+  focus_sessions?: FocusSessionRow[]
   messages?: MessageRow[]
 }
 
@@ -688,6 +745,8 @@ export function exportAll(db: DatabaseSync, info: DbInfo, includeMessages = fals
     resources: listResources(db),
     review_checklist: getReviewChecklist(db),
     conversations: listConversations(db, 200),
+    // Pomodoro history can be large — only the recent window ships by default.
+    focus_sessions: listFocusSessions(db, 90, MAX_LIMIT),
     ...(messageRows ? { messages: messageRows } : {})
   }
 }

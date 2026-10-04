@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { playFocusChime, primeFocusAudio } from '../utils/focusSound'
 import type {
   ViewType,
   Task,
@@ -14,6 +15,9 @@ import type {
   Habit,
   HabitDetail,
   Resource,
+  FocusStats,
+  FocusConfig,
+  FocusTimer,
 } from '../types'
 
 interface AppStore {
@@ -84,6 +88,21 @@ interface AppStore {
   incrementHabitCount: (habitId: string, date: string) => Promise<void>
   decrementHabitCount: (habitId: string, date: string) => Promise<void>
 
+  // ─── Focus (Pomodoro) ───────────────────────────────────────────────────────
+  focusStats: FocusStats | null
+  focusConfig: FocusConfig | null
+  focusTimer: FocusTimer
+  loadFocusStats: () => Promise<void>
+  loadFocusConfig: () => Promise<void>
+  syncFocusTimer: () => Promise<void>
+  setFocusGoalMinutes: (minutes: number) => Promise<void>
+  setFocusDurationMinutes: (minutes: number) => Promise<void>
+  startFocus: (task?: FocusTask | null) => Promise<void>
+  pauseFocus: () => Promise<void>
+  resumeFocus: () => Promise<void>
+  stopFocus: () => Promise<void>
+  resetFocus: () => Promise<void>
+
   // ─── Review ────────────────────────────────────────────────────────────────
   reviewItems: ReviewItem[]
   loadReview: () => Promise<void>
@@ -141,6 +160,72 @@ function parseModelList(model: string): string[] {
     return Array.isArray(parsed) ? parsed : [model]
   } catch {
     return model ? [model] : []
+  }
+}
+
+/**
+ * What a focus session runs against. Focus items come from several GTD
+ * buckets — tasks, waiting items, habits and someday/maybe ideas — so
+ * `sourceKey` identifies the item for the UI while `id` is only set for real
+ * `tasks` rows (it is the value written to the focus_sessions.task_id FK).
+ */
+export interface FocusTask {
+  id?: string
+  sourceKey?: string
+  title?: string
+  context?: string
+}
+
+const DEFAULT_FOCUS_DURATION = 25
+
+function idleFocusTimer(durationMinutes: number, carry?: FocusTask | null): FocusTimer {
+  // The selected item survives a reset so the next pomodoro starts on it again.
+  return {
+    status: 'idle',
+    sessionId: null,
+    taskId: carry?.id ?? null,
+    sourceKey: carry?.sourceKey ?? null,
+    taskTitle: carry?.title ?? '',
+    context: carry?.context ?? '',
+    totalSeconds: durationMinutes * 60,
+    remainingSeconds: durationMinutes * 60,
+  }
+}
+
+/**
+ * Apply a snapshot pushed by the main-process clock. `sourceKey` is UI-only and
+ * never crosses the IPC boundary, so it is preserved while the focused item is
+ * unchanged and dropped once main reports a different one.
+ */
+function applyFocusSnapshot(
+  set: (fn: (state: AppStore) => Partial<AppStore>) => void,
+  snapshot: Omit<FocusTimer, 'sourceKey'>
+): void {
+  set(state => {
+    const sameItem = state.focusTimer.taskTitle === snapshot.taskTitle
+      && (state.focusTimer.taskId ?? null) === (snapshot.taskId ?? null)
+    return {
+      focusTimer: {
+        ...snapshot,
+        sourceKey: sameItem ? state.focusTimer.sourceKey : null,
+      },
+    }
+  })
+}
+
+// Mirror the main-process clock. Bound once per page lifetime; the flag lives on
+// window so a Vite HMR reload cannot stack duplicate listeners.
+if (typeof window !== 'undefined' && window.api?.onFocusTick) {
+  const bound = window as Window & { __oasisFocusBound?: boolean }
+  if (!bound.__oasisFocusBound) {
+    bound.__oasisFocusBound = true
+
+    window.api.onFocusTick(snapshot => applyFocusSnapshot(useStore.setState, snapshot))
+    window.api.onFocusCompleted(() => {
+      // The OS toast is raised by the main process; this is the in-app side.
+      playFocusChime()
+      void useStore.getState().loadFocusStats()
+    })
   }
 }
 
@@ -382,6 +467,92 @@ export const useStore = create<AppStore>((set, get) => ({
       await get().loadHabits()
     } catch (err) { logError('decrementHabitCount', err) }
   },
+
+  // ─── Focus (Pomodoro) ───────────────────────────────────────────────────────
+  focusStats: null,
+  focusConfig: null,
+  focusTimer: idleFocusTimer(DEFAULT_FOCUS_DURATION),
+  loadFocusStats: async () => {
+    try {
+      const focusStats = await window.api.getFocusStats()
+      set({ focusStats })
+    } catch (err) { logError('loadFocusStats', err) }
+  },
+  loadFocusConfig: async () => {
+    try {
+      const focusConfig = await window.api.getFocusConfig()
+      // Only seed an idle countdown — a running/paused session keeps its length.
+      set(state => ({
+        focusConfig,
+        focusTimer: state.focusTimer.status === 'idle'
+          ? idleFocusTimer(focusConfig.durationMinutes, {
+              id: state.focusTimer.taskId ?? undefined,
+              sourceKey: state.focusTimer.sourceKey ?? undefined,
+              title: state.focusTimer.taskTitle || undefined,
+              context: state.focusTimer.context || undefined,
+            })
+          : state.focusTimer,
+      }))
+    } catch (err) { logError('loadFocusConfig', err) }
+  },
+  syncFocusTimer: async () => {
+    try {
+      applyFocusSnapshot(set, await window.api.getFocusState())
+    } catch (err) { logError('syncFocusTimer', err) }
+  },
+  setFocusGoalMinutes: async (minutes) => {
+    try {
+      set({ focusConfig: await window.api.setFocusGoalMinutes(minutes) })
+    } catch (err) { logError('setFocusGoalMinutes', err) }
+  },
+  setFocusDurationMinutes: async (minutes) => {
+    if (get().focusTimer.status !== 'idle') return
+    try {
+      const focusConfig = await window.api.setFocusDurationMinutes(minutes)
+      set(state => ({
+        focusConfig,
+        focusTimer: idleFocusTimer(focusConfig.durationMinutes, {
+          id: state.focusTimer.taskId ?? undefined,
+          sourceKey: state.focusTimer.sourceKey ?? undefined,
+          title: state.focusTimer.taskTitle || undefined,
+          context: state.focusTimer.context || undefined,
+        }),
+      }))
+    } catch (err) { logError('setFocusDurationMinutes', err) }
+  },
+  startFocus: async (task) => {
+    const state = get()
+    if (state.focusTimer.status !== 'idle') return
+
+    primeFocusAudio()
+    try {
+      const snapshot = await window.api.startFocusSession({
+        taskId: task?.id,
+        taskTitle: task?.title,
+        context: task?.context,
+        durationMinutes: state.focusConfig?.durationMinutes ?? DEFAULT_FOCUS_DURATION,
+      })
+      set({ focusTimer: { ...snapshot, sourceKey: task?.sourceKey ?? null } })
+    } catch (err) { logError('startFocus', err) }
+  },
+  pauseFocus: async () => {
+    try {
+      applyFocusSnapshot(set, await window.api.pauseFocusSession())
+    } catch (err) { logError('pauseFocus', err) }
+  },
+  resumeFocus: async () => {
+    try {
+      applyFocusSnapshot(set, await window.api.resumeFocusSession())
+    } catch (err) { logError('resumeFocus', err) }
+  },
+  stopFocus: async () => {
+    try {
+      applyFocusSnapshot(set, await window.api.stopFocusSession())
+    } catch (err) { logError('stopFocus', err) }
+    await get().loadFocusStats()
+  },
+  // Keeps whatever was focused, but discards the current pomodoro.
+  resetFocus: async () => get().stopFocus(),
 
   // ─── Review ────────────────────────────────────────────────────────────────
   reviewItems: [],

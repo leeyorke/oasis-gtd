@@ -215,19 +215,6 @@ export default function Settings() {
             <div className="fade-in">
               <SectionTitle>{t.settings_general}</SectionTitle>
 
-              <FieldGroup label={t.settings_appName}>
-                <input
-                  className="form-input"
-                  value={settings.app_name}
-                  onChange={e => updateSetting('app_name', e.target.value)}
-                  placeholder="Oasis"
-                  style={{ maxWidth: '240px' }}
-                />
-                <FieldHint>Shown in the sidebar header</FieldHint>
-              </FieldGroup>
-
-              <Divider />
-
               <FieldGroup label={t.settings_reviewDay}>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {t.weekdays.map((day, idx) => (

@@ -42,6 +42,8 @@ function createIndexes(): void {
     'CREATE INDEX IF NOT EXISTS idx_habits_archived ON habits(is_archived)',
     'CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)',
     'CREATE INDEX IF NOT EXISTS idx_waiting_project ON waiting_items(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_focus_sessions_date ON focus_sessions(record_date)',
+    'CREATE INDEX IF NOT EXISTS idx_focus_sessions_task ON focus_sessions(task_id)',
   ]
   for (const sql of indexes) {
     db.exec(sql)
@@ -121,6 +123,13 @@ function runMigrations(): void {
   if (version < 3) {
     try { db.exec(`ALTER TABLE chat_conversations ADD COLUMN model TEXT`) } catch { /* exists */ }
     setSchemaVersion(3)
+  }
+
+  if (version < 4) {
+    // v4: Pomodoro focus sessions — CREATE TABLE IF NOT EXISTS in createTables()
+    // already covers existing databases; this block only advances the marker so
+    // future migrations can assume the table is present.
+    setSchemaVersion(4)
   }
 }
 
@@ -260,6 +269,19 @@ function createTables(): void {
       tags TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS focus_sessions (
+      id TEXT PRIMARY KEY,
+      task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+      task_title TEXT,
+      context TEXT,
+      duration_minutes INTEGER NOT NULL DEFAULT 25,
+      focused_seconds INTEGER NOT NULL DEFAULT 0,
+      record_date TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1))
     );
   `)
 
@@ -867,4 +889,71 @@ export const resourceQueries = {
 
   delete: (id: string) =>
     db.prepare('DELETE FROM resources WHERE id = ?').run(id),
+}
+
+// ─── Focus (Pomodoro) Queries ──────────────────────────────────────────────────
+export interface FocusDailyTotal {
+  date: string
+  seconds: number
+  sessions: number
+}
+
+export const focusQueries = {
+  /** Opens a session row up-front so elapsed time survives a crash/quit. */
+  create: (session: Record<string, unknown>) => {
+    const id = uuidv4()
+    const now = new Date().toISOString()
+    db.prepare(`
+      INSERT INTO focus_sessions
+        (id, task_id, task_title, context, duration_minutes, focused_seconds, record_date, started_at, ended_at, completed)
+      VALUES (@id, @task_id, @task_title, @context, @duration_minutes, @focused_seconds, @record_date, @started_at, @ended_at, @completed)
+    `).run({
+      id,
+      task_id: session.task_id ?? null,
+      task_title: session.task_title ?? null,
+      context: session.context ?? null,
+      duration_minutes: session.duration_minutes ?? 25,
+      focused_seconds: 0,
+      record_date: session.record_date,
+      started_at: now,
+      ended_at: null,
+      completed: 0,
+    })
+    return id
+  },
+
+  /** Closes a session — `focusedSeconds` is what the user actually spent. */
+  finish: (id: string, focusedSeconds: number, completed: boolean) =>
+    db.prepare(`
+      UPDATE focus_sessions
+      SET focused_seconds = @focused_seconds, ended_at = @ended_at, completed = @completed
+      WHERE id = @id
+    `).run({
+      id,
+      focused_seconds: Math.max(0, Math.round(focusedSeconds)),
+      ended_at: new Date().toISOString(),
+      completed: completed ? 1 : 0,
+    }),
+
+  /** Per-day totals for an inclusive local date range. */
+  getDailyTotals: (startDate: string, endDate: string): FocusDailyTotal[] =>
+    db.prepare(`
+      SELECT record_date AS date,
+             SUM(focused_seconds) AS seconds,
+             SUM(completed) AS sessions
+      FROM focus_sessions
+      WHERE record_date BETWEEN ? AND ?
+      GROUP BY record_date
+    `).all(startDate, endDate) as FocusDailyTotal[],
+
+  getByRange: (startDate: string, endDate: string) =>
+    db.prepare('SELECT * FROM focus_sessions WHERE record_date BETWEEN ? AND ? ORDER BY started_at DESC')
+      .all(startDate, endDate),
+
+  /** Total focus time for one task (history survives task deletion). */
+  getByTaskId: (taskId: string) =>
+    db.prepare('SELECT * FROM focus_sessions WHERE task_id = ? ORDER BY started_at DESC').all(taskId),
+
+  deleteAll: () =>
+    db.prepare('DELETE FROM focus_sessions').run(),
 }

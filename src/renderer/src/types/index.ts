@@ -1,4 +1,63 @@
-export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts' | 'kanban' | 'daily-reminder'
+export type ViewType = 'start' | 'next-actions' | 'schedule' | 'habit' | 'habit-detail' | 'pomodoro' | 'resource' | 'archive' | 'projects' | 'waiting' | 'someday' | 'weekly-review' | 'ai-chat' | 'settings' | 'thoughts' | 'kanban' | 'daily-reminder'
+
+// ─── Pomodoro (番茄钟) ──────────────────────────────────────────────────────────
+
+/** One day's focus total, used by the 7-day distribution chart. */
+export interface FocusDayStat {
+  /** Local calendar day, YYYY-MM-DD. */
+  date: string
+  /** Focus time in seconds. */
+  seconds: number
+  /** Completed pomodoros on that day. */
+  sessions: number
+}
+
+/** Aggregated focus statistics, computed in the main process. */
+export interface FocusStats {
+  todaySeconds: number
+  /** Completed pomodoros today. */
+  todaySessions: number
+  /** Sum of `days`. */
+  weekSeconds: number
+  weekSessions: number
+  /** weekSeconds / days.length */
+  averageSeconds: number
+  /** Consecutive days with focus time, counting back from today (or yesterday). */
+  streak: number
+  days: FocusDayStat[]
+}
+
+/** Persisted pomodoro preferences (app_settings keys). */
+export interface FocusConfig {
+  /** Daily focus goal in minutes (default 240 = 4 hours). */
+  goalMinutes: number
+  /** Default focus length in minutes (default 25). */
+  durationMinutes: number
+}
+
+export type FocusTimerStatus = 'idle' | 'running' | 'paused'
+
+/**
+ * Mirror of the main-process clock (see src/main/focus-timer.ts). The renderer
+ * never owns the countdown — background tabs get their timers throttled, so
+ * keeping it here would stall the session whenever the window is in the tray.
+ */
+export interface FocusTimer {
+  status: FocusTimerStatus
+  /** focus_sessions row id while a session is active. */
+  sessionId: string | null
+  /**
+   * `tasks.id` when the focus item is a real task, otherwise null. This is the
+   * only field written to focus_sessions.task_id (an FK into tasks).
+   */
+  taskId: string | null
+  /** UI-only identity of the focused item, e.g. `habit:abc` — see FocusTask. */
+  sourceKey: string | null
+  taskTitle: string
+  context: string
+  totalSeconds: number
+  remainingSeconds: number
+}
 
 /** Live state of the agent-facing MCP HTTP endpoint (Settings → MCP section). */
 export interface McpServiceState {

@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { McpServiceState } from '../renderer/src/types'
+import type { McpServiceState, FocusConfig, FocusStats, FocusTimer } from '../renderer/src/types'
 
 declare global {
   interface Window {
@@ -44,6 +44,18 @@ declare global {
       toggleHabitComplete: (habitId: string, date: string, completed: boolean) => Promise<string | null>
       incrementHabitCount: (habitId: string, date: string) => Promise<string | null>
       decrementHabitCount: (habitId: string, date: string) => Promise<string | null>
+      // Pomodoro focus — clock lives in the main process
+      getFocusConfig: () => Promise<FocusConfig>
+      setFocusGoalMinutes: (minutes: number) => Promise<FocusConfig>
+      setFocusDurationMinutes: (minutes: number) => Promise<FocusConfig>
+      getFocusState: () => Promise<FocusTimer>
+      startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) => Promise<FocusTimer>
+      pauseFocusSession: () => Promise<FocusTimer>
+      resumeFocusSession: () => Promise<FocusTimer>
+      stopFocusSession: () => Promise<FocusTimer>
+      getFocusStats: () => Promise<FocusStats>
+      onFocusTick: (callback: (snapshot: FocusTimer) => void) => void
+      onFocusCompleted: (callback: (notice: { title: string; body: string }) => void) => void
       getReview: () => Promise<ReviewItem[]>
       updateReviewItem: (id: string, completed: boolean) => Promise<void>
       resetReview: () => Promise<void>

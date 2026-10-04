@@ -16,8 +16,16 @@ import {
   habitQueries,
   habitRecordQueries,
   resourceQueries,
+  focusQueries,
 } from '../db/database'
 import { mcpController } from '../mcp-controller'
+import {
+  beginFocusSession,
+  endFocusSession,
+  getFocusTimerState,
+  pauseFocusSession,
+  resumeFocusSession
+} from '../focus-timer'
 
 // ─── Proxy-aware fetch for main process ───────────────────────────────
 // session.setProxy() only affects renderer; main process Node.js fetch needs undici
@@ -408,6 +416,103 @@ export function registerHandlers(): void {
   ipcMain.handle('resources:create', (_, resource) => resourceQueries.create(resource))
   ipcMain.handle('resources:update', (_, id: string, updates) => resourceQueries.update(id, updates))
   ipcMain.handle('resources:delete', (_, id: string) => resourceQueries.delete(id))
+
+  // ─── Focus (Pomodoro) ────────────────────────────────────────────────────────
+  const FOCUS_GOAL_KEY = 'pomodoro_daily_goal_minutes'
+  const FOCUS_DURATION_KEY = 'pomodoro_duration_minutes'
+  const DEFAULT_FOCUS_GOAL = 240     // 4 hours
+  const DEFAULT_FOCUS_DURATION = 25  // minutes
+  const MAX_FOCUS_GOAL = 720         // 12 hours
+  const MAX_FOCUS_DURATION = 180     // 3 hours
+
+  function getFocusConfig() {
+    const goal = Number(settingsQueries.get(FOCUS_GOAL_KEY))
+    const duration = Number(settingsQueries.get(FOCUS_DURATION_KEY))
+    return {
+      goalMinutes: Number.isFinite(goal) && goal > 0 ? goal : DEFAULT_FOCUS_GOAL,
+      durationMinutes: Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_FOCUS_DURATION,
+    }
+  }
+
+  ipcMain.handle('focus:getConfig', () => getFocusConfig())
+
+  ipcMain.handle('focus:setGoalMinutes', (_, minutes: number) => {
+    const goal = Number(minutes)
+    const clamped = Math.min(MAX_FOCUS_GOAL, Math.max(15, Math.round(Number.isFinite(goal) ? goal : DEFAULT_FOCUS_GOAL)))
+    settingsQueries.set(FOCUS_GOAL_KEY, String(clamped))
+    return getFocusConfig()
+  })
+
+  ipcMain.handle('focus:setDurationMinutes', (_, minutes: number) => {
+    const duration = Number(minutes)
+    const clamped = Math.min(MAX_FOCUS_DURATION, Math.max(1, Math.round(Number.isFinite(duration) ? duration : DEFAULT_FOCUS_DURATION)))
+    settingsQueries.set(FOCUS_DURATION_KEY, String(clamped))
+    return getFocusConfig()
+  })
+
+  ipcMain.handle('focus:startSession', (_, payload: {
+    taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number
+  }) => beginFocusSession(payload ?? {}))
+
+  ipcMain.handle('focus:pauseSession', () => pauseFocusSession())
+  ipcMain.handle('focus:resumeSession', () => resumeFocusSession())
+  // Reset/abandon: keep whatever was focused, discard the pomodoro itself.
+  ipcMain.handle('focus:stopSession', () => endFocusSession(false))
+  ipcMain.handle('focus:getState', () => getFocusTimerState())
+
+  ipcMain.handle('focus:getStats', () => {
+    const now = new Date()
+    const today = getLocalDateString(now)
+
+    // 本周 = 周一 .. 周日
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1))
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    const weekTotals = focusQueries.getDailyTotals(getLocalDateString(monday), getLocalDateString(sunday))
+    const byDate = new Map(weekTotals.map(t => [t.date, t]))
+
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(monday)
+      date.setDate(monday.getDate() + i)
+      const key = getLocalDateString(date)
+      const total = byDate.get(key)
+      return { date: key, seconds: total?.seconds ?? 0, sessions: total?.sessions ?? 0 }
+    })
+
+    const todayTotal = byDate.get(today)
+    const weekSeconds = days.reduce((sum, d) => sum + d.seconds, 0)
+    const weekSessions = days.reduce((sum, d) => sum + d.sessions, 0)
+
+    // 连续专注：从今天（或昨天）往回数有专注记录的天数
+    const historyStart = new Date(monday)
+    historyStart.setDate(monday.getDate() - 364)
+    const activeDates = new Set(
+      focusQueries
+        .getDailyTotals(getLocalDateString(historyStart), today)
+        .filter(t => t.seconds > 0)
+        .map(t => t.date),
+    )
+
+    const cursor = new Date(now)
+    if (!activeDates.has(today)) cursor.setDate(cursor.getDate() - 1)
+    let streak = 0
+    while (activeDates.has(getLocalDateString(cursor))) {
+      streak++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+
+    return {
+      todaySeconds: todayTotal?.seconds ?? 0,
+      todaySessions: todayTotal?.sessions ?? 0,
+      weekSeconds,
+      weekSessions,
+      averageSeconds: Math.round(weekSeconds / 7),
+      streak,
+      days,
+    }
+  })
 
   // ─── Habits ─────────────────────────────────────────────────────────────────
   ipcMain.handle('habits:getAll', () => {

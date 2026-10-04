@@ -64,7 +64,8 @@ export const APP_TABLES = [
   'notes',
   'habits',
   'habit_records',
-  'resources'
+  'resources',
+  'focus_sessions'
 ] as const
 
 function userDataRoots(): string[] {

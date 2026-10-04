@@ -65,6 +65,24 @@ const api = {
   decrementHabitCount: (habitId: string, date: string) =>
     ipcRenderer.invoke('habits:decrementCount', habitId, date),
 
+  // Pomodoro focus — the clock itself lives in the main process
+  getFocusConfig: () => ipcRenderer.invoke('focus:getConfig'),
+  setFocusGoalMinutes: (minutes: number) => ipcRenderer.invoke('focus:setGoalMinutes', minutes),
+  setFocusDurationMinutes: (minutes: number) => ipcRenderer.invoke('focus:setDurationMinutes', minutes),
+  getFocusState: () => ipcRenderer.invoke('focus:getState'),
+  startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) =>
+    ipcRenderer.invoke('focus:startSession', payload),
+  pauseFocusSession: () => ipcRenderer.invoke('focus:pauseSession'),
+  resumeFocusSession: () => ipcRenderer.invoke('focus:resumeSession'),
+  stopFocusSession: () => ipcRenderer.invoke('focus:stopSession'),
+  getFocusStats: () => ipcRenderer.invoke('focus:getStats'),
+  // Main-process clock pushes state; the renderer only mirrors it.
+  // The event object is stripped so callbacks receive just the payload.
+  onFocusTick: (callback: (snapshot: unknown) => void) =>
+    ipcRenderer.on('focus:tick', (_event, snapshot) => callback(snapshot)),
+  onFocusCompleted: (callback: (notice: { title: string; body: string }) => void) =>
+    ipcRenderer.on('focus:completed', (_event, notice) => callback(notice)),
+
   // Review
   getReview: () => ipcRenderer.invoke('review:getAll'),
   updateReviewItem: (id: string, completed: boolean) => ipcRenderer.invoke('review:updateItem', id, completed),

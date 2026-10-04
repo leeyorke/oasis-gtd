@@ -6,6 +6,7 @@ import Projects from './views/Projects'
 import Schedule from './views/Schedule'
 import Habit from './views/Habit'
 import HabitDetail from './views/HabitDetail'
+import Pomodoro from './views/Pomodoro'
 import Resource from './views/Resource'
 import Archive from './views/Archive'
 import WaitingFor from './views/WaitingFor'
@@ -109,6 +110,7 @@ export default function App() {
       case 'schedule':      return <Schedule />
       case 'habit':         return <Habit />
       case 'habit-detail':  return <HabitDetail />
+      case 'pomodoro':      return <Pomodoro />
       case 'resource':      return <Resource />
       case 'archive':       return <Archive />
       case 'waiting':       return <WaitingFor />
