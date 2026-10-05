@@ -33,6 +33,10 @@ export interface FocusConfig {
   goalMinutes: number
   /** Default focus length in minutes (default 25). */
   durationMinutes: number
+  /** file:// URL of the ringtone the user picked, or null for none. */
+  soundPath: string | null
+  /** Basename of `soundPath`, for display only. */
+  soundName: string | null
 }
 
 export type FocusTimerStatus = 'idle' | 'running' | 'paused'

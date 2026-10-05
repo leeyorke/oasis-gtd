@@ -309,6 +309,15 @@ const translations = {
     mcp_nodeHint:       'The system Node.js (≥ 22.5) that runs the MCP server. Resolved automatically (PATH → registry → common install locations); pin a specific one with app_settings.mcp_http_node_path.',
     // General section
     settings_reviewDay: 'Weekly Review Day',
+    // Pomodoro section
+    settings_pomodoro:     'Pomodoro',
+    settings_pomodoroDesc: 'Focus timer and completion ringtone',
+    settings_sound:        'Completion Ringtone',
+    settings_soundNone:    'No ringtone selected',
+    settings_soundBrowse:  'Browse…',
+    settings_soundPreview: 'Preview',
+    settings_soundClear:   'Clear',
+    settings_soundHint:    'Pick any audio file from your machine. Played when a focus session completes; the system notification appears regardless.',
     settings_captureStatus: 'Default Capture Status',
     settings_autoLaunch: 'Launch at Startup',
     settings_autoLaunchDesc: 'Automatically start Oasis GTD when you log in',
@@ -691,6 +700,15 @@ const translations = {
     mcp_nodeHint:       '运行 MCP 服务的系统 Node.js（≥ 22.5）。自动解析（PATH → 注册表 → 常见安装位置）；可在 app_settings.mcp_http_node_path 指定。',
     // General section
     settings_reviewDay: '每周回顾日',
+    // Pomodoro section
+    settings_pomodoro:     '番茄钟',
+    settings_pomodoroDesc: '专注计时与完成提示音',
+    settings_sound:        '完成提示音',
+    settings_soundNone:    '未选择音频文件',
+    settings_soundBrowse:  '浏览…',
+    settings_soundPreview: '试听',
+    settings_soundClear:   '清除',
+    settings_soundHint:    '从本机选择任意音频文件，专注结束时播放；系统通知不受影响。',
     settings_captureStatus: '默认捕捉状态',
     settings_autoLaunch: '开机自启动',
     settings_autoLaunchDesc: '登录时自动启动 Oasis GTD',

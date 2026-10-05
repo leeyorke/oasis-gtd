@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { playFocusChime, primeFocusAudio } from '../utils/focusSound'
+import { playFocusSound, stopFocusSound } from '../utils/focusSound'
 import type {
   ViewType,
   Task,
@@ -97,6 +97,8 @@ interface AppStore {
   syncFocusTimer: () => Promise<void>
   setFocusGoalMinutes: (minutes: number) => Promise<void>
   setFocusDurationMinutes: (minutes: number) => Promise<void>
+  setFocusSound: (filePath: string | null) => Promise<void>
+  pickFocusSound: () => Promise<void>
   startFocus: (task?: FocusTask | null) => Promise<void>
   pauseFocus: () => Promise<void>
   resumeFocus: () => Promise<void>
@@ -223,7 +225,7 @@ if (typeof window !== 'undefined' && window.api?.onFocusTick) {
     window.api.onFocusTick(snapshot => applyFocusSnapshot(useStore.setState, snapshot))
     window.api.onFocusCompleted(() => {
       // The OS toast is raised by the main process; this is the in-app side.
-      playFocusChime()
+      playFocusSound()
       void useStore.getState().loadFocusStats()
     })
   }
@@ -520,11 +522,26 @@ export const useStore = create<AppStore>((set, get) => ({
       }))
     } catch (err) { logError('setFocusDurationMinutes', err) }
   },
+  setFocusSound: async (filePath) => {
+    try {
+      const focusConfig = await window.api.setFocusSound(filePath)
+      set({ focusConfig })
+      if (!filePath) stopFocusSound()
+    } catch (err) { logError('setFocusSound', err) }
+  },
+  /** Opens the OS picker; stores the result and previews it. */
+  pickFocusSound: async () => {
+    try {
+      const picked = await window.api.pickFocusSound()
+      if (!picked) return            // user cancelled
+      set({ focusConfig: await window.api.setFocusSound(picked) })
+      await playFocusSound()
+    } catch (err) { logError('pickFocusSound', err) }
+  },
   startFocus: async (task) => {
     const state = get()
     if (state.focusTimer.status !== 'idle') return
 
-    primeFocusAudio()
     try {
       const snapshot = await window.api.startFocusSession({
         taskId: task?.id,

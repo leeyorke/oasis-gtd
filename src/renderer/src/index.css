@@ -862,6 +862,35 @@ body {
   border-bottom-color: var(--ink-primary);
 }
 
+/* Settings: small inline actions (browse / preview / clear) sitting next to a
+   read-only value such as the selected ringtone filename. */
+.settings-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid rgba(20, 28, 58, 0.14);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.settings-action-btn:hover:not(:disabled) {
+  color: var(--ink-primary);
+  border-color: var(--ink-primary);
+}
+
+.settings-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .form-textarea {
   resize: none;
   min-height: 60px;

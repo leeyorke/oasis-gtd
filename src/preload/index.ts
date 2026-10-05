@@ -69,6 +69,9 @@ const api = {
   getFocusConfig: () => ipcRenderer.invoke('focus:getConfig'),
   setFocusGoalMinutes: (minutes: number) => ipcRenderer.invoke('focus:setGoalMinutes', minutes),
   setFocusDurationMinutes: (minutes: number) => ipcRenderer.invoke('focus:setDurationMinutes', minutes),
+  setFocusSound: (filePath: string | null) => ipcRenderer.invoke('focus:setSound', filePath),
+  pickFocusSound: () => ipcRenderer.invoke('focus:pickSound'),
+  playFocusSound: () => ipcRenderer.invoke('focus:playSound'),
   getFocusState: () => ipcRenderer.invoke('focus:getState'),
   startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) =>
     ipcRenderer.invoke('focus:startSession', payload),

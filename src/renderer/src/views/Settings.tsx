@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import type { AIProvider, McpServiceState } from '../types'
 import { useT } from '../i18n/useT'
-import { Check, Pencil, Trash2 } from 'lucide-react'
+import { Check, Pencil, Trash2, FolderOpen, Play } from 'lucide-react'
+import { playFocusSound } from '../utils/focusSound'
 
-type Section = 'general' | 'contexts' | 'ai-providers' | 'shortcuts' | 'network' | 'data' | 'mcp'
+type Section = 'general' | 'pomodoro' | 'contexts' | 'ai-providers' | 'shortcuts' | 'network' | 'data' | 'mcp'
 
 const PROVIDER_PRESETS = [
   { name: 'OpenAI',                  type: 'openai' as const,    base_url: 'https://api.openai.com',   model: 'gpt-4o' },
@@ -15,13 +16,15 @@ const PROVIDER_PRESETS = [
 ]
 
 export default function Settings() {
-  const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack } = useStore()
+  const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack,
+          focusConfig, loadFocusConfig, pickFocusSound, setFocusSound } = useStore()
   const t = useT()
   const [activeSection, setActiveSection] = useState<Section>('general')
   const [appVersion, setAppVersion] = useState('')
 
   const SECTIONS: { id: Section; label: string; description: string }[] = [
     { id: 'general',      label: t.settings_general,      description: t.settings_generalDesc },
+    { id: 'pomodoro',    label: t.settings_pomodoro,    description: t.settings_pomodoroDesc },
     { id: 'contexts',     label: t.settings_contexts,     description: t.settings_contextsDesc },
     { id: 'ai-providers', label: t.settings_aiProviders,  description: t.settings_aiProvidersDesc },
     { id: 'shortcuts',    label: t.settings_shortcuts,    description: t.settings_shortcutsDesc },
@@ -44,6 +47,7 @@ export default function Settings() {
     window.api.getAppVersion()
       .then(v => setAppVersion(v))
       .catch(err => console.error('[Settings] getAppVersion failed:', err))
+    loadFocusConfig()
   }, [])
 
   // ─── Context editing ──────────────────────────────────────────────────────
@@ -323,6 +327,49 @@ export default function Settings() {
               </FieldGroup>
             </div>
           )}
+          {activeSection === 'pomodoro' && (
+            <div className="fade-in">
+              <SectionTitle>{t.settings_pomodoro}</SectionTitle>
+
+              <FieldGroup label={t.settings_sound}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.72rem',
+                    color: focusConfig?.soundName ? 'var(--ink-primary)' : 'var(--ink-secondary)',
+                    maxWidth: '280px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {focusConfig?.soundName || t.settings_soundNone}
+                  </span>
+                  <button className="settings-action-btn" onClick={pickFocusSound}>
+                    <FolderOpen size={13} />
+                    {t.settings_soundBrowse}
+                  </button>
+                  <button
+                    className="settings-action-btn"
+                    onClick={() => { void playFocusSound() }}
+                    disabled={!focusConfig?.soundPath}
+                  >
+                    <Play size={13} />
+                    {t.settings_soundPreview}
+                  </button>
+                  <button
+                    className="settings-action-btn"
+                    onClick={() => setFocusSound(null)}
+                    disabled={!focusConfig?.soundPath}
+                  >
+                    <Trash2 size={13} />
+                    {t.settings_soundClear}
+                  </button>
+                </div>
+                <FieldHint>{t.settings_soundHint}</FieldHint>
+              </FieldGroup>
+            </div>
+          )}
+
           {activeSection === 'contexts' && (
             <div className="fade-in">
               <SectionTitle>{t.settings_contextsTitle}</SectionTitle>

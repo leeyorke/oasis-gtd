@@ -1,6 +1,8 @@
 import { ipcMain, dialog, app, shell, WebContents, BrowserWindow, session } from 'electron'
 import { writeFileSync } from 'fs'
-import { join, dirname } from 'path'
+import { readFile } from 'fs/promises'
+import { join, dirname, basename, extname } from 'path'
+import { pathToFileURL, fileURLToPath } from 'url'
 import { ProxyAgent } from 'undici'
 import { summarizeTitle } from '../utils/conversationTitle'
 import {
@@ -420,10 +422,40 @@ export function registerHandlers(): void {
   // ─── Focus (Pomodoro) ────────────────────────────────────────────────────────
   const FOCUS_GOAL_KEY = 'pomodoro_daily_goal_minutes'
   const FOCUS_DURATION_KEY = 'pomodoro_duration_minutes'
+  const FOCUS_SOUND_KEY = 'pomodoro_sound_path'
   const DEFAULT_FOCUS_GOAL = 240     // 4 hours
   const DEFAULT_FOCUS_DURATION = 25  // minutes
   const MAX_FOCUS_GOAL = 720         // 12 hours
   const MAX_FOCUS_DURATION = 180     // 3 hours
+
+  /** Content types the renderer needs to build the Blob for playback. */
+  const AUDIO_MIME_BY_EXT: Record<string, string> = {
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+    '.oga': 'audio/ogg',
+    '.opus': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.flac': 'audio/flac',
+    '.webm': 'audio/webm',
+  }
+
+  /**
+   * The ringtone is stored as a file:// URL rather than a bare path: the
+   * renderer has no node integration, so this is the form it can hand straight
+   * to <audio src>. Conversion happens here with node's url helpers.
+   */
+  function readFocusSound(): { soundPath: string | null; soundName: string | null } {
+    const raw = settingsQueries.get(FOCUS_SOUND_KEY)
+    if (!raw) return { soundPath: null, soundName: null }
+    try {
+      return { soundPath: raw, soundName: basename(fileURLToPath(raw)) }
+    } catch {
+      // Stored value is no longer a parseable file URL — treat as unset.
+      return { soundPath: null, soundName: null }
+    }
+  }
 
   function getFocusConfig() {
     const goal = Number(settingsQueries.get(FOCUS_GOAL_KEY))
@@ -431,6 +463,7 @@ export function registerHandlers(): void {
     return {
       goalMinutes: Number.isFinite(goal) && goal > 0 ? goal : DEFAULT_FOCUS_GOAL,
       durationMinutes: Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_FOCUS_DURATION,
+      ...readFocusSound(),
     }
   }
 
@@ -448,6 +481,55 @@ export function registerHandlers(): void {
     const clamped = Math.min(MAX_FOCUS_DURATION, Math.max(1, Math.round(Number.isFinite(duration) ? duration : DEFAULT_FOCUS_DURATION)))
     settingsQueries.set(FOCUS_DURATION_KEY, String(clamped))
     return getFocusConfig()
+  })
+
+  ipcMain.handle('focus:setSound', (_, filePath: string | null) => {
+    if (!filePath) {
+      settingsQueries.set(FOCUS_SOUND_KEY, '')
+      return getFocusConfig()
+    }
+    // Accept either a bare path or a URL; store canonical URL form.
+    const absolute = /^file:\/\//i.test(filePath) ? fileURLToPath(filePath) : filePath
+    settingsQueries.set(FOCUS_SOUND_KEY, pathToFileURL(absolute).toString())
+    return getFocusConfig()
+  })
+
+  /** Opens the OS file picker so the user can pick any local audio file. */
+  ipcMain.handle('focus:pickSound', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select ringtone',
+      properties: ['openFile'],
+      filters: [
+        {
+          name: 'Audio',
+          extensions: ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus', 'webm'],
+        },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return pathToFileURL(result.filePaths[0]).toString()
+  })
+
+  /**
+   * Streams the ringtone's bytes to the renderer instead of handing it a file://
+   * URL. Chromium refuses to load file:// subresources when the page itself is
+   * served over http:// — which is exactly the case in dev, where electron-vite
+   * serves the renderer from a local dev server. Reading here works regardless
+   * of origin and keeps dev/prod behaviour identical.
+   */
+  ipcMain.handle('focus:playSound', async () => {
+    const raw = settingsQueries.get(FOCUS_SOUND_KEY)
+    if (!raw) return { ok: false, reason: 'no-sound' }
+    try {
+      const filePath = fileURLToPath(raw)
+      const buffer = await readFile(filePath)
+      const mime = AUDIO_MIME_BY_EXT[extname(filePath).toLowerCase()] ?? 'application/octet-stream'
+      // Uint8Array survives the structured clone that contextIsolation IPC uses.
+      return { ok: true, bytes: new Uint8Array(buffer), mime }
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) }
+    }
   })
 
   ipcMain.handle('focus:startSession', (_, payload: {

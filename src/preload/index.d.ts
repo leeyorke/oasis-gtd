@@ -48,6 +48,9 @@ declare global {
       getFocusConfig: () => Promise<FocusConfig>
       setFocusGoalMinutes: (minutes: number) => Promise<FocusConfig>
       setFocusDurationMinutes: (minutes: number) => Promise<FocusConfig>
+      setFocusSound: (filePath: string | null) => Promise<FocusConfig>
+      pickFocusSound: () => Promise<string | null>
+      playFocusSound: () => Promise<{ ok: boolean; bytes?: Uint8Array; mime?: string; reason?: string }>
       getFocusState: () => Promise<FocusTimer>
       startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) => Promise<FocusTimer>
       pauseFocusSession: () => Promise<FocusTimer>
