@@ -48,9 +48,26 @@
   content: '\ebae';
 }
 
-.ph.ph-tray::before {
-  content: '\e4aa';
-}
+/* ─── Sidebar glyphs ─────────────────────────────────────────────────────── */
+/* Codes copied from @phosphor-icons/web (regular weight) so the rail's icons
+   ship in the locally bundled woff2 instead of a CDN. */
+.ph.ph-sidebar-simple::before  { content: '\ec24'; }
+.ph.ph-caret-down::before      { content: '\e136'; }
+.ph.ph-envelope-simple::before { content: '\e218'; }
+.ph.ph-squares-four::before    { content: '\e464'; }
+.ph.ph-lightning::before       { content: '\e2de'; }
+.ph.ph-arrow-right::before     { content: '\e06c'; }
+.ph.ph-calendar-blank::before  { content: '\e10a'; }
+.ph.ph-stack::before           { content: '\e466'; }
+.ph.ph-hourglass-high::before  { content: '\e2b4'; }
+.ph.ph-repeat::before          { content: '\e3f6'; }
+.ph.ph-folder-open::before     { content: '\e256'; }
+.ph.ph-cloud-sun::before       { content: '\e540'; }
+.ph.ph-archive::before         { content: '\e00c'; }
+.ph.ph-chart-bar::before       { content: '\e150'; }
+.ph.ph-timer::before           { content: '\e492'; }
+.ph.ph-sparkle::before         { content: '\e6a2'; }
+.ph.ph-gear-six::before        { content: '\e272'; }
 
 :root {
   --canvas: #e9e6e2;
@@ -116,6 +133,8 @@ body {
 }
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────── */
+/* Visual language follows the Variant reference design: a warm paper rail
+   (#ede9e0) beside the canvas, 220px open / 76px collapsed. */
 .nav-sidebar {
   display: flex;
   flex-direction: column;
@@ -128,285 +147,285 @@ body {
      it was, so the border grows without moving any content. */
   margin-top: -4vh;
   margin-bottom: -4vh;
+  /* Cancel the workspace's 24px left padding so the rail's background runs
+     flush to the window edge — the design has no canvas strip on the left.
+     The rail keeps its own 12px inner padding, so content still breathes. */
+  margin-left: -24px;
   padding-top: 32px;
   padding-bottom: calc(4vh + 1vh);
-  padding-left: 0;
+  padding-left: 12px;
+  padding-right: 12px;
   z-index: 10;
-  width: 180px;
-  transition: width 0.3s ease, padding-left 0.3s ease;
+  width: 220px;
+  /* Same translucent warm-white as the task cards (--card), composited over
+     the same canvas — so the rail reads exactly like the 立即做 task list
+     instead of the slightly warmer grey it had before. */
+  background-color: var(--card);
+  transition: width 0.3s ease;
   flex-shrink: 0;
-  border-right: 1px solid #bab7b2;
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  /* Grid items default to min-height: auto, so a tall nav would stretch the
+     rail past the window and push the settings row out of view. Zeroing it
+     lets the stretch (100vh via the -4vh margins) win: .nav-sidebar-body then
+     shrinks, .nav-scroll-area scrolls, and the footer stays pinned at the
+     bottom-left corner in both the expanded and collapsed states. */
+  min-height: 0;
 }
 
 .nav-sidebar.collapsed {
   width: 76px;
-  padding-left: 5px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* Body column: brand row + scrolling nav. The footer sits outside it so the
+   settings row stays pinned while the groups scroll underneath. */
+.nav-sidebar-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
 }
 
 .nav-brand-wrapper {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
   height: 38px;
   flex-shrink: 0;
   overflow: hidden;
-  padding-left: 12px;
 }
 
 .nav-sidebar.collapsed .nav-brand-wrapper {
-  justify-content: flex-start;
-  padding-left: 6px;
+  justify-content: center;
 }
 
-.logo-icon {
+.nav-brand {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--ink-primary);
-  overflow: hidden;
-  transition: width 0.3s ease, opacity 0.3s ease;
-  width: 32px;
+  gap: 10px;
+  min-width: 0;
+  color: #1a1a1a;
+}
+
+.nav-brand-icon {
+  font-size: 26px;
+  line-height: 1;
   flex-shrink: 0;
 }
 
-/* Phosphor's .ph-fill carries no intrinsic size — size the brand mark here. */
-.logo-icon .ph-plant {
-  font-size: 26px;
+.nav-brand-text {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
-.nav-sidebar.collapsed .logo-icon {
-  width: 0;
-  opacity: 0;
+.nav-sidebar.collapsed .nav-brand-text {
+  display: none;
+}
+
+/* Collapsed rail: the brand mark gives way — only the toggle stays, centred,
+   so the 76px rail isn't crowded by two icons in the header row. */
+.nav-sidebar.collapsed .nav-brand-icon {
+  display: none;
+}
+
+.nav-sidebar.collapsed .nav-brand-icon {
+  font-size: 24px;
 }
 
 .sidebar-toggle {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--nav-text);
+  color: #a0a0a0;
   padding: 6px;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
   flex-shrink: 0;
+}
+
+.sidebar-toggle i {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .sidebar-toggle:hover {
   background: rgba(0, 0, 0, 0.04);
+  color: #5a5a5a;
 }
 
-.nav-sidebar.collapsed .sidebar-toggle {
-  margin: 0;
+/* Scroll region for the nav groups — the design hides its scrollbar. */
+.nav-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.nav-scroll-area::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-links {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 2px;
 }
 
+/* Row: icon + label + optional count badge (design: .sidebar-item). */
 .nav-link {
   font-family: var(--font-sans);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--nav-text);
+  font-size: 14px;
+  color: #5a5a5a;
   text-decoration: none;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0 8px;
-  padding-left: 12px;
-  border-radius: var(--radius-sm);
-  transition: color 0.2s ease, background 0.2s ease, width 0.3s ease, padding-left 0.3s ease;
-  font-weight: 500;
   display: flex;
   align-items: center;
-  height: 34px;
-  width: 140px;
-  overflow: hidden;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background 0.2s ease, color 0.2s ease;
+  text-align: left;
 }
 
-.nav-link > svg {
-  flex-shrink: 0;
+.nav-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #2c2c2c;
 }
 
-.nav-sidebar.collapsed .nav-link {
-  width: 34px;
-  padding-left: 7px;
-}
-
-.nav-sidebar.collapsed .nav-link.active {
-  border-radius: var(--nav-sidebar-radius);
-}
-
-.nav-link:hover,
 .nav-link.active {
-  color: var(--nav-text-active);
+  background: rgba(0, 0, 0, 0.07);
+  color: #1a1a1a;
   font-weight: 600;
+}
+
+.nav-link-icon {
+  font-size: 18px;
+  line-height: 1;
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 
 .nav-link-text {
   white-space: nowrap;
   overflow: hidden;
-  opacity: 1;
-  max-width: 200px;
-  margin-left: 12px;
-  transition: opacity 0.3s ease, max-width 0.3s ease, margin-left 0.3s ease;
 }
 
-.nav-sidebar.collapsed .nav-link-text {
-  opacity: 0;
-  max-width: 0;
-  margin-left: 0;
+/* Count badge — right-aligned after the label (design: .badge). */
+.nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: #666;
+  flex-shrink: 0;
 }
 
-/* ─── Collapsible GTD group ───────────────────────────────────────────────── */
+.nav-badge-accent {
+  background: #ea580c;
+  color: #fff;
+}
+
+.nav-link.active .nav-badge {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.nav-link.active .nav-badge-accent {
+  background: #ea580c;
+  color: #fff;
+}
+
+/* ─── Collapsible nav groups ─────────────────────────────────────────────── */
+/* Grouping follows the Variant reference design: an uppercase caption with a
+   caret, then indented items. */
 .nav-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-  /* Positioning context for the collapsed-rail flyout. */
-  position: relative;
-  /* The collapsed rail zeroes this margin. Without a transition the 12px it
-     removes snaps instantly while the width below eases, so the group icon
-     lurches instead of moving with the rest of the column. */
-  transition: margin-top 0.3s ease;
+  margin-bottom: 6px;
 }
 
 .nav-group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 140px;
-  height: 34px;
+  width: 100%;
   padding: 0 12px;
+  margin: 16px 0 4px;
   border: none;
   background: none;
   cursor: pointer;
   font-family: var(--font-sans);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--nav-text);
-  border-radius: var(--radius-sm);
-  /* Must mirror .nav-link's width/padding-left transition — without it the
-     collapsed-state icon snaps 5px sideways instead of gliding with its
-     neighbours. */
-  transition: color 0.2s ease, background 0.2s ease, width 0.3s ease, padding-left 0.3s ease;
+  color: #a0a0a0;
+  border-radius: 6px;
+  user-select: none;
 }
 
 .nav-group-header:hover {
-  color: var(--nav-text-active);
-  background: rgba(0, 0, 0, 0.04);
+  color: #5a5a5a;
 }
 
-/* A child view is active — surface that on the group header too. The tray icon
-   and label inherit the colour, so only the button needs the state. */
-.nav-group-header.active {
-  color: var(--nav-text-active);
-}
-
-/* Aligns the "GTD" caption with the text column of the sibling links. */
-.nav-group-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-/* Matches the 18px lucide icons used by the sibling nav links (Tailwind's text-lg). */
-.nav-group-icon {
-  font-size: 18px;
+.nav-group-caret {
+  font-size: 12px;
+  line-height: 1;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
 }
 
-.nav-group-chevron {
-  flex-shrink: 0;
-  transition: transform 0.25s var(--ease-out);
-}
-
-.nav-group-chevron.is-collapsed {
+.nav-group.collapsed-group .nav-group-caret {
   transform: rotate(-90deg);
 }
 
-/* Nested list: indented under a thin guide rail. */
-.nav-group-items {
-  margin-left: 12px;
-  padding-left: 14px;
-  border-left: 1px solid var(--border);
+/* Nested list: indented under the caption (design: .nav-sub). */
+.nav-sub .nav-link {
+  padding-left: 22px;
 }
 
-.nav-group-items .nav-link {
-  width: 114px;
-  padding-left: 0;
+/* ─── Footer (settings) ─────────────────────────────────────────────────── */
+.nav-sidebar-footer {
+  flex-shrink: 0;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.nav-links-tail {
-  margin-top: 0.75rem;
-  /* Same reason as .nav-group — animates the collapsed-state spacing change. */
-  transition: margin-top 0.3s ease;
-}
-
-/* ─── Collapsed rail: icon-only trigger + hover flyout ──────────────────── */
-.nav-sidebar.collapsed .nav-group,
-.nav-sidebar.collapsed .nav-links-tail {
-  margin-top: 0;
-}
-
+/* ─── Collapsed rail: icon-only rows ─────────────────────────────────────── */
+/* The design drops the group captions entirely and centres every icon, so the
+   rail reads as a plain stack of icons. */
 .nav-sidebar.collapsed .nav-group-header {
-  width: 34px;
-  padding-left: 7px;
-  justify-content: flex-start;
-}
-
-/* Icon-only: the label and chevron give way, matching the sibling nav links. */
-.nav-sidebar.collapsed .nav-group-label,
-.nav-sidebar.collapsed .nav-group-chevron {
   display: none;
 }
 
-.nav-flyout {
-  position: absolute;
-  left: calc(100% + 6px);
-  top: 0;
-  min-width: 170px;
-  padding: 6px;
-  background-color: #fbfaf8;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-float);
-  z-index: 120;
-  animation: nav-flyout-in 0.16s var(--ease-out);
+.nav-sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 10px 0;
 }
 
-@keyframes nav-flyout-in {
-  from { opacity: 0; transform: translateX(-6px); }
-  to   { opacity: 1; transform: translateX(0); }
+.nav-sidebar.collapsed .nav-sub .nav-link {
+  padding-left: 0;
 }
 
-.nav-flyout .nav-link {
-  width: 100%;
+.nav-sidebar.collapsed .nav-link-icon {
+  margin-right: 0;
+  font-size: 20px;
 }
 
-/* The collapsed rail hides labels via `.nav-sidebar.collapsed .nav-link-text`,
-   which also reaches the flyout because the flyout lives inside that sidebar.
-   These rules re-assert the full-size row for flyout entries. */
-.nav-sidebar.collapsed .nav-flyout .nav-link {
-  width: 100%;
-  padding-left: 12px;
-}
-
-.nav-sidebar.collapsed .nav-flyout .nav-link-text {
-  opacity: 1;
-  max-width: 200px;
-  margin-left: 12px;
+.nav-sidebar.collapsed .nav-link-text,
+.nav-sidebar.collapsed .nav-badge {
+  display: none;
 }
 
 /* ─── Collapsed rail: hover tooltips ────────────────────────────────────── */
@@ -416,14 +435,7 @@ body {
   position: relative;
 }
 
-/* The base rule clips to a 34px box so the hidden label stays out of sight;
-   the tooltip is drawn outside that box. */
-.nav-sidebar.collapsed .nav-link {
-  overflow: visible;
-}
-
-.nav-sidebar.collapsed .nav-link::after,
-.nav-sidebar.collapsed .nav-group-header::after {
+.nav-sidebar.collapsed .nav-link::after {
   content: attr(data-label);
   position: absolute;
   left: calc(100% + 8px);
@@ -431,13 +443,11 @@ body {
   transform: translateY(-50%);
   z-index: 130;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  background-color: var(--foreground);
-  color: var(--primary-foreground);
-  font-size: 0.7rem;
+  border-radius: 6px;
+  background-color: #2c2c2c;
+  color: #fff;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -445,19 +455,8 @@ body {
   transition: opacity 0.15s ease 0.2s;
 }
 
-.nav-sidebar.collapsed .nav-link:hover::after,
-.nav-sidebar.collapsed .nav-group-header:hover::after {
+.nav-sidebar.collapsed .nav-link:hover::after {
   opacity: 1;
-}
-
-/* Flyout rows already carry their label — suppress the duplicate tooltip.
-   The trigger's own tooltip is hidden the same way: the flyout covers it. */
-.nav-sidebar.collapsed .nav-flyout .nav-link::after {
-  content: none;
-}
-
-.nav-sidebar.collapsed .nav-group:hover > .nav-group-header::after {
-  opacity: 0;
 }
 
 .nav-meta {

@@ -17,6 +17,15 @@ const translations = {
     nav_meta_actions:   'Actions',
     nav_meta_projects:  'Projects',
     nav_meta_waiting:   'Waiting',
+    // Sidebar group captions
+    nav_group_overview: 'Overview',
+    nav_group_gtd:      'GTD System',
+    nav_group_tools:    'Productivity Tools',
+    // Sidebar controls
+    nav_expandSidebar:  'Expand sidebar',
+    nav_collapseSidebar:'Collapse sidebar',
+    nav_expandGroup:    'Expand group',
+    nav_collapseGroup:  'Collapse group',
 
     // ─── Dashboard
     db_colInbox:        'Inbox',
@@ -402,12 +411,21 @@ const translations = {
     nav_someday:        '将来也许',
     nav_weeklyReview:   '每周回顾',
     nav_aiChat:         'AI 助手',
-    nav_settings:       '设置',
+    nav_settings:       '系统设置',
     nav_kanban:         '看板',
     nav_pomodoro:       '番茄钟',
     nav_meta_actions:   '行动',
     nav_meta_projects:  '项目',
     nav_meta_waiting:   '等待',
+    // Sidebar group captions
+    nav_group_overview: '总览',
+    nav_group_gtd:      'GTD 系统',
+    nav_group_tools:    '效率工具',
+    // Sidebar controls
+    nav_expandSidebar:  '展开侧边栏',
+    nav_collapseSidebar:'收起侧边栏',
+    nav_expandGroup:    '展开分组',
+    nav_collapseGroup:  '收起分组',
 
     // ─── Dashboard
     db_colInbox:        '收件箱',
