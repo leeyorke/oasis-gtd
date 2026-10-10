@@ -8,7 +8,7 @@
 
 Premium desktop GTD system built with Electron + React + TypeScript.
 
-![](resources\Oasis_GTD_iQfYzpW4Wa.png)
+![](resources/Oasis_GTD_iQfYzpW4Wa.png)
 
 ## Tech Stack
 
