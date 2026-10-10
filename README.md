@@ -8,6 +8,8 @@
 
 Premium desktop GTD system built with Electron + React + TypeScript.
 
+![](resources\Oasis_GTD_iQfYzpW4Wa.png)
+
 ## Tech Stack
 
 - **Electron 29** + **electron-vite** — Desktop app framework & build tool
