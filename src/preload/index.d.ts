@@ -90,6 +90,8 @@ declare global {
       // Data
       getStats: () => Promise<{tasks: number; nextActions: number; doneTasks: number; projects: number; waitingItems: number; somedayItems: number; conversations: number; messages: number}>
       getDbPath: () => Promise<string>
+      /** Signature of the GTD tables — changes when an external agent writes. */
+      getDataStamp: () => Promise<string>
       clearCompleted: () => Promise<{success: boolean}>
       clearChatHistory: () => Promise<{success: boolean}>
       exportJSON: () => Promise<{success: boolean; path?: string; canceled?: boolean; error?: string}>
@@ -108,7 +110,10 @@ declare global {
       setProxy: (host: string, port: number) => Promise<void>
       // MCP agent endpoint
       getMcpState: () => Promise<McpServiceState>
-      setMcpEnabled: (enabled: boolean) => Promise<McpServiceState>      // Quick Capture
+      setMcpEnabled: (enabled: boolean) => Promise<McpServiceState>
+      /** Allow/disallow agent writes; restarts the endpoint so it takes effect. */
+      setMcpAllowWrite: (allowWrite: boolean) => Promise<McpServiceState>
+      // Quick Capture
       closeQuickCapture: () => void
       registerQuickCaptureShortcut: (shortcut: string) => void
     }

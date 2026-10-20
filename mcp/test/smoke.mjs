@@ -526,7 +526,7 @@ async function testHttpMode(fixturePath) {
 
     const toolsRes = await postMcp(port, { jsonrpc: '2.0', id: 2, method: 'tools/list' })
     const toolsJson = await parseMcpResponse(toolsRes)
-    check('http: tools/list → 19 tools', (toolsJson.result?.tools ?? []).length === 19)
+    check('http: tools/list → 34 tools', (toolsJson.result?.tools ?? []).length === 34)
 
     const overviewRes = await postMcp(port, {
       jsonrpc: '2.0',
@@ -537,6 +537,20 @@ async function testHttpMode(fixturePath) {
     const overviewJson = JSON.parse((await parseMcpResponse(overviewRes)).result.content[0].text)
     check('http: get_overview reads fixture data', overviewJson.counts.tasks.total === 5
       && overviewJson.database.openMode === 'read-only')
+
+    // The HTTP transport refuses writes unless it is explicitly enabled, so
+    // a network endpoint stays read-only by default.
+    const httpWrite = await postMcp(port, {
+      jsonrpc: '2.0',
+      id: 31,
+      method: 'tools/call',
+      params: { name: 'create_note', arguments: { content: 'should not be written' } }
+    })
+    const httpWriteJson = await parseMcpResponse(httpWrite)
+    check('http: write tool refused by default',
+      httpWriteJson.result?.isError === true
+      && /disabled/i.test(httpWriteJson.result?.content?.[0]?.text ?? ''),
+      httpWriteJson.result?.content?.[0]?.text)
 
     const resourceRes = await postMcp(port, {
       jsonrpc: '2.0',
@@ -598,6 +612,313 @@ async function testHttpMode(fixturePath) {
   }
 }
 
+// ─── Write mode (OASIS_MCP_WRITE=1) ──────────────────────────────────────────
+
+/**
+ * Exercises the write tools against a throwaway fixture: every create/update/
+ * delete path, the validation errors, and a direct look into the database file
+ * to prove the rows really landed there.
+ */
+async function testWriteMode() {
+  console.log('\n── write tools ──')
+  const workDir = mkdtempSync(join(tmpdir(), 'oasis-gtd-mcp-write-'))
+  const fixturePath = join(workDir, 'oasis-gtd.db')
+  buildFixtureDb(fixturePath)
+  const client = new StdioMcpClient({ OASIS_DB_PATH: fixturePath, OASIS_MCP_WRITE: '1' })
+
+  try {
+    const init = await client.request('initialize', {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'smoke-write', version: '1.0.0' }
+    })
+    check('write mode: initialize returns serverInfo', init.result?.serverInfo?.name === 'oasis-gtd')
+    check('write mode: instructions advertise the write tools',
+      /capture_item/.test(init.result?.instructions ?? ''))
+    client.notify('notifications/initialized')
+
+    // ── Notes (随想) ────────────────────────────────────────────────────────
+    const note = await callTool(client, 'create_note', {
+      content: 'MCP 写入的随想',
+      tags: ['mcp', 'test'],
+      weather: '晴朗'
+    })
+    check('create_note returns id + record', typeof note.id === 'string'
+      && note.record?.content === 'MCP 写入的随想'
+      && Array.isArray(note.record?.tags) && note.record.tags[0] === 'mcp'
+      && note.record?.weather === '晴朗')
+
+    const notes = await callTool(client, 'list_notes', { limit: 10 })
+    check('create_note is visible to the read tools', notes.notes.some((n) => n.id === note.id))
+
+    const updatedNote = await callTool(client, 'update_note', {
+      id: note.id,
+      content: 'MCP 写入的随想（已修改）',
+      tags: ['mcp']
+    })
+    check('update_note changes content and tags',
+      updatedNote.record?.content === 'MCP 写入的随想（已修改）'
+      && updatedNote.record?.tags?.length === 1
+      && updatedNote.record?.tags[0] === 'mcp')
+
+    const missingNote = await client.request('tools/call', {
+      name: 'update_note',
+      arguments: { id: 'does-not-exist', content: 'x' }
+    })
+    check('update_note on an unknown id → isError', missingNote.result?.isError === true)
+
+    // ── Tasks ───────────────────────────────────────────────────────────────
+    const task = await callTool(client, 'create_task', {
+      title: 'MCP 创建的任务',
+      status: 'next',
+      context: '@Computer',
+      due_date: '2030-01-31',
+      project: 'Launch website',
+      priority: 'high'
+    })
+    check('create_task resolves the project by title',
+      task.record?.project_id === IDS.project && task.record?.project_title === 'Launch website')
+    check('create_task stores the fields',
+      task.record?.status === 'next' && task.record?.context === '@Computer'
+      && task.record?.due_date === '2030-01-31' && task.record?.priority === 'high')
+
+    const unknownProject = await client.request('tools/call', {
+      name: 'create_task',
+      arguments: { title: 'x', project: 'No Such Project' }
+    })
+    check('create_task with an unknown project → isError',
+      unknownProject.result?.isError === true
+      && /No project matching/.test(unknownProject.result?.content?.[0]?.text ?? ''))
+
+    const waitingWithoutWho = await client.request('tools/call', {
+      name: 'create_task',
+      arguments: { title: 'x', status: 'waiting' }
+    })
+    check('create_task status=waiting without waiting_for → isError',
+      waitingWithoutWho.result?.isError === true)
+
+    const badStatus = await client.request('tools/call', {
+      name: 'create_task',
+      arguments: { title: 'x', status: 'nonsense' }
+    })
+    check('create_task with an invalid status → isError', badStatus.result?.isError === true)
+
+    const doneTask = await callTool(client, 'update_task', { id: task.id, status: 'done' })
+    check('update_task changes the status', doneTask.record?.status === 'done')
+
+    const deletedTask = await callTool(client, 'delete_task', { id: task.id })
+    check('delete_task returns the deleted row',
+      deletedTask.action === 'delete' && deletedTask.record?.title === 'MCP 创建的任务')
+    const afterDelete = await client.request('tools/call', {
+      name: 'get_task',
+      arguments: { id: task.id }
+    })
+    check('deleted task is gone', afterDelete.result?.isError === true)
+
+    // ── Projects ────────────────────────────────────────────────────────────
+    const project = await callTool(client, 'create_project', {
+      title: 'MCP 创建的项目',
+      description: '由 agent 创建',
+      outcome: '上线'
+    })
+    check('create_project stores the fields',
+      project.record?.title === 'MCP 创建的项目'
+      && project.record?.description === '由 agent 创建'
+      && project.record?.status === 'active')
+    const renamed = await callTool(client, 'update_project', {
+      id: project.id,
+      title: 'MCP 创建的项目（改名）'
+    })
+    check('update_project renames the project', renamed.record?.title === 'MCP 创建的项目（改名）')
+
+    // ── Waiting-for ─────────────────────────────────────────────────────────
+    const waiting = await callTool(client, 'create_waiting_item', {
+      title: '等 Alice 回复',
+      waiting_for: 'Alice',
+      since: '2026-01-15',
+      project: 'Launch website',
+      notes: '催一下'
+    })
+    check('create_waiting_item stores the fields',
+      waiting.record?.waiting_for === 'Alice'
+      && waiting.record?.since === '2026-01-15'
+      && waiting.record?.project_id === IDS.project)
+    const waitingList = await callTool(client, 'list_waiting_items')
+    check('created waiting item shows up in the read tools',
+      waitingList.waiting_items.some((item) => item.id === waiting.id))
+
+    // ── Someday / maybe ─────────────────────────────────────────────────────
+    const someday = await callTool(client, 'create_someday_item', {
+      title: '学钢琴',
+      horizon: '1year',
+      category: 'hobby'
+    })
+    check('create_someday_item stores the fields',
+      someday.record?.horizon === '1year' && someday.record?.category === 'hobby')
+    const rescheduled = await callTool(client, 'update_someday_item', {
+      id: someday.id,
+      horizon: 'soon'
+    })
+    check('update_someday_item changes the horizon', rescheduled.record?.horizon === 'soon')
+    const deletedSomeday = await callTool(client, 'delete_someday_item', { id: someday.id })
+    check('delete_someday_item returns the deleted row',
+      deletedSomeday.record?.title === '学钢琴')
+
+    // ── One-shot capture (随想 → GTD bucket) ─────────────────────────────────
+    const capturedNote = await callTool(client, 'capture_item', {
+      content: '随手记一笔',
+      target: 'note',
+      tags: ['quick']
+    })
+    check('capture_item target=note writes a note',
+      capturedNote.bucket === 'notes' && capturedNote.record?.content === '随手记一笔')
+
+    const capturedInbox = await callTool(client, 'capture_item', {
+      content: '收一下邮箱',
+      target: 'inbox',
+      context: '@Email'
+    })
+    check('capture_item target=inbox writes a task',
+      capturedInbox.bucket === 'tasks' && capturedInbox.record?.status === 'inbox'
+      && capturedInbox.record?.context === '@Email')
+
+    const capturedWaiting = await callTool(client, 'capture_item', {
+      content: '等回复',
+      target: 'waiting',
+      waiting_for: 'Bob'
+    })
+    check('capture_item target=waiting writes a waiting task',
+      capturedWaiting.record?.status === 'waiting' && capturedWaiting.record?.waiting_for === 'Bob')
+
+    const captureWithoutWho = await client.request('tools/call', {
+      name: 'capture_item',
+      arguments: { content: 'x', target: 'waiting' }
+    })
+    check('capture_item target=waiting without waiting_for → isError',
+      captureWithoutWho.result?.isError === true)
+
+    const capturedSomeday = await callTool(client, 'capture_item', {
+      content: '去日本看樱花',
+      target: 'someday_item',
+      horizon: '1year'
+    })
+    check('capture_item target=someday_item writes a someday item',
+      capturedSomeday.bucket === 'someday_items' && capturedSomeday.record?.horizon === '1year')
+
+    const capturedWaitingItem = await callTool(client, 'capture_item', {
+      content: '等供应商报价',
+      target: 'waiting_item',
+      waiting_for: 'Carol',
+      since: '2026-02-01'
+    })
+    check('capture_item target=waiting_item writes a waiting item',
+      capturedWaitingItem.bucket === 'waiting_items'
+      && capturedWaitingItem.record?.waiting_for === 'Carol'
+      && capturedWaitingItem.record?.since === '2026-02-01')
+
+    const capturedProject = await callTool(client, 'capture_item', {
+      content: '装修书房',
+      target: 'project',
+      notes: '预算 2 万'
+    })
+    check('capture_item target=project writes a project',
+      capturedProject.bucket === 'projects'
+      && capturedProject.record?.title === '装修书房'
+      && capturedProject.record?.description === '预算 2 万')
+
+    const badTarget = await client.request('tools/call', {
+      name: 'capture_item',
+      arguments: { content: 'x', target: 'nowhere' }
+    })
+    check('capture_item with an unknown target → isError', badTarget.result?.isError === true)
+
+    // ── Deleting a project detaches its rows ───────────────────────────────
+    const deletedProject = await callTool(client, 'delete_project', { id: project.id })
+    check('delete_project returns the deleted project',
+      deletedProject.record?.title === 'MCP 创建的项目（改名）')
+    const projectList = await callTool(client, 'list_projects')
+    check('deleted project is gone', !projectList.projects.some((p) => p.id === project.id))
+
+    // ── The rows really are in the database file ────────────────────────────
+    const db = new DatabaseSync(fixturePath)
+    const noteRows = db.prepare('SELECT content, tags FROM notes WHERE id = ?').get(note.id)
+    check('note row is in the database file', noteRows?.content === 'MCP 写入的随想（已修改）'
+      && JSON.parse(noteRows.tags)[0] === 'mcp')
+    const taskRows = db.prepare('SELECT title, status, project_id FROM tasks WHERE id = ?')
+      .get(capturedInbox.id)
+    check('captured task row is in the database file', taskRows?.title === '收一下邮箱'
+      && taskRows?.status === 'inbox')
+    const waitingRows = db.prepare('SELECT waiting_for, since FROM waiting_items WHERE id = ?')
+      .get(waiting.id)
+    check('waiting item row is in the database file',
+      waitingRows?.waiting_for === 'Alice' && waitingRows?.since === '2026-01-15')
+    const orphanTasks = db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE project_id = ?')
+      .get(project.id)
+    check('deleting a project detaches its tasks', orphanTasks.n === 0)
+    const secretRows = db.prepare('SELECT COUNT(*) AS n FROM ai_providers WHERE api_key = ?')
+      .get(SECRET)
+    check('the write path never touched ai_providers', secretRows.n === 1)
+    db.close()
+
+    // The read tools still work after all that writing.
+    // Fixture: 5 tasks / 2 notes. One task was created and deleted again, and
+    // two more were captured (inbox + waiting) → 7 tasks, 4 notes.
+    const overview = await callTool(client, 'get_overview')
+    check('overview still reads correctly after writes', overview.counts.notes === 4
+      && overview.counts.tasks.total === 7, JSON.stringify(overview.counts))
+  } finally {
+    await client.close()
+    await removeDir(workDir)
+  }
+}
+
+// ─── Writes disabled ─────────────────────────────────────────────────────────
+
+async function testWriteDisabled() {
+  console.log('\n── writes disabled ──')
+  const workDir = mkdtempSync(join(tmpdir(), 'oasis-gtd-mcp-readonly-'))
+  const fixturePath = join(workDir, 'oasis-gtd.db')
+  buildFixtureDb(fixturePath)
+  const client = new StdioMcpClient({ OASIS_DB_PATH: fixturePath, OASIS_MCP_WRITE: '0' })
+
+  try {
+    const init = await client.request('initialize', {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'smoke-readonly', version: '1.0.0' }
+    })
+    check('read-only mode: instructions say writing is off',
+      /DISABLED/.test(init.result?.instructions ?? ''))
+    client.notify('notifications/initialized')
+
+    const refused = await client.request('tools/call', {
+      name: 'create_note',
+      arguments: { content: 'nope' }
+    })
+    check('writes disabled → create_note isError', refused.result?.isError === true
+      && /disabled/i.test(refused.result?.content?.[0]?.text ?? ''),
+      refused.result?.content?.[0]?.text)
+
+    const refusedCapture = await client.request('tools/call', {
+      name: 'capture_item',
+      arguments: { content: 'nope', target: 'note' }
+    })
+    check('writes disabled → capture_item isError', refusedCapture.result?.isError === true)
+
+    const overview = await callTool(client, 'get_overview')
+    check('writes disabled → the database is opened read-only',
+      overview.database.openMode === 'read-only', overview.database.openMode)
+
+    const db = new DatabaseSync(fixturePath)
+    const count = db.prepare('SELECT COUNT(*) AS n FROM notes').get()
+    check('writes disabled → nothing was written', count.n === 2, String(count.n))
+    db.close()
+  } finally {
+    await client.close()
+    await removeDir(workDir)
+  }
+}
+
 // ─── Test run ────────────────────────────────────────────────────────────────
 
 function sleep(ms) {
@@ -646,18 +967,36 @@ async function main() {
     // 2. Tool catalogue
     const tools = await client.request('tools/list')
     const toolNames = (tools.result?.tools ?? []).map((t) => t.name)
-    const expectedTools = [
+    const readOnlyTools = [
       'get_overview', 'get_db_info', 'list_tasks', 'get_task', 'search_tasks',
       'list_projects', 'get_project', 'list_waiting_items', 'list_someday_items',
       'list_notes', 'search_notes', 'list_habits', 'get_habit',
       'list_conversations', 'get_conversation', 'list_resources',
       'get_review_checklist', 'list_focus_sessions', 'export_gtd_data'
     ]
-    for (const name of expectedTools) {
+    const writeTools = [
+      'create_note', 'update_note', 'delete_note',
+      'create_task', 'update_task', 'delete_task',
+      'create_project', 'update_project', 'delete_project',
+      'create_waiting_item', 'delete_waiting_item',
+      'create_someday_item', 'update_someday_item', 'delete_someday_item',
+      'capture_item'
+    ]
+    for (const name of [...readOnlyTools, ...writeTools]) {
       check(`tool registered: ${name}`, toolNames.includes(name))
     }
-    check('all tools advertise readOnlyHint',
-      (tools.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true))
+    check('tools/list → 34 tools', toolNames.length === 34, String(toolNames.length))
+    const toolByName = new Map((tools.result?.tools ?? []).map((t) => [t.name, t]))
+    check('read tools advertise readOnlyHint',
+      readOnlyTools.every((name) => toolByName.get(name)?.annotations?.readOnlyHint === true))
+    check('write tools do not advertise readOnlyHint',
+      writeTools.every((name) => toolByName.get(name)?.annotations?.readOnlyHint === false))
+    check('delete tools advertise destructiveHint',
+      ['delete_note', 'delete_task', 'delete_project', 'delete_waiting_item', 'delete_someday_item']
+        .every((name) => toolByName.get(name)?.annotations?.destructiveHint === true))
+    check('create tools are not marked destructive',
+      ['create_note', 'create_task', 'create_project', 'create_waiting_item', 'create_someday_item']
+        .every((name) => toolByName.get(name)?.annotations?.destructiveHint === false))
 
     // 3. Tool behaviour
     const overview = await callTool(client, 'get_overview')
@@ -674,7 +1013,8 @@ async function main() {
       JSON.stringify(overview.attention))
     check('overview contexts parsed', Array.isArray(overview.contexts) && overview.contexts.includes('@Computer'))
     check('overview exposes database path', overview.database.path === fixturePath)
-    check('overview shows read-only mode', overview.database.openMode === 'read-only')
+    check('stdio transport opens the database read-write (writes are on by default)',
+      overview.database.openMode === 'read-write', overview.database.openMode)
 
     const nextTasks = await callTool(client, 'list_tasks', { status: 'next' })
     check('list_tasks filters by status', nextTasks.returned === 1
@@ -825,6 +1165,8 @@ async function main() {
   }
 
   await testHttpMode(fixturePath)
+  await testWriteMode()
+  await testWriteDisabled()
   await removeDir(workDir)
 
   console.log(`\n${checks - failures.length}/${checks} checks passed`)

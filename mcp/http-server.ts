@@ -18,7 +18,8 @@
  * Security model (deliberately strict):
  *   - Bearer-token auth on every MCP request (OASIS_MCP_TOKEN); the token is
  *     compared in constant time and a missing token refuses to start.
- *   - The database is opened read-only, exactly like the stdio mode.
+ *   - The database is opened read-only unless the server runs in write mode
+ *     (OASIS_MCP_WRITE=1) — the same rule as the stdio transport.
  *   - Streamable POSTs each run against a fresh server instance, so no session
  *     state (and therefore no other agent's context) is ever shared. Legacy SSE
  *     sessions are per-connection and torn down when the stream closes.
@@ -32,7 +33,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { DatabaseSync } from 'node:sqlite'
 import { createServer } from './server.ts'
-import type { DbInfo } from './db.ts'
+import type { DbInfo, WritePolicy } from './db.ts'
 
 export interface HttpServerOptions {
   /** Shared bearer token. Required — the server refuses to start without it. */
@@ -41,6 +42,8 @@ export interface HttpServerOptions {
   host: string
   /** TCP port to listen on. */
   port: number
+  /** Whether the write tools may modify the database. */
+  writePolicy: WritePolicy
 }
 
 export interface RunningHttpServer {
@@ -100,7 +103,8 @@ async function handleMcpRequest(
   db: DatabaseSync,
   info: DbInfo,
   req: IncomingMessage,
-  res: ServerResponse
+  res: ServerResponse,
+  writePolicy: WritePolicy
 ): Promise<void> {
   const declaredLength = Number(req.headers['content-length'] ?? 0)
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
@@ -112,7 +116,7 @@ async function handleMcpRequest(
     return
   }
 
-  const server = createServer(db, info)
+  const server = createServer(db, info, writePolicy)
   const transport = new StreamableHTTPServerTransport({
     // Stateless mode: no session ids, no shared state between requests.
     sessionIdGenerator: undefined,
@@ -293,7 +297,7 @@ async function route(
   // requests then arrive on that endpoint and responses stream back over the
   // SSE connection. One server instance per connection, torn down on close.
   if (path === MCP_PATH && req.method === 'GET') {
-    await handleSseHandshake(db, info, req, res)
+    await handleSseHandshake(db, info, req, res, options.writePolicy)
     return
   }
 
@@ -302,17 +306,18 @@ async function route(
     return
   }
 
-  await handleMcpRequest(db, info, req, res)
+  await handleMcpRequest(db, info, req, res, options.writePolicy)
 }
 
 async function handleSseHandshake(
   db: DatabaseSync,
   info: DbInfo,
   req: IncomingMessage,
-  res: ServerResponse
+  res: ServerResponse,
+  writePolicy: WritePolicy
 ): Promise<void> {
   const transport = new SSEServerTransport(SSE_MESSAGES_PATH, res)
-  const server = createServer(db, info)
+  const server = createServer(db, info, writePolicy)
   const sessionId = transport.sessionId
   sseSessions.set(sessionId, { transport, server })
 

@@ -81,6 +81,8 @@ export interface McpServiceState {
   nodePath: string | null
   /** Last startup failure (missing node, port in use, …), if any. */
   error: string | null
+  /** Whether agents may create/change/delete data through this endpoint. */
+  allowWrite: boolean
 }
 
 export interface AppSettings {

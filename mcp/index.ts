@@ -19,12 +19,14 @@
  *   OASIS_MCP_TOKEN      Bearer token for HTTP mode (required for --http).
  *   OASIS_MCP_HOST       HTTP bind address (default 0.0.0.0 — LAN accessible).
  *   OASIS_MCP_PORT       HTTP port (default 7800).
+ *   OASIS_MCP_WRITE      "1" enables the write tools, "0" disables them. Without
+ *                        it stdio allows writes and http does not.
  *
  * IMPORTANT: in stdio mode stdout is the MCP protocol channel — all logging
  * must go to stderr.
  */
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { openDatabase } from './db.ts'
+import { openDatabase, resolveWritePolicy, type Transport } from './db.ts'
 import { createServer } from './server.ts'
 import { startHttpServer } from './http-server.ts'
 
@@ -41,27 +43,34 @@ function resolveHttpPort(): number {
 }
 
 async function main(): Promise<void> {
-  const { db, info } = openDatabase()
-  const dbLog =
-    `[oasis-gtd-mcp] serving ${info.path} ` +
-    `(profile=${info.profile}, mode=${info.openMode}, schema=v${info.schemaVersion})`
-
   const httpMode =
     process.argv.slice(2).includes('--http') ||
     (process.env['OASIS_MCP_TRANSPORT'] ?? '').toLowerCase() === 'http'
+  const transport: Transport = httpMode ? 'http' : 'stdio'
+
+  // The write policy decides how the database is opened: write mode needs a
+  // read-write handle, read-only mode keeps the preferred read-only one.
+  const writePolicy = resolveWritePolicy(transport)
+  const { db, info } = openDatabase({ allowWrite: writePolicy.enabled })
+
+  const dbLog =
+    `[oasis-gtd-mcp] serving ${info.path} ` +
+    `(profile=${info.profile}, mode=${info.openMode}, schema=v${info.schemaVersion}, ` +
+    `writes=${writePolicy.enabled ? 'enabled' : 'disabled'} via ${writePolicy.source})`
 
   if (httpMode) {
     const token = process.env['OASIS_MCP_TOKEN']
     if (!token || token.trim() === '') {
       throw new Error(
         'HTTP mode requires OASIS_MCP_TOKEN (bearer token clients must send). ' +
-        'Example: set OASIS_MCP_TOKEN=my-secret-token'
+          'Example: set OASIS_MCP_TOKEN=my-secret-token'
       )
     }
     const port = resolveHttpPort()
     const host = process.env['OASIS_MCP_HOST'] ?? '0.0.0.0'
     console.error(dbLog)
-    const running = await startHttpServer(db, info, { token, host, port })
+    if (!writePolicy.enabled) console.error(`[oasis-gtd-mcp] ${writePolicy.reason}`)
+    const running = await startHttpServer(db, info, { token, host, port, writePolicy })
     const shutdown = async (): Promise<void> => {
       await running.close()
       process.exit(0)
@@ -71,9 +80,10 @@ async function main(): Promise<void> {
     return
   }
 
-  const server = createServer(db, info)
+  const server = createServer(db, info, writePolicy)
   await server.connect(new StdioServerTransport())
   console.error(dbLog)
+  if (!writePolicy.enabled) console.error(`[oasis-gtd-mcp] ${writePolicy.reason}`)
 }
 
 main().catch((error: unknown) => {

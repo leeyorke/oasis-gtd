@@ -84,6 +84,53 @@ export default function App() {
     return () => clearInterval(interval)
   }, [])
 
+  // Pick up data written by an external agent. The MCP server writes straight
+  // into the database file, so the app's in-memory lists would otherwise stay
+  // stale. A cheap signature tells us when something moved; the focus and
+  // visibility listeners cover the "the app was in the background" case
+  // without waiting for the next poll.
+  useEffect(() => {
+    let lastStamp = ''
+    let stopped = false
+
+    const reload = async (): Promise<void> => {
+      try {
+        const stamp = await window.api.getDataStamp()
+        if (stopped) return
+        // The first call only establishes the baseline — the app already
+        // loaded everything on startup.
+        if (lastStamp !== '' && stamp !== lastStamp) {
+          await Promise.all([
+            loadTasks(),
+            loadProjects(),
+            loadWaiting(),
+            loadSomeday(),
+            loadNotes()
+          ])
+        }
+        lastStamp = stamp
+      } catch {
+        /* the database may not be ready yet — try again on the next tick */
+      }
+    }
+
+    const onFocus = (): void => { void reload() }
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') void reload()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(() => { void reload() }, 5000)
+    void reload()
+
+    return () => {
+      stopped = true
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadTasks, loadProjects, loadWaiting, loadSomeday, loadNotes])
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

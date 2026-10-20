@@ -1,15 +1,18 @@
 /**
  * MCP tools exposing the Oasis GTD database to agents.
  *
- * Every tool is strictly read-only: the handlers only ever run SELECT
- * statements (see db.ts) and the tool metadata advertises readOnlyHint so
- * well-behaved clients know the data cannot be modified.
+ * The read tools (get_*, list_*, search_*, export_*) only ever run SELECT
+ * statements and advertise readOnlyHint. The write tools (create_*, update_*,
+ * delete_*, capture_item) are allowed to change the user's GTD data — they are
+ * registered only when the server runs in write mode, and they advertise
+ * readOnlyHint:false / destructiveHint so a well-behaved client can warn the
+ * user before something is removed.
  */
 import type { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import type { DbInfo } from './db.ts'
+import type { DbInfo, WritePolicy } from './db.ts'
 import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
@@ -39,10 +42,47 @@ import {
   listWaitingItems,
   searchNotes
 } from './data.ts'
+import {
+  CAPTURE_TARGETS,
+  PROJECT_WRITABLE_STATUSES,
+  WRITABLE_TASK_STATUSES,
+  WRITABLE_TASK_STATUSES_ALL,
+  captureItem,
+  createNote,
+  createProject,
+  createSomedayItem,
+  createTask,
+  createWaitingItem,
+  deleteNote,
+  deleteProject,
+  deleteSomedayItem,
+  deleteTask,
+  deleteWaitingItem,
+  updateNote,
+  updateProject,
+  updateSomedayItem,
+  updateTask
+} from './write.ts'
 
 const READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false
+}
+
+/** Creates data — not read-only, but not destructive either. */
+const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+}
+
+/** Removes data — clients should confirm with the user first. */
+const DESTRUCTIVE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
   idempotentHint: true,
   openWorldHint: false
 }
@@ -80,7 +120,12 @@ const offsetSchema = z
 
 const idSchema = z.string().min(1).describe('UUID of the record, as returned by list_* tools')
 
-export function registerTools(server: McpServer, db: DatabaseSync, info: DbInfo): void {
+export function registerTools(
+  server: McpServer,
+  db: DatabaseSync,
+  info: DbInfo,
+  writePolicy: WritePolicy
+): void {
   // ── Orientation ────────────────────────────────────────────────────────────
 
   server.registerTool(
@@ -103,8 +148,9 @@ export function registerTools(server: McpServer, db: DatabaseSync, info: DbInfo)
     {
       title: 'Database Info',
       description:
-        'Which database file is being served (path, dev vs packaged profile, read-only mode, schema ' +
-        'version, size) and the row count of every table. Useful for debugging agent setups.',
+        'Which database file is being served (path, dev vs packaged profile, open mode ' +
+        '(read-only / read-write), schema version, size) and the row count of every table. ' +
+        'Useful for debugging agent setups.',
       inputSchema: {},
       annotations: READ_ONLY_ANNOTATIONS
     },
@@ -446,5 +492,438 @@ export function registerTools(server: McpServer, db: DatabaseSync, info: DbInfo)
       annotations: READ_ONLY_ANNOTATIONS
     },
     async ({ include_messages }) => ok(exportAll(db, info, include_messages ?? false))
+  )
+
+  // ── Write tools ────────────────────────────────────────────────────────────
+  //
+  // These change the user's data. They stay registered even when the server
+  // runs read-only, so an agent that tries to capture something gets a precise
+  // explanation ("writes are disabled …") instead of an "unknown tool" error.
+
+  /** Runs a write and turns validation problems into readable tool errors. */
+  const write = <T>(action: () => T): CallToolResult => {
+    if (!writePolicy.enabled) {
+      return fail(
+        writePolicy.reason ?? 'Write operations are disabled for this server. Enable writes to use it.'
+      )
+    }
+    try {
+      return ok(action())
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const projectRefSchema = {
+    project_id: z
+      .string()
+      .optional()
+      .describe('Project UUID (from list_projects) the item belongs to'),
+    project: z
+      .string()
+      .optional()
+      .describe('Project title instead of the id — matched case-insensitively')
+  }
+
+  // ── Notes (随想) ───────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'create_note',
+    {
+      title: 'Create Note (随想)',
+      description:
+        'Create a quick note / thought in the 随想 view. Notes are free-form captures; use ' +
+        'capture_item with target="note" as a one-shot alternative.',
+      inputSchema: {
+        content: z.string().min(1).describe('The note text'),
+        tags: z.array(z.string()).optional().describe('Tags, e.g. ["idea","work"]'),
+        weather: z
+          .string()
+          .optional()
+          .describe('Optional weather label the app shows next to the note (晴朗/多云/小雨/大风)')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ content, tags, weather }) =>
+      write(() => {
+        const record = createNote(db, { content, tags, weather })
+        return { action: 'create', entity: 'note', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'update_note',
+    {
+      title: 'Update Note (随想)',
+      description: 'Change the text, tags or weather of an existing note. Only the given fields are changed.',
+      inputSchema: {
+        id: idSchema,
+        content: z.string().min(1).optional().describe('New note text'),
+        tags: z.array(z.string()).optional().describe('Replacement tag list'),
+        weather: z.string().optional().describe('Replacement weather label')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ id, content, tags, weather }) =>
+      write(() => {
+        const record = updateNote(db, id, { content, tags, weather })
+        return { action: 'update', entity: 'note', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'delete_note',
+    {
+      title: 'Delete Note (随想)',
+      description: 'Delete a note permanently. The deleted note is returned so the agent can report it.',
+      inputSchema: { id: idSchema },
+      annotations: DESTRUCTIVE_ANNOTATIONS
+    },
+    async ({ id }) =>
+      write(() => {
+        const record = deleteNote(db, id)
+        return { action: 'delete', entity: 'note', id: record.id, record }
+      })
+  )
+
+  // ── Tasks ──────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'create_task',
+    {
+      title: 'Create Task',
+      description:
+        'Create a GTD task in one of the app\'s task buckets: inbox (unprocessed capture), next ' +
+        '(next action), waiting (delegated/blocked), someday or done. A waiting task needs ' +
+        'waiting_for; a task can be linked to a project by id or by title.',
+      inputSchema: {
+        title: z.string().min(1).describe('What needs to be done'),
+        status: z
+          .enum(WRITABLE_TASK_STATUSES)
+          .optional()
+          .describe('Task bucket (default: inbox)'),
+        notes: z.string().optional().describe('Longer description / details'),
+        context: z.string().optional().describe('@context, e.g. "@Computer"'),
+        due_date: z.string().optional().describe('Due date (YYYY-MM-DD)'),
+        ...projectRefSchema,
+        waiting_for: z
+          .string()
+          .optional()
+          .describe('For status "waiting": who the item is waiting on'),
+        priority: z.enum(TASK_PRIORITIES).optional().describe('Task priority')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const record = createTask(db, {
+          title: args.title,
+          status: args.status,
+          notes: args.notes ?? null,
+          context: args.context ?? null,
+          due_date: args.due_date ?? null,
+          project_id: args.project_id ?? null,
+          project: args.project ?? null,
+          waiting_for: args.waiting_for ?? null,
+          priority: args.priority ?? null
+        })
+        return { action: 'create', entity: 'task', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'update_task',
+    {
+      title: 'Update Task',
+      description:
+        'Change an existing task — title, notes, @context, due date, project, status, ' +
+        'waiting_for or priority. Only the fields you pass are changed. status="done" closes a ' +
+        'task, status="archive" files it away. Pass an empty project/project_id to detach the ' +
+        'task from its project.',
+      inputSchema: {
+        id: idSchema,
+        title: z.string().min(1).optional().describe('New title'),
+        notes: z.string().optional().describe('New notes'),
+        context: z.string().optional().describe('New @context'),
+        due_date: z.string().optional().describe('New due date (YYYY-MM-DD)'),
+        ...projectRefSchema,
+        status: z.enum(WRITABLE_TASK_STATUSES_ALL).optional().describe('New task status'),
+        waiting_for: z.string().optional().describe('New waiting_for person'),
+        priority: z.enum(TASK_PRIORITIES).optional().describe('New priority')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const record = updateTask(db, args.id, {
+          title: args.title,
+          notes: args.notes,
+          context: args.context,
+          due_date: args.due_date,
+          project_id: args.project_id,
+          project: args.project,
+          status: args.status,
+          waiting_for: args.waiting_for,
+          priority: args.priority
+        })
+        return { action: 'update', entity: 'task', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'delete_task',
+    {
+      title: 'Delete Task',
+      description: 'Delete a task permanently. The deleted task is returned so the agent can report it.',
+      inputSchema: { id: idSchema },
+      annotations: DESTRUCTIVE_ANNOTATIONS
+    },
+    async ({ id }) =>
+      write(() => {
+        const record = deleteTask(db, id)
+        return { action: 'delete', entity: 'task', id: record.id, record }
+      })
+  )
+
+  // ── Projects ───────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'create_project',
+    {
+      title: 'Create Project',
+      description:
+        'Create a project — an outcome the user is working towards. The description is the ' +
+        'project intent, the outcome is the definition of done.',
+      inputSchema: {
+        title: z.string().min(1).describe('Project title'),
+        description: z.string().optional().describe('What this project is about'),
+        outcome: z.string().optional().describe('What "done" looks like'),
+        status: z.enum(PROJECT_WRITABLE_STATUSES).optional().describe('active (default) or on-hold')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ title, description, outcome, status }) =>
+      write(() => {
+        const record = createProject(db, { title, description, outcome, status })
+        return { action: 'create', entity: 'project', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'update_project',
+    {
+      title: 'Update Project',
+      description: 'Change a project\'s title, description, outcome or status.',
+      inputSchema: {
+        id: idSchema,
+        title: z.string().min(1).optional().describe('New title'),
+        description: z.string().optional().describe('New description'),
+        outcome: z.string().optional().describe('New outcome'),
+        status: z.enum(PROJECT_WRITABLE_STATUSES).optional().describe('New status')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const record = updateProject(db, args.id, {
+          title: args.title,
+          description: args.description,
+          outcome: args.outcome,
+          status: args.status
+        })
+        return { action: 'update', entity: 'project', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'delete_project',
+    {
+      title: 'Delete Project',
+      description:
+        'Delete a project. Its tasks and waiting-for items are kept and detached (project_id = null).',
+      inputSchema: { id: idSchema },
+      annotations: DESTRUCTIVE_ANNOTATIONS
+    },
+    async ({ id }) =>
+      write(() => {
+        const record = deleteProject(db, id)
+        return { action: 'delete', entity: 'project', id: record.id, record }
+      })
+  )
+
+  // ── Waiting-for ────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'create_waiting_item',
+    {
+      title: 'Create Waiting-For Item',
+      description:
+        'Record something the user delegated and is now waiting on (waiting_for = the person). ' +
+        '"since" is the day the delegation started.',
+      inputSchema: {
+        title: z.string().min(1).describe('What the user is waiting for'),
+        waiting_for: z.string().min(1).describe('Who the user is waiting on'),
+        since: z.string().optional().describe('Delegation date (YYYY-MM-DD, default: today)'),
+        notes: z.string().optional().describe('Extra context'),
+        ...projectRefSchema
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const record = createWaitingItem(db, {
+          title: args.title,
+          waiting_for: args.waiting_for,
+          since: args.since ?? null,
+          notes: args.notes ?? null,
+          project_id: args.project_id ?? null,
+          project: args.project ?? null
+        })
+        return { action: 'create', entity: 'waiting_item', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'delete_waiting_item',
+    {
+      title: 'Delete Waiting-For Item',
+      description: 'Delete a waiting-for item permanently.',
+      inputSchema: { id: idSchema },
+      annotations: DESTRUCTIVE_ANNOTATIONS
+    },
+    async ({ id }) =>
+      write(() => {
+        const record = deleteWaitingItem(db, id)
+        return { action: 'delete', entity: 'waiting_item', id: record.id, record }
+      })
+  )
+
+  // ── Someday / maybe ────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'create_someday_item',
+    {
+      title: 'Create Someday/Maybe Item',
+      description:
+        'Park a future idea in the Someday/Maybe view — a thing to do someday, ordered by horizon ' +
+        '(soon, 1month, 3months, 1year, someday).',
+      inputSchema: {
+        title: z.string().min(1).describe('The idea'),
+        notes: z.string().optional().describe('Extra context'),
+        horizon: z.enum(SOMEDAY_HORIZONS).optional().describe('Time horizon (default: someday)'),
+        category: z.string().optional().describe('Free-form category, e.g. "travel"')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ title, notes, horizon, category }) =>
+      write(() => {
+        const record = createSomedayItem(db, { title, notes, horizon, category })
+        return { action: 'create', entity: 'someday_item', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'update_someday_item',
+    {
+      title: 'Update Someday/Maybe Item',
+      description: 'Change a someday/maybe item — title, notes, horizon or category.',
+      inputSchema: {
+        id: idSchema,
+        title: z.string().min(1).optional().describe('New title'),
+        notes: z.string().optional().describe('New notes'),
+        horizon: z.enum(SOMEDAY_HORIZONS).optional().describe('New horizon'),
+        category: z.string().optional().describe('New category')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const record = updateSomedayItem(db, args.id, {
+          title: args.title,
+          notes: args.notes,
+          horizon: args.horizon,
+          category: args.category
+        })
+        return { action: 'update', entity: 'someday_item', id: record.id, record }
+      })
+  )
+
+  server.registerTool(
+    'delete_someday_item',
+    {
+      title: 'Delete Someday/Maybe Item',
+      description: 'Delete a someday/maybe item permanently.',
+      inputSchema: { id: idSchema },
+      annotations: DESTRUCTIVE_ANNOTATIONS
+    },
+    async ({ id }) =>
+      write(() => {
+        const record = deleteSomedayItem(db, id)
+        return { action: 'delete', entity: 'someday_item', id: record.id, record }
+      })
+  )
+
+  // ── One-shot capture ───────────────────────────────────────────────────────
+
+  server.registerTool(
+    'capture_item',
+    {
+      title: 'Capture Item (随想 or GTD bucket)',
+      description:
+        'Capture one thought into the right place — the single tool to reach for when the user ' +
+        'says "记一下 …". target decides where it lands: "note" → 随想 (notes table); ' +
+        '"inbox"/"next"/"waiting"/"someday" → a task in that GTD bucket; "project" → a new ' +
+        'project; "waiting_item" → a delegated item (needs waiting_for); "someday_item" → a ' +
+        'someday/maybe idea (needs horizon).',
+      inputSchema: {
+        content: z.string().min(1).describe('The thought to capture'),
+        target: z.enum(CAPTURE_TARGETS).describe('Where the thought should land'),
+        tags: z.array(z.string()).optional().describe('Tags (target="note")'),
+        weather: z.string().optional().describe('Weather label (target="note")'),
+        context: z.string().optional().describe('@context (task targets)'),
+        due_date: z.string().optional().describe('Due date / delegation date (YYYY-MM-DD)'),
+        priority: z.enum(TASK_PRIORITIES).optional().describe('Priority (task targets)'),
+        ...projectRefSchema,
+        waiting_for: z
+          .string()
+          .optional()
+          .describe('Who the user is waiting on (target="waiting" / "waiting_item")'),
+        since: z
+          .string()
+          .optional()
+          .describe('Delegation date (YYYY-MM-DD, target="waiting_item")'),
+        notes: z.string().optional().describe('Extra context'),
+        horizon: z.enum(SOMEDAY_HORIZONS).optional().describe('Horizon (target="someday_item")'),
+        category: z.string().optional().describe('Category (target="someday_item")')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) =>
+      write(() => {
+        const result = captureItem(db, {
+          content: args.content,
+          target: args.target,
+          tags: args.tags,
+          weather: args.weather,
+          context: args.context,
+          due_date: args.due_date,
+          priority: args.priority,
+          project_id: args.project_id,
+          project: args.project,
+          waiting_for: args.waiting_for,
+          notes: args.notes,
+          horizon: args.horizon,
+          category: args.category,
+          since: args.since
+        })
+        return {
+          action: 'capture',
+          target: result.target,
+          bucket: result.bucket,
+          id: result.record.id,
+          record: result.record,
+          warnings: result.warnings
+        }
+      })
   )
 }

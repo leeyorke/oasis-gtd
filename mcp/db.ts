@@ -1,5 +1,5 @@
 /**
- * Resolves and opens the Oasis GTD SQLite database for strictly read-only access.
+ * Resolves and opens the Oasis GTD SQLite database.
  *
  * The desktop app stores all of its data in the Electron userData directory:
  *
@@ -15,6 +15,11 @@
  * The app runs SQLite in WAL mode, so external readers can safely read the
  * database file while the app is running; no IPC into the Electron process
  * is required and the running app is never blocked or disturbed.
+ *
+ * The same WAL mode also lets a second process WRITE while the app is running:
+ * SQLite serialises writers, `busy_timeout` makes the MCP server wait for the
+ * app's short transactions instead of failing. Writes are only possible when
+ * the server was started in write mode (see `resolveWritePolicy`).
  */
 import { DatabaseSync } from 'node:sqlite'
 import { existsSync, statSync } from 'node:fs'
@@ -35,6 +40,75 @@ export interface DbInfo {
   schemaVersion: number
   /** Size of the main database file in bytes. */
   sizeBytes: number
+}
+
+/** Transport the server was started with — decides the default write policy. */
+export type Transport = 'stdio' | 'http'
+
+/**
+ * Whether the write tools may modify the database, and why.
+ *
+ * The policy is resolved once at startup and never changes while the server
+ * runs, so a client cannot flip it mid-session.
+ */
+export interface WritePolicy {
+  /** True when write tools are allowed to change data. */
+  enabled: boolean
+  /** Why writes are disabled (null when they are enabled). */
+  reason: string | null
+  /** Where the decision came from — shown in the server log and instructions. */
+  source: string
+}
+
+const TRUTHY = new Set(['1', 'true', 'yes', 'on', 'enabled'])
+const FALSY = new Set(['0', 'false', 'no', 'off', 'disabled'])
+
+/**
+ * Resolves the write policy.
+ *
+ * `OASIS_MCP_WRITE` wins whenever it is set:
+ *   1 / true / yes / on   → writes allowed
+ *   0 / false / no / off  → writes refused
+ *
+ * Without the variable the transport decides:
+ *   stdio — a local agent on this machine (`.mcp.json`): writes allowed.
+ *   http  — a network endpoint other machines can reach: writes refused
+ *           unless the operator opts in explicitly (the desktop app passes
+ *           OASIS_MCP_WRITE=1 when the user enables writes in Settings).
+ */
+export function resolveWritePolicy(
+  transport: Transport,
+  env: Record<string, string | undefined> = process.env
+): WritePolicy {
+  const raw = (env['OASIS_MCP_WRITE'] ?? '').trim().toLowerCase()
+  if (raw !== '') {
+    if (TRUTHY.has(raw)) {
+      return { enabled: true, reason: null, source: 'OASIS_MCP_WRITE' }
+    }
+    if (FALSY.has(raw)) {
+      return {
+        enabled: false,
+        reason:
+          'Write operations are disabled for this server (OASIS_MCP_WRITE is set to a falsy value).',
+        source: 'OASIS_MCP_WRITE'
+      }
+    }
+    return {
+      enabled: false,
+      reason: `OASIS_MCP_WRITE has an invalid value "${raw}" — expected one of 1/0, true/false, yes/no, on/off.`,
+      source: 'OASIS_MCP_WRITE'
+    }
+  }
+  if (transport === 'stdio') {
+    return { enabled: true, reason: null, source: 'default (stdio transport)' }
+  }
+  return {
+    enabled: false,
+    reason:
+      'Write operations are disabled for the HTTP transport. Set OASIS_MCP_WRITE=1 for the ' +
+      'server process, or enable "Allow writes" in the desktop app (Settings → MCP).',
+    source: 'default (http transport)'
+  }
 }
 
 export interface DbCandidate {
@@ -180,26 +254,52 @@ export function describeError(error: unknown): string {
 }
 
 /**
- * Opens the resolved database. Read-only is attempted first (the preferred,
- * safe mode); a read-write handle is only used as a fallback for files whose
- * WAL sidecars prevent a read-only open — and even then every statement this
- * server runs is a SELECT (see assertReadOnly below).
+ * Opens the resolved database.
+ *
+ * Read-only is attempted first (the preferred, safe mode); a read-write handle
+ * is only used as a fallback for files whose WAL sidecars prevent a read-only
+ * open — and even then every read statement this server runs is a SELECT (see
+ * assertReadOnly below).
+ *
+ * With `allowWrite: true` the file is opened read-write from the start, which
+ * is what the write tools need. The connection is then tuned for safe
+ * concurrent use with the running desktop app:
+ *   - `busy_timeout`  — wait for the app's short write transactions instead of
+ *                       failing with SQLITE_BUSY.
+ *   - `journal_mode`  — WAL, so the app can keep reading while we write.
+ *   - `foreign_keys`  — ON, so a task can never reference a missing project.
  */
-export function openDatabase(): { db: DatabaseSync; info: DbInfo } {
+export function openDatabase(options: { allowWrite?: boolean } = {}): { db: DatabaseSync; info: DbInfo } {
   const candidate = resolveCandidate()
-  const attempts: Array<{ mode: OpenMode; open: () => DatabaseSync }> = [
-    { mode: 'read-only', open: () => new DatabaseSync(candidate.path, { readOnly: true }) },
-    { mode: 'read-write', open: () => new DatabaseSync(candidate.path) }
-  ]
+  const allowWrite = options.allowWrite === true
+  const attempts: Array<{ mode: OpenMode; open: () => DatabaseSync }> = allowWrite
+    ? [{ mode: 'read-write', open: () => new DatabaseSync(candidate.path) }]
+    : [
+        { mode: 'read-only', open: () => new DatabaseSync(candidate.path, { readOnly: true }) },
+        { mode: 'read-write', open: () => new DatabaseSync(candidate.path) }
+      ]
 
   let lastError: unknown = null
   for (const attempt of attempts) {
     try {
       const db = attempt.open()
       try {
-        db.exec('PRAGMA busy_timeout = 3000')
+        db.exec('PRAGMA busy_timeout = 5000')
       } catch {
         /* some connections refuse pragmas — not fatal */
+      }
+      if (allowWrite) {
+        // WAL keeps the desktop app readable while this process writes.
+        try {
+          db.prepare('PRAGMA journal_mode = WAL').get()
+        } catch {
+          /* another process may hold the file — WAL is the app default anyway */
+        }
+        try {
+          db.exec('PRAGMA foreign_keys = ON')
+        } catch {
+          /* not fatal: writes still validate their references explicitly */
+        }
       }
       if (!isGtdDatabase(db)) {
         db.close()
@@ -258,6 +358,42 @@ export function queryOne<T = Record<string, unknown>>(
 ): T | undefined {
   assertReadOnly(sql)
   return db.prepare(sql).get(...params) as T | undefined
+}
+
+// ─── Write helpers ───────────────────────────────────────────────────────────
+//
+// The write tools in write.ts build every statement with bound parameters, so
+// no user-supplied value is ever concatenated into SQL. The helpers below are
+// the ONLY way this server mutates data; they do not re-validate the SQL
+// (that is write.ts's job) but they do guarantee the write happens inside a
+// transaction so a failed step never leaves half a change behind.
+
+/** Runs one INSERT/UPDATE/DELETE with bound parameters. */
+export function runStatement(db: DatabaseSync, sql: string, params: unknown[] = []): void {
+  db.prepare(sql).run(...params)
+}
+
+/**
+ * Runs `fn` inside an IMMEDIATE transaction.
+ *
+ * IMMEDIATE takes the write lock up front, so a concurrent writer (the running
+ * desktop app) can never interleave with ours and produce a half-applied
+ * change.
+ */
+export function transact<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const result = fn()
+    db.exec('COMMIT')
+    return result
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      /* the transaction was already rolled back by SQLite */
+    }
+    throw error
+  }
 }
 
 /** Row counts for every table the app owns. */

@@ -162,6 +162,11 @@ const api = {
   // MCP agent endpoint (Settings → MCP)
   getMcpState: () => ipcRenderer.invoke('mcp:getState'),
   setMcpEnabled: (enabled: boolean) => ipcRenderer.invoke('mcp:setEnabled', enabled),
+  setMcpAllowWrite: (allowWrite: boolean) => ipcRenderer.invoke('mcp:setAllowWrite', allowWrite),
+
+  // Cheap signature of the GTD tables — changes when an external agent (the
+  // MCP server) writes into the database.
+  getDataStamp: () => ipcRenderer.invoke('data:getStamp'),
 
   // Quick Capture
   closeQuickCapture: () => ipcRenderer.send('quick-capture:close'),

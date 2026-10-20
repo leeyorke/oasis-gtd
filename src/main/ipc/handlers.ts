@@ -1060,6 +1060,15 @@ export function registerHandlers(): void {
   // (src/main/index.ts → mcp-controller.ts).
   ipcMain.handle('mcp:getState', () => mcpController.getState())
   ipcMain.handle('mcp:setEnabled', (_, enabled: boolean) => mcpController.setEnabled(enabled))
+  // Whether agents may create/change/delete data through the endpoint. The
+  // child process reads the flag from its environment, so the controller
+  // restarts the endpoint for the change to take effect.
+  ipcMain.handle('mcp:setAllowWrite', (_, allowWrite: boolean) => mcpController.setAllowWrite(allowWrite))
+
+  // ─── External change detection ──────────────────────────────────────────────
+  // The MCP server writes straight into the database file, so the renderer
+  // polls this cheap signature and reloads the lists when it moves.
+  ipcMain.handle('data:getStamp', () => dataQueries.getDataStamp())
 
   // ─── Export Conversation Markdown ───────────────────────────────────────────
   ipcMain.handle('chat:exportMarkdown', async (_, conversationId: string, title: string, messages: Array<{role: string; content: string}>) => {

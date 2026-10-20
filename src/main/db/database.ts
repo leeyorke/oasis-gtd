@@ -612,6 +612,33 @@ export const dataQueries = {
     messages:      (db.prepare('SELECT COUNT(*) as n FROM chat_messages').get() as { n: number }).n,
   }),
 
+  /**
+   * A cheap signature of the GTD tables, used by the renderer to notice that
+   * somebody else changed the data (the MCP server writes straight into this
+   * file while the app is running).
+   *
+   * `PRAGMA data_version` changes whenever ANOTHER connection commits — that
+   * alone is not enough, because an update to an older row keeps MAX() intact.
+   * The content signature (row counts + the sum of every updated_at) catches
+   * those, so a change is detected whichever way it arrives.
+   */
+  getDataStamp: (): string => {
+    const version = db.pragma('data_version', { simple: true })
+    const row = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM tasks) || '|' ||
+        (SELECT COALESCE(SUM(CAST(strftime('%s', updated_at) AS INTEGER)), 0) FROM tasks) || '|' ||
+        (SELECT COUNT(*) FROM projects) || '|' ||
+        (SELECT COALESCE(SUM(CAST(strftime('%s', updated_at) AS INTEGER)), 0) FROM projects) || '|' ||
+        (SELECT COUNT(*) FROM waiting_items) || '|' ||
+        (SELECT COUNT(*) FROM someday_items) || '|' ||
+        (SELECT COALESCE(SUM(CAST(strftime('%s', COALESCE(updated_at, created_at)) AS INTEGER)), 0) FROM someday_items) || '|' ||
+        (SELECT COUNT(*) FROM notes) || '|' ||
+        (SELECT COALESCE(SUM(CAST(strftime('%s', updated_at) AS INTEGER)), 0) FROM notes) AS stamp
+    `).get() as { stamp: string }
+    return `${version}:${row.stamp}`
+  },
+
   exportAll: () => ({
     exported_at: new Date().toISOString(),
     tasks:        db.prepare('SELECT * FROM tasks').all(),

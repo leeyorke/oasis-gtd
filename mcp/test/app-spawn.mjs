@@ -89,6 +89,8 @@ function buildFixtureDb(filePath) {
       since TEXT NOT NULL, project_id TEXT, notes TEXT, created_at TEXT NOT NULL);
     CREATE TABLE someday_items (id TEXT PRIMARY KEY, title TEXT NOT NULL, notes TEXT, horizon TEXT,
       category TEXT, created_at TEXT NOT NULL, updated_at TEXT);
+    CREATE TABLE notes (id TEXT PRIMARY KEY, content TEXT NOT NULL, tags TEXT, weather TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     CREATE TABLE ai_providers (id TEXT PRIMARY KEY, name TEXT NOT NULL, provider_type TEXT,
       base_url TEXT, model TEXT, api_key TEXT, created_at TEXT NOT NULL);
     CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -210,7 +212,7 @@ async function main() {
     }, 'bundle-token-1')
     check('bundle: initialize', init.message?.result?.serverInfo?.name === 'oasis-gtd')
     const tools = await rpc(bundlePort, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, 'bundle-token-1')
-    check('bundle: tools/list → 18', (tools.message?.result?.tools ?? []).length === 18)
+    check('bundle: tools/list → 34', (tools.message?.result?.tools ?? []).length === 34)
     const bundleTasks = await callTool(bundlePort, 'list_tasks', {}, 'bundle-token-1')
     check('bundle: reads the app database', bundleTasks.total_matching === 2
       && bundleTasks.tasks.every((task) => task.id.startsWith('aaaaaaaa-')))
@@ -218,6 +220,15 @@ async function main() {
     check('bundle: serves the exact database file', bundleDbInfo.database.path === fixturePath,
       bundleDbInfo.database.path)
     check('bundle: api_key never exposed', !JSON.stringify(bundleDbInfo).includes(SECRET))
+    // The HTTP transport is read-only unless the app explicitly opts in.
+    const bundleWrite = await rpc(bundlePort, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      params: { name: 'create_note', arguments: { content: 'nope' } }
+    }, 'bundle-token-1')
+    check('bundle: writes refused by default',
+      bundleWrite.message?.result?.isError === true
+      && /disabled/i.test(bundleWrite.message?.result?.content?.[0]?.text ?? ''),
+      bundleWrite.message?.result?.content?.[0]?.text)
     const unauthorized = await rpc(bundlePort, { jsonrpc: '2.0', id: 3, method: 'ping' }, null)
     check('bundle: token required', unauthorized.status === 401)
   } finally {
@@ -259,6 +270,7 @@ async function main() {
   check('manager: state exposes endpoint urls', Array.isArray(state.urls)
     && state.urls.some((url) => url.endsWith(`:${managerPort}/mcp`)))
   check('manager: dbPath passed through', state.dbPath === fixturePath)
+  check('manager: write access is on by default', state.allowWrite === true)
 
   try {
     check('manager: child becomes ready (/health)', await waitForHealth(managerPort), logs.join('\n').slice(-500))
@@ -294,6 +306,39 @@ async function main() {
     }, on.token)
     check('manager: stable token across restarts', on.token === state.token
       && initAgain.message?.result?.serverInfo?.name === 'oasis-gtd')
+
+    // ── Write access ───────────────────────────────────────────────────────
+    // The child reads OASIS_MCP_WRITE from its environment, so the controller
+    // restarts the endpoint when the switch flips.
+    const created = await callTool(managerPort, 'create_note', { content: 'agent 写入的随想' }, on.token)
+    check('manager: agent can write into the app database', typeof created.id === 'string'
+      && created.record?.content === 'agent 写入的随想')
+    const written = await callTool(managerPort, 'list_notes', {}, on.token)
+    check('manager: the written note is readable through the endpoint',
+      written.notes.some((note) => note.id === created.id))
+
+    const readonly = await controller.setAllowWrite(false)
+    check('manager: setAllowWrite(false) reports read-only', readonly.allowWrite === false)
+    check('manager: endpoint is back up after the write switch flipped',
+      await waitForHealth(managerPort))
+    const refused = await rpc(managerPort, {
+      jsonrpc: '2.0', id: 7, method: 'tools/call',
+      params: { name: 'create_note', arguments: { content: 'nope' } }
+    }, readonly.token)
+    check('manager: writes refused after the switch is off',
+      refused.message?.result?.isError === true,
+      refused.message?.result?.content?.[0]?.text)
+
+    const writable = await controller.setAllowWrite(true)
+    check('manager: setAllowWrite(true) re-enables writes', writable.allowWrite === true)
+    check('manager: endpoint is back up after re-enabling writes', await waitForHealth(managerPort))
+    const allowed = await rpc(managerPort, {
+      jsonrpc: '2.0', id: 8, method: 'tools/call',
+      params: { name: 'create_note', arguments: { content: '又可以写了' } }
+    }, writable.token)
+    check('manager: writes work again after the switch is on',
+      allowed.message?.result?.isError !== true,
+      allowed.message?.result?.content?.[0]?.text)
   } finally {
     // Simulates app quit: before-quit handler calls controller.stop().
     controller.stop()

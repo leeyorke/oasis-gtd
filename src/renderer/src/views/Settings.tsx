@@ -759,6 +759,20 @@ function McpSection() {
     }
   }
 
+  // Write access is read by the MCP server from its environment, so flipping
+  // it restarts the endpoint — the state comes back once it is up again.
+  const toggleWrite = async (allowWrite: boolean) => {
+    setBusy(true)
+    try {
+      setState(await window.api.setMcpAllowWrite(allowWrite))
+      setTimeout(refresh, 800)
+    } catch {
+      refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const copy = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -793,6 +807,38 @@ function McpSection() {
     flexShrink: 0,
     transition: 'all 0.2s',
   }
+
+  /** The On/Off button pair used by the service and write-access toggles. */
+  const toggleRow = (
+    selected: boolean | undefined,
+    onSelect: (value: boolean) => void
+  ) => (
+    <div style={{ display: 'flex', gap: '0.5rem' }}>
+      {[true, false].map(val => (
+        <button
+          key={String(val)}
+          onClick={() => onSelect(val)}
+          disabled={busy || selected === val}
+          style={{
+            background: selected === val ? 'var(--ink-primary)' : 'transparent',
+            color: selected === val ? 'var(--ink-light)' : 'var(--ink-secondary)',
+            border: '1px solid',
+            borderColor: selected === val ? 'var(--ink-primary)' : 'rgba(20,28,58,0.12)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.62rem',
+            padding: '0.35rem 0.9rem',
+            cursor: busy ? 'default' : 'pointer',
+            opacity: busy && selected === val ? 0.6 : 1,
+            transition: 'all 0.2s',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
+          {val ? t.on : t.off}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="fade-in">
@@ -846,6 +892,14 @@ function McpSection() {
           <FieldHint style={{ color: '#a83232' }}>{t.mcp_errorPrefix}: {state.error}</FieldHint>
         )}
         <FieldHint>{t.mcp_lifecycle}</FieldHint>
+      </FieldGroup>
+
+      {/* Write access — lets agents file thoughts and tasks for the user. */}
+      <FieldGroup label={t.mcp_write}>
+        {toggleRow(state?.allowWrite, toggleWrite)}
+        <FieldHint>{state?.allowWrite ? t.mcp_writeOn : t.mcp_writeOff}</FieldHint>
+        <FieldHint>{t.mcp_writeHint}</FieldHint>
+        <FieldHint>{t.mcp_writeTools}</FieldHint>
       </FieldGroup>
 
       {state?.running && (

@@ -10,7 +10,10 @@
     },
     "oasis-gtd": {
       "command": "node",
-      "args": ["mcp/index.ts"]
+      "args": ["mcp/index.ts"],
+      "env": {
+        "OASIS_MCP_WRITE": "1"
+      }
     }
   }
 }

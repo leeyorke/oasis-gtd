@@ -1,16 +1,27 @@
 # Oasis GTD — MCP Server
 
-An [MCP](https://modelcontextprotocol.io) server that lets **other agents read the Oasis GTD app's
-data** — tasks, projects, waiting-for items, someday items, notes, habits, AI chat history,
-reference resources and the weekly review checklist.
+An [MCP](https://modelcontextprotocol.io) server that lets **other agents read and write the Oasis
+GTD app's data** — tasks, projects, waiting-for items, someday items, notes (随想), habits, AI chat
+history, reference resources and the weekly review checklist.
 
-The server is **strictly read-only** and runs as a standalone process over stdio. It talks directly
-to the same SQLite database file the desktop app uses, so any data written by the running app is
-visible immediately. The Electron app itself is never started, blocked or modified.
+The server runs as a standalone process over stdio. It talks directly to the same SQLite database
+file the desktop app uses, so any data written by the running app is visible immediately, and — with
+write access enabled — anything an agent files is picked up by the app on its next refresh. The
+Electron app itself is never started, blocked or modified.
 
 ```
-agent / MCP client  ──stdin/stdout (JSON-RPC)──►  mcp/index.ts  ──SELECT──►  %APPDATA%\oasis-gtd\oasis-gtd.db
+agent / MCP client  ──stdin/stdout (JSON-RPC)──►  mcp/index.ts  ──SQL──►  %APPDATA%\oasis-gtd\oasis-gtd.db
 ```
+
+**Write access** is a switch, not a build flag:
+
+| Transport | Default | How to change it |
+|-----------|---------|------------------|
+| stdio (local agent) | **writes enabled** | `OASIS_MCP_WRITE=0` disables them |
+| http (LAN endpoint) | **writes disabled** | `OASIS_MCP_WRITE=1` enables them — the desktop app does this when you turn on "Write access" in Settings → MCP |
+
+With writes disabled the write tools stay registered but answer with a clear
+`Write operations are disabled …` error, so an agent never gets a confusing "unknown tool".
 
 ## Requirements
 
@@ -26,8 +37,8 @@ agent / MCP client  ──stdin/stdout (JSON-RPC)──►  mcp/index.ts  ──
 # from the repository root
 npm install       # once (installs @modelcontextprotocol/sdk as a devDependency)
 npm run mcp       # start the server on stdio
-npm run test:mcp  # 95-assertion end-to-end smoke test (fixture DB + tool/resource + HTTP sweep)
-                  # + app-spawn.mjs (14 assertions: app-managed spawn, packaged bundle, lifecycle)
+npm run test:mcp  # 167-assertion end-to-end smoke test (fixture DB + tool/resource + HTTP sweep)
+                  # + app-spawn.mjs (46 assertions: app-managed spawn, packaged bundle, lifecycle)
 ```
 
 The repository already registers the server for Claude Code-style clients in
@@ -146,12 +157,13 @@ work as-is through the legacy handshake above.
 ### Discovering the tools
 
 Tool discovery is built into the protocol: after `initialize`, every MCP client
-calls `tools/list` and receives all 18 tools (name, description, JSON-Schema
-parameters) plus `resources/list` / `resources/templates/list`. The
+calls `tools/list` and receives all 34 tools (19 read + 15 write; name, description,
+JSON-Schema parameters) plus `resources/list` / `resources/templates/list`. The
 `initialize` response also carries an **instructions** block that the client
-hands to the agent — it documents the GTD data model and tells the agent to call
-`get_overview` first. Claude Code-style clients do all of this automatically and
-expose the tools as `mcp__oasis-gtd__*`.
+hands to the agent — it documents the GTD data model, tells the agent to call
+`get_overview` first, and states whether writing is enabled on this server.
+Claude Code-style clients do all of this automatically and expose the tools as
+`mcp__oasis-gtd__*`.
 
 To inspect the catalogue yourself:
 
@@ -178,10 +190,11 @@ curl -X POST http://192.168.31.70:7800/mcp \
 - Stateless: each request runs against a fresh server instance, so no session state (and no other
   agent's context) is ever shared between connections.
 - Bearer token compared in constant time; without `OASIS_MCP_TOKEN` the server refuses to start.
-- The database is opened **read-only**, exactly like stdio mode — the network exposes nothing the
-  stdio server could not read.
+- The database is opened **read-only** unless write access is enabled — the network exposes nothing
+  the stdio server could not read, and nothing more.
 - `0.0.0.0` means every interface, i.e. anyone on the LAN with the token can read the user's GTD
-  data. Keep the token secret; use `OASIS_MCP_HOST=127.0.0.1` when only local agents need it.
+  data — and, with write access on, change it. Keep the token secret; use
+  `OASIS_MCP_HOST=127.0.0.1` when only local agents need it.
 - Request bodies are capped at 1 MB.
 
 ## App-managed mode (automatic start/stop)
@@ -207,12 +220,15 @@ toggle (no app restart needed):
   grey `Stopped` otherwise, including start failures (the reason is shown).
 - **On / Off toggle** — persists to `app_settings.mcp_http_enabled` and starts
   or kills the service immediately.
+- **Write access toggle** — persists to `app_settings.mcp_allow_write` and restarts
+  the endpoint so the change takes effect immediately. On = agents may file
+  thoughts/tasks and edit or delete GTD data; off = read-only endpoint.
 - **Endpoint URLs** — loopback + every LAN address, each with a copy button.
 - **Bearer token** — the value to hand to agents, with a copy button.
 - **Database** — the exact file the endpoint is serving.
 
-Backed by the `mcp:getState` / `mcp:setEnabled` IPC handlers in
-`src/main/ipc/handlers.ts`, served by the shared controller in
+Backed by the `mcp:getState` / `mcp:setEnabled` / `mcp:setAllowWrite` IPC handlers
+in `src/main/ipc/handlers.ts`, served by the shared controller in
 `src/main/mcp-controller.ts`.
 
 ### Settings keys (app_settings)
@@ -223,6 +239,7 @@ Backed by the `mcp:getState` / `mcp:setEnabled` IPC handlers in
 | `mcp_http_port` | `7800` packaged / `7801` dev | Port for the endpoint. Dev builds default to 7801 so a dev app and an installed build can run side by side |
 | `mcp_http_token` | auto-generated | Bearer token (base64url, 24 random bytes). Generated on first launch and kept stable across restarts |
 | `mcp_http_node_path` | auto-detected | Absolute path to the system Node.js (≥ 22.5) runtime. Auto-resolved (PATH → registry → common install locations); set this when detection picks the wrong node or finds none |
+| `mcp_allow_write` | enabled | Whether agents may create/change/delete data through the endpoint. Passed to the child as `OASIS_MCP_WRITE`; flipping it restarts the endpoint |
 
 > **The token is per-profile.** `npm run dev` and the packaged build use *different*
 > databases (`oasis-gtd-dev.db` vs `oasis-gtd.db`), so each has its own
@@ -246,7 +263,11 @@ node.exe), and a pinned `mcp_http_node_path` is a *preference*, not a hard
 requirement: if it cannot be launched, auto-discovery takes over.
 
 The exact database file the app uses is passed to the server (`OASIS_DB_PATH`),
-so agents always see the same data as the app — live, read-only.
+so agents always see the same data as the app — live.
+
+The app polls a cheap signature of the GTD tables every few seconds and reloads
+its lists when it moves, so anything an agent files shows up in the app within
+seconds (and immediately when the window regains focus).
 
 Only one endpoint can run per machine: the controller kills any child left over
 from a main-process reload (electron-vite dev re-evaluates the main entry on
@@ -270,6 +291,10 @@ The stdio section below still applies to local MCP clients (`.mcp.json`).
 |------------------|-----------------------|---------|---------|
 | `OASIS_DB_PATH`  | file path             | auto    | Explicit path to the `oasis-gtd*.db` SQLite file. Wins over auto-detection. |
 | `OASIS_PROFILE`  | `dev` \| `packaged`   | auto    | Force which database to serve when both a dev and a packaged database exist. |
+| `OASIS_MCP_WRITE`| `1` \| `0`            | stdio: `1`, http: `0` | Whether the write tools may modify the database. `1/true/yes/on` enables, `0/false/no/off` disables. |
+| `OASIS_MCP_TOKEN`| any string            | —       | Bearer token; required in HTTP mode. |
+| `OASIS_MCP_HOST` | host / IP             | `0.0.0.0` | Bind address in HTTP mode. Use `127.0.0.1` for a loopback-only endpoint. |
+| `OASIS_MCP_PORT` | `1`–`65535`           | `7800`  | TCP port in HTTP mode. |
 
 Auto-detection probes the Electron userData directory for `oasis-gtd` (dev, `oasis-gtd-dev.db`)
 and `Oasis GTD` (packaged, `oasis-gtd.db`) — on Windows/macOS/Linux respectively — and prefers the
@@ -283,7 +308,7 @@ profile sorts first). `get_db_info` always reports which file is being served.
 | Tool | Purpose |
 |------|---------|
 | `get_overview` | Whole-system snapshot: counts per task status, attention items (overdue, due today, inbox size, stale waiting-for), recent activity, `@context` list, database info. **Start here.** |
-| `get_db_info` | Which database file is served (path, profile, read-only mode, schema version, size) and row counts per table. |
+| `get_db_info` | Which database file is served (path, profile, open mode, schema version, size) and row counts per table. |
 | `list_tasks` | Tasks with filters: `status`, `project_id`, `priority`, `context`, `query`, `due_before`, `exclude_done`, `order`, `limit`, `offset`. |
 
 Task statuses: `inbox` (unprocessed captures), `next` (next action), `waiting` (delegated/blocked),
@@ -309,14 +334,48 @@ Static: `gtd://overview`, `gtd://tasks`, `gtd://projects`, `gtd://waiting-items`
 
 Templated: `gtd://tasks/{status}`, `gtd://projects/{id}`, `gtd://conversations/{id}`
 
+## What agents can write
+
+Available when write access is enabled (see the switch at the top of this file).
+Every write answers with `{ action, entity, id, record }` — the row as it now
+exists in the database — so the agent can report exactly what was filed.
+
+| Tool | Purpose |
+|------|---------|
+| `capture_item` | **The one to reach for.** Routes one thought by `target`: `note` → 随想, `inbox`/`next`/`waiting`/`someday` → a task in that GTD bucket, `project`, `waiting_item` (needs `waiting_for`), `someday_item` (needs `horizon`). |
+| `create_note` / `update_note` / `delete_note` | 随想: content, tags (array), weather. |
+| `create_task` / `update_task` / `delete_task` | Tasks: title, status, notes, `@context`, due date, priority, `waiting_for`, project. |
+| `create_project` / `update_project` / `delete_project` | Projects: title, description, outcome, status. Deleting detaches the project's tasks and waiting items instead of orphaning them. |
+| `create_waiting_item` / `delete_waiting_item` | Delegated items: title, `waiting_for`, `since`, project, notes. |
+| `create_someday_item` / `update_someday_item` / `delete_someday_item` | Someday/maybe ideas: title, notes, horizon, category. |
+
+Details worth knowing:
+
+- **Projects by title.** `create_task` / `capture_item` accept `project_id` (UUID) *or*
+  `project` (title, matched case-insensitively). An ambiguous title is an error — the
+  message lists the candidates.
+- **Partial updates.** Only the fields you pass are changed.
+- **Validation mirrors the app.** `status`, `priority` and `horizon` are checked against the
+  app's own `CHECK` constraints; a `waiting` task without `waiting_for` is refused; dates are
+  normalised to `YYYY-MM-DD`.
+- **Deletes are permanent.** They are marked `destructiveHint: true`, so a well-behaved client
+  asks the user first.
+- **Transactions.** Multi-step changes (e.g. deleting a project) run inside one transaction —
+  a failure never leaves half a change behind.
+- **`ai_providers` and `app_settings` are never writable** — API keys and configuration stay
+  out of reach.
+
 ## How it works
 
 - **Schema source of truth:** `src/main/db/database.ts`. The MCP layer re-uses the same table
   definitions; column names are returned verbatim (snake_case) so agents see the app's own model.
 - **Concurrency:** the app opens SQLite in WAL mode, so external readers can read while the app
-  runs. The server opens the file read-only whenever possible (falling back to a read-write handle
-  only when WAL sidecars prevent a read-only open — and even then it executes SELECT statements
-  only; `db.ts` rejects any non-`SELECT` statement before it reaches SQLite).
+  runs — and an external writer can write, too. In read mode the server opens the file read-only
+  whenever possible (falling back to a read-write handle only when WAL sidecars prevent a
+  read-only open — and even then it executes SELECT statements only; `db.ts` rejects any
+  non-`SELECT` statement before it reaches SQLite). In write mode it opens read-write, sets
+  `busy_timeout` (so the app's short transactions are waited for, not failed on), keeps WAL and
+  turns foreign keys on.
 - **No build step:** TypeScript runs directly on Node (type stripping). `mcp/package.json` declares
   `"type": "module"` for this subdirectory only — the Electron app build in `out/` is untouched.
 - **Local only:** the server speaks stdio and binds no ports; every agent that connects does so
@@ -324,12 +383,16 @@ Templated: `gtd://tasks/{status}`, `gtd://projects/{id}`, `gtd://conversations/{
 
 ## Security notes
 
-- Read-only by construction: every tool advertises `readOnlyHint`, and `db.ts` validates each
-  statement is a `SELECT` (or a benign informational PRAGMA).
+- The read path is read-only by construction: every read tool advertises `readOnlyHint`, and
+  `db.ts` validates each statement is a `SELECT` (or a benign informational PRAGMA).
+- The write path is opt-in per server (see the switch at the top of this file) and narrow:
+  only the GTD tables are writable, every statement is parameterised, updates touch whitelisted
+  columns only, and `ai_providers` / `app_settings` are never writable.
 - **`ai_providers` (API keys) and `app_settings` are intentionally not exposed** — no tool or
   resource can read them, and the smoke test asserts a planted secret never leaks.
 - The server exposes the user's personal data (tasks, notes, chat history) to whatever MCP client
-  connects. Only register it with clients you trust.
+  connects — and, with write access on, lets it change that data. Only register it with clients
+  you trust, and keep the bearer token secret.
 
 ## Files
 
@@ -338,13 +401,14 @@ mcp/
 ├── index.ts          # entry point (stdio or --http transport, env config, logging to stderr only)
 ├── http-server.ts    # Streamable HTTP transport: bearer auth, CORS, /health, stateless per-request
 ├── server.ts         # McpServer identity + agent instructions
-├── tools.ts          # 18 read-only tools (zod-validated inputs)
+├── tools.ts          # 34 tools (19 read + 15 write, zod-validated inputs)
 ├── resources.ts      # static + templated resources
-├── data.ts           # all SQL queries (the data access layer)
-├── db.ts             # database resolution, read-only open, statement whitelisting
+├── data.ts           # all read queries (the data access layer)
+├── write.ts          # all write operations (validation, transactions, whitelisted columns)
+├── db.ts             # database resolution, read-only/read-write open, statement whitelisting
 ├── types/sqlite.d.ts # ambient typings for Node's built-in node:sqlite
-├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP, 95 assertions)
-├── test/app-spawn.mjs # app-managed spawn test (bundle + src/main/mcp-http.ts wiring, 14 assertions)
+├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP + writes, 167 assertions)
+├── test/app-spawn.mjs # app-managed spawn test (bundle + src/main/mcp-http.ts wiring, 46 assertions)
 └── tsconfig.json     # editor / `tsc --noEmit` support (no emit — Node runs the TS directly)
 ```
 
@@ -379,6 +443,7 @@ traced to network layer, HTTP layer, or auth layer.
 
 ## Extending
 
-1. Add a query function to `mcp/data.ts` (SELECT only).
+1. Add a read query function to `mcp/data.ts` (SELECT only) or a write function to `mcp/write.ts`
+   (parameterised statements, whitelisted columns, wrapped in `transact`).
 2. Register a tool in `mcp/tools.ts` (`server.registerTool(...)`) or a resource in `mcp/resources.ts`.
 3. Add coverage to `mcp/test/smoke.mjs` and run `npm run test:mcp`.

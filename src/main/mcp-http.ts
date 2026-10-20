@@ -66,6 +66,8 @@ export interface McpServiceState {
   nodePath: string | null
   /** Last startup failure, if any (missing node, port in use, …). */
   error: string | null
+  /** Whether agents may create/change/delete data through this endpoint. */
+  allowWrite: boolean
 }
 
 export interface McpController {
@@ -75,6 +77,8 @@ export interface McpController {
   stop: () => McpServiceState
   /** Persists the preference and starts/stops the service immediately. */
   setEnabled: (enabled: boolean) => Promise<McpServiceState>
+  /** Persists the write preference and restarts the child so it takes effect. */
+  setAllowWrite: (allowWrite: boolean) => Promise<McpServiceState>
   /** Current state without changing anything. */
   getState: () => McpServiceState
   isRunning: () => boolean
@@ -90,6 +94,18 @@ export const MCP_SETTING_PORT = 'mcp_http_port'
 export const MCP_SETTING_TOKEN = 'mcp_http_token'
 /** Optional explicit path to the system node executable (see resolveNodeExecutable). */
 export const MCP_SETTING_NODE_PATH = 'mcp_http_node_path'
+/**
+ * Whether agents may write through the endpoint (app_settings.mcp_allow_write).
+ *
+ * The MCP server reads this as OASIS_MCP_WRITE in the child's environment, so
+ * flipping it requires a restart of the child process — setAllowWrite() does
+ * that for you.
+ *
+ * Default: enabled. The endpoint is token-protected and the user asked for
+ * agents to be able to file thoughts and tasks; the setting is one click away
+ * in Settings → MCP for anyone who wants a read-only endpoint.
+ */
+export const MCP_SETTING_ALLOW_WRITE = 'mcp_allow_write'
 
 /** Survives electron-vite dev module reloads (globalThis is per-process). */
 const GLOBAL_CHILD_KEY = '__oasisGtdMcpHttpChild'
@@ -333,6 +349,11 @@ function resolveToken(deps: McpControllerDeps): string {
   return token
 }
 
+/** Whether agents may write through the endpoint (default: enabled). */
+function resolveAllowWrite(deps: McpControllerDeps): boolean {
+  return deps.getSetting(MCP_SETTING_ALLOW_WRITE) !== '0'
+}
+
 /** The child from a previous module load, if it is still alive. */
 function leftoverGlobalChild(): ChildProcess | undefined {
   const previous = (globalThis as Record<string, unknown>)[GLOBAL_CHILD_KEY] as
@@ -374,7 +395,8 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       urls: endpointUrls(port),
       dbPath: deps.dbPath(),
       nodePath: node.path,
-      error
+      error,
+      allowWrite: resolveAllowWrite(deps)
     }
   }
 
@@ -394,6 +416,7 @@ export function createMcpController(deps: McpControllerDeps): McpController {
 
     const token = resolveToken(deps)
     const port = resolvePort(deps)
+    const allowWrite = resolveAllowWrite(deps)
     error = null
 
     // The MCP server needs Node ≥ 22.5, which Electron's own Node (20.x) does
@@ -448,6 +471,9 @@ export function createMcpController(deps: McpControllerDeps): McpController {
             OASIS_DB_PATH: deps.dbPath(),
             OASIS_MCP_TOKEN: token,
             OASIS_MCP_PORT: String(port),
+            // The MCP server reads this to decide whether its write tools
+            // (create_/update_/delete_/capture_item) may touch the database.
+            OASIS_MCP_WRITE: allowWrite ? '1' : '0',
             // LAN-accessible by design; the bearer token is the access control.
             OASIS_MCP_HOST: '0.0.0.0'
           },
@@ -514,6 +540,11 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       `[MCP] agent HTTP endpoint: http://<this-machine>:${port}/mcp  token: ${token} ` +
         '(disable in Settings → MCP, or set app_settings.mcp_http_enabled=0)'
     )
+    deps.onLog?.(
+      allowWrite
+        ? '[MCP] write access ENABLED — agents may create, change and delete tasks, notes and projects'
+        : '[MCP] write access disabled — agents can only read your data'
+    )
     return getState()
   }
 
@@ -522,5 +553,25 @@ export function createMcpController(deps: McpControllerDeps): McpController {
     return enabled ? start() : stop()
   }
 
-  return { start, stop, setEnabled, getState, isRunning }
+  /**
+   * Flips the write permission. The child process reads OASIS_MCP_WRITE from
+   * its environment, so the endpoint has to be restarted for the change to
+   * take effect.
+   */
+  const setAllowWrite = async (allowWrite: boolean): Promise<McpServiceState> => {
+    const previous = resolveAllowWrite(deps)
+    deps.setSetting(MCP_SETTING_ALLOW_WRITE, allowWrite ? '1' : '0')
+    if (previous === allowWrite || !isRunning()) return getState()
+
+    stop()
+    await sleep(400) // let the OS release the listening socket
+    let state = await start()
+    if (state.error && state.error.includes('already in use')) {
+      await sleep(800)
+      state = await start()
+    }
+    return state
+  }
+
+  return { start, stop, setEnabled, setAllowWrite, getState, isRunning }
 }
