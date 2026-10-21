@@ -15,6 +15,11 @@ files:
   - '!{tsconfig.json,tsconfig.*}'
   - '!tailwind.config.js'
   - '!postcss.config.js'
+  # Repository-only assets: the README screenshot and the icon notes are not
+  # used by the app. The icons themselves (icon.ico / icon.png) are shipped
+  # through extraResources, because the app loads them at runtime.
+  - '!resources/Oasis_GTD_iQfYzpW4Wa.png'
+  - '!resources/README.txt'
 asarUnpack:
   - resources/**
   - node_modules/better-sqlite3/**
@@ -29,6 +34,8 @@ asarUnpack:
 extraResources:
   - from: resources/icon.ico
     to: icon.ico
+  # The Linux window icon (see src/main/index.ts) is loaded from the
+  # executable's directory in a packaged build.
   - from: resources/icon.png
     to: icon.png
   # Self-contained MCP server bundle the app spawns as `node server.mjs --http`
