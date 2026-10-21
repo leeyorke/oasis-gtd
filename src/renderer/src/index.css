@@ -5687,6 +5687,22 @@ body {
   flex-shrink: 0;
 }
 
+/* "Marked complete when the timer ends" — shown above the controls. */
+.pomodoro-auto-hint {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+.pomodoro-auto-hint svg {
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+
 .pomodoro-controls {
   display: flex;
   align-items: center;

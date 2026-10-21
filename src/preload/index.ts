@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { FocusTargetType } from '../renderer/src/types'
 
 type AIStreamStartCallback = (event: IpcRendererEvent, data: { conversationId: string }) => void
 type AIStreamChunkCallback = (event: IpcRendererEvent, data: { conversationId: string; content: string }) => void
@@ -69,12 +70,19 @@ const api = {
   getFocusConfig: () => ipcRenderer.invoke('focus:getConfig'),
   setFocusGoalMinutes: (minutes: number) => ipcRenderer.invoke('focus:setGoalMinutes', minutes),
   setFocusDurationMinutes: (minutes: number) => ipcRenderer.invoke('focus:setDurationMinutes', minutes),
+  setFocusAutoComplete: (enabled: boolean) => ipcRenderer.invoke('focus:setAutoComplete', enabled),
   setFocusSound: (filePath: string | null) => ipcRenderer.invoke('focus:setSound', filePath),
   pickFocusSound: () => ipcRenderer.invoke('focus:pickSound'),
   playFocusSound: () => ipcRenderer.invoke('focus:playSound'),
   getFocusState: () => ipcRenderer.invoke('focus:getState'),
-  startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) =>
-    ipcRenderer.invoke('focus:startSession', payload),
+  startFocusSession: (payload: {
+    taskId?: string
+    taskTitle?: string
+    context?: string
+    durationMinutes?: number
+    targetType?: FocusTargetType
+    targetId?: string
+  }) => ipcRenderer.invoke('focus:startSession', payload),
   pauseFocusSession: () => ipcRenderer.invoke('focus:pauseSession'),
   resumeFocusSession: () => ipcRenderer.invoke('focus:resumeSession'),
   stopFocusSession: () => ipcRenderer.invoke('focus:stopSession'),

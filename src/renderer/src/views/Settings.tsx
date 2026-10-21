@@ -17,7 +17,7 @@ const PROVIDER_PRESETS = [
 
 export default function Settings() {
   const { settings, updateSetting, providers, saveProvider, setActiveProvider, deleteProvider, loadProviders, goBack,
-          focusConfig, loadFocusConfig, pickFocusSound, setFocusSound } = useStore()
+          focusConfig, loadFocusConfig, pickFocusSound, setFocusSound, setFocusAutoComplete } = useStore()
   const t = useT()
   const [activeSection, setActiveSection] = useState<Section>('general')
   const [appVersion, setAppVersion] = useState('')
@@ -330,6 +330,35 @@ export default function Settings() {
           {activeSection === 'pomodoro' && (
             <div className="fade-in">
               <SectionTitle>{t.settings_pomodoro}</SectionTitle>
+
+              <FieldGroup label={t.settings_autoComplete}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {[true, false].map(val => (
+                    <button
+                      key={String(val)}
+                      onClick={() => setFocusAutoComplete(val)}
+                      disabled={focusConfig?.autoComplete === val}
+                      style={{
+                        background: focusConfig?.autoComplete === val ? 'var(--ink-primary)' : 'transparent',
+                        color: focusConfig?.autoComplete === val ? 'var(--ink-light)' : 'var(--ink-secondary)',
+                        border: '1px solid',
+                        borderColor: focusConfig?.autoComplete === val ? 'var(--ink-primary)' : 'rgba(20,28,58,0.12)',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.62rem',
+                        padding: '0.35rem 0.9rem',
+                        cursor: 'pointer',
+                        opacity: focusConfig?.autoComplete === val ? 0.6 : 1,
+                        transition: 'all 0.2s',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {val ? t.on : t.off}
+                    </button>
+                  ))}
+                </div>
+                <FieldHint>{t.settings_autoCompleteHint}</FieldHint>
+              </FieldGroup>
 
               <FieldGroup label={t.settings_sound}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>

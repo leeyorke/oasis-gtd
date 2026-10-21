@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { Target, TrendingUp, RotateCcw, Square, Search, CircleDot } from 'lucide-react'
+import type { FocusTargetType } from '../types'
+import { Target, TrendingUp, RotateCcw, Square, Search, CircleDot, CheckCheck } from 'lucide-react'
 
 type PomodoroTab = 'focus' | 'stats'
 
@@ -34,6 +35,10 @@ interface FocusableItem {
   title: string
   /** Right-hand tag, e.g. `@Deep Work`. */
   tag: string
+  /** What the main process should close when the countdown hits zero. */
+  targetType: FocusTargetType
+  /** Primary key of the item in its own table (habits keep their own id). */
+  targetId: string
 }
 
 function formatClock(seconds: number): string {
@@ -138,23 +143,40 @@ export default function Pomodoro() {
 
     for (const task of tasks) {
       if (EXCLUDED_TASK_STATUSES.includes(task.status)) continue
-      items.push({ key: `task:${task.id}`, id: task.id, title: task.title, tag: task.context || '' })
+      items.push({
+        key: `task:${task.id}`,
+        id: task.id,
+        title: task.title,
+        tag: task.context || '',
+        targetType: 'task',
+        targetId: task.id,
+      })
     }
     for (const item of waitingItems) {
       items.push({
         key: `waiting:${item.id}`,
         title: item.title,
         tag: item.waiting_for ? `@${item.waiting_for}` : '',
+        targetType: 'waiting',
+        targetId: item.id,
       })
     }
     for (const habit of habits) {
-      items.push({ key: `habit:${habit.id}`, title: habit.title, tag: isZh ? '@习惯' : '@Habit' })
+      items.push({
+        key: `habit:${habit.id}`,
+        title: habit.title,
+        tag: isZh ? '@习惯' : '@Habit',
+        targetType: 'habit',
+        targetId: habit.id,
+      })
     }
     for (const item of somedayItems) {
       items.push({
         key: `someday:${item.id}`,
         title: item.title,
         tag: item.category || (isZh ? '@将来也许' : '@Someday'),
+        targetType: 'someday',
+        targetId: item.id,
       })
     }
 
@@ -197,16 +219,45 @@ export default function Pomodoro() {
         sourceKey: focusTimer.sourceKey ?? undefined,
         title: focusTimer.taskTitle || undefined,
         context: focusTimer.context || undefined,
+        targetType: focusTimer.targetType,
+        targetId: focusTimer.targetId ?? undefined,
       })
     }
   }
 
   const handleSelectItem = (item: FocusableItem) => {
     if (isActive) return
-    startFocus({ id: item.id, sourceKey: item.key, title: item.title, context: item.tag })
+    startFocus({
+      id: item.id,
+      sourceKey: item.key,
+      title: item.title,
+      context: item.tag,
+      targetType: item.targetType,
+      targetId: item.targetId,
+    })
   }
 
   const handleStop = () => stopFocus()
+
+  /** Only tasks and habits carry a completion state the timer can close. */
+  const autoCompleteTarget = focusTimer.targetType === 'task' || focusTimer.targetType === 'habit'
+    ? focusTimer.targetType
+    : null
+
+  /** The habit the session runs against — needed for the multi-count wording. */
+  const focusedHabit = habits.find(h => h.id === focusTimer.targetId)
+  const isMultiCountHabit = focusedHabit?.is_quantitative === 1
+
+  const autoCompleteHint = (() => {
+    if (!autoCompleteTarget || focusConfig?.autoComplete === false) return null
+    if (autoCompleteTarget === 'task') {
+      return isZh ? '倒计时结束后将自动标记为完成' : 'Marked complete when the timer ends'
+    }
+    if (isMultiCountHabit) {
+      return isZh ? '倒计时结束后将自动打卡一次' : 'One check-in when the timer ends'
+    }
+    return isZh ? '倒计时结束后将自动打卡完成' : 'Checked off when the timer ends'
+  })()
 
   const renderFocusTab = () => (
     <div className="pomodoro-focus">
@@ -280,6 +331,13 @@ export default function Pomodoro() {
             </span>
           )}
         </div>
+
+        {autoCompleteHint && (
+          <div className="pomodoro-auto-hint">
+            <CheckCheck size={12} />
+            <span>{autoCompleteHint}</span>
+          </div>
+        )}
 
         <div className="pomodoro-controls">
           <button

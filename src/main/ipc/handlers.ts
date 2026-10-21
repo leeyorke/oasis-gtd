@@ -26,7 +26,10 @@ import {
   endFocusSession,
   getFocusTimerState,
   pauseFocusSession,
-  resumeFocusSession
+  resumeFocusSession,
+  isAutoCompleteEnabled,
+  FOCUS_AUTO_COMPLETE_KEY,
+  type FocusTargetType
 } from '../focus-timer'
 
 // ─── Proxy-aware fetch for main process ───────────────────────────────
@@ -463,6 +466,7 @@ export function registerHandlers(): void {
     return {
       goalMinutes: Number.isFinite(goal) && goal > 0 ? goal : DEFAULT_FOCUS_GOAL,
       durationMinutes: Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_FOCUS_DURATION,
+      autoComplete: isAutoCompleteEnabled(),
       ...readFocusSound(),
     }
   }
@@ -480,6 +484,12 @@ export function registerHandlers(): void {
     const duration = Number(minutes)
     const clamped = Math.min(MAX_FOCUS_DURATION, Math.max(1, Math.round(Number.isFinite(duration) ? duration : DEFAULT_FOCUS_DURATION)))
     settingsQueries.set(FOCUS_DURATION_KEY, String(clamped))
+    return getFocusConfig()
+  })
+
+  // Toggle: close the focused item automatically when a pomodoro runs out.
+  ipcMain.handle('focus:setAutoComplete', (_, enabled: boolean) => {
+    settingsQueries.set(FOCUS_AUTO_COMPLETE_KEY, enabled ? '1' : '0')
     return getFocusConfig()
   })
 
@@ -533,7 +543,12 @@ export function registerHandlers(): void {
   })
 
   ipcMain.handle('focus:startSession', (_, payload: {
-    taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number
+    taskId?: string
+    taskTitle?: string
+    context?: string
+    durationMinutes?: number
+    targetType?: FocusTargetType
+    targetId?: string
   }) => beginFocusSession(payload ?? {}))
 
   ipcMain.handle('focus:pauseSession', () => pauseFocusSession())

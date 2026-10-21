@@ -12,9 +12,23 @@
  * becomes a pure display of `remainingSeconds`.
  */
 import { BrowserWindow, Notification } from 'electron'
-import { focusQueries, settingsQueries } from './db/database'
+import {
+  focusQueries,
+  habitQueries,
+  habitRecordQueries,
+  settingsQueries,
+  taskQueries,
+} from './db/database'
+import {
+  describeCompletion,
+  planFocusCompletion,
+  type CompletionPlan,
+  type FocusTargetType,
+} from './focus-completion'
 
 export type FocusTimerStatus = 'idle' | 'running' | 'paused'
+
+export type { FocusTargetType } from './focus-completion'
 
 /** What the renderer mirrors; the source of truth lives here. */
 export interface FocusTimerSnapshot {
@@ -25,21 +39,40 @@ export interface FocusTimerSnapshot {
   context: string
   totalSeconds: number
   remainingSeconds: number
+  /** The kind of item being focused — decides how it is completed. */
+  targetType: FocusTargetType
+  /**
+   * Primary key of the focused item in its own table. For tasks this equals
+   * `taskId`; habits keep their own id because `focus_sessions.task_id` is a
+   * foreign key into `tasks` and must stay null for them.
+   */
+  targetId: string | null
 }
 
 const DEFAULT_DURATION_MINUTES = 25
 /** Fast enough to stay smooth, cheap enough to idle at. */
 const TICK_MS = 250
 
+/** app_settings key: mark the focused item complete when a pomodoro ends. */
+export const FOCUS_AUTO_COMPLETE_KEY = 'pomodoro_auto_complete'
+
 let ticker: NodeJS.Timeout | null = null
 /** Epoch ms the countdown reaches zero; null unless running. */
 let endsAt: number | null = null
 
 /** The focused item, remembered so the next pomodoro starts on it again. */
-let carried: { id: string | null; taskTitle: string; context: string } = {
+let carried: {
+  id: string | null
+  taskTitle: string
+  context: string
+  targetType: FocusTargetType
+  targetId: string | null
+} = {
   id: null,
   taskTitle: '',
-  context: ''
+  context: '',
+  targetType: 'free',
+  targetId: null
 }
 
 // Built without touching the DB — this module is imported before initDatabase().
@@ -50,7 +83,9 @@ let snapshot: FocusTimerSnapshot = {
   taskTitle: '',
   context: '',
   totalSeconds: DEFAULT_DURATION_MINUTES * 60,
-  remainingSeconds: DEFAULT_DURATION_MINUTES * 60
+  remainingSeconds: DEFAULT_DURATION_MINUTES * 60,
+  targetType: 'free',
+  targetId: null
 }
 
 function localDateString(date = new Date()): string {
@@ -71,7 +106,9 @@ function idleSnapshot(durationMinutes = configuredDuration()): FocusTimerSnapsho
     taskTitle: carried.taskTitle,
     context: carried.context,
     totalSeconds,
-    remainingSeconds: totalSeconds
+    remainingSeconds: totalSeconds,
+    targetType: carried.targetType,
+    targetId: carried.targetId
   }
 }
 
@@ -104,7 +141,7 @@ function tick(): void {
   if (remaining <= 0) endFocusSession(true)
 }
 
-function completionNotice(finished: FocusTimerSnapshot): { title: string; body: string } {
+function completionNotice(finished: FocusTimerSnapshot, autoComplete?: string): { title: string; body: string } {
   const isZh = (settingsQueries.get('language') || 'en') === 'zh'
   const minutes = Math.round(finished.totalSeconds / 60)
   // The session row was just finished, so today's total already includes it.
@@ -115,10 +152,99 @@ function completionNotice(finished: FocusTimerSnapshot): { title: string; body: 
   const counter = isZh ? `今天第 ${sessions} 个番茄钟` : `Pomodoro ${sessions} today`
   const details = [finished.taskTitle, counter].filter(Boolean).join(' · ')
 
+  const body = details ? `${headline} · ${details}` : headline
   return {
     title: isZh ? '专注完成' : 'Focus Complete',
-    body: details ? `${headline} · ${details}` : headline
+    body: autoComplete ? `${body} · ${autoComplete}` : body
   }
+}
+
+/** True when the user wants the focused item closed when a pomodoro ends. */
+export function isAutoCompleteEnabled(): boolean {
+  // Absent key → enabled: the behaviour is the point of the feature.
+  return settingsQueries.get(FOCUS_AUTO_COMPLETE_KEY) !== '0'
+}
+
+/**
+ * Marks the focused item complete once a pomodoro runs out.
+ *
+ * The rules live in `focus-completion.ts` (unit tested); this function only
+ * reads the current state, applies the plan and returns a short, localized
+ * line for the completion toast.
+ *
+ * A task is closed (`status = 'done'`). A habit is checked off instead: a
+ * single-shot habit simply gets today's tick, while a multi-count habit only
+ * advances by **one** tick — it is finished once every count of the day is in
+ * (e.g. 3/8 → 4/8) and the counter never runs past its target.
+ *
+ * Waiting-for and someday items have no completion state, so they are left
+ * alone.
+ */
+function autoCompleteTarget(finished: FocusTimerSnapshot): string | null {
+  const targetId = finished.targetId
+  if (!targetId) return null
+
+  const isZh = (settingsQueries.get('language') || 'en') === 'zh'
+  const today = localDateString()
+
+  let plan: CompletionPlan
+  try {
+    if (finished.targetType === 'task') {
+      const task = taskQueries.getById(targetId) as Record<string, unknown> | undefined
+      if (!task) return null
+      plan = planFocusCompletion({
+        enabled: isAutoCompleteEnabled(),
+        targetType: finished.targetType,
+        targetId,
+        date: today,
+        info: { taskStatus: (task.status as string) ?? null },
+      })
+    } else if (finished.targetType === 'habit') {
+      const habit = habitQueries.getById(targetId) as Record<string, unknown> | undefined
+      if (!habit) return null
+      const record = habitRecordQueries.getByHabitAndDate(targetId, today) as Record<string, unknown> | undefined
+      plan = planFocusCompletion({
+        enabled: isAutoCompleteEnabled(),
+        targetType: finished.targetType,
+        targetId,
+        date: today,
+        info: {
+          habit: {
+            isQuantitative: (habit.is_quantitative as number) === 1,
+            target: (habit.target as number) || 1,
+          },
+          count: record ? (record.count as number || 1) : 0,
+        },
+      })
+    } else {
+      return null
+    }
+  } catch (err) {
+    // A failed auto-completion must never break the timer.
+    console.error('[Focus] Failed to plan the auto-completion:', err)
+    return null
+  }
+
+  try {
+    switch (plan.kind) {
+      case 'complete-task':
+        taskQueries.update(targetId, { status: 'done' })
+        break
+      case 'check-habit':
+        habitRecordQueries.toggleComplete(targetId, today, true)
+        break
+      case 'credit-habit':
+        habitRecordQueries.incrementCount(targetId, today, plan.target)
+        break
+      default:
+        break
+    }
+  } catch (err) {
+    console.error('[Focus] Failed to auto-complete the focused item:', err)
+    return null
+  }
+
+  return describeCompletion(plan, isZh, finished.targetType)
 }
 
 function showNotification(payload: { title: string; body: string }): void {
@@ -149,15 +275,21 @@ export function beginFocusSession(input: {
   taskTitle?: string
   context?: string
   durationMinutes?: number
+  targetType?: FocusTargetType
+  targetId?: string
 }): FocusTimerSnapshot {
   if (snapshot.status !== 'idle') return snapshot
 
   const durationMinutes = input?.durationMinutes ?? configuredDuration()
   const totalSeconds = durationMinutes * 60
 
+  // A task id alone identifies a task; anything else needs an explicit type.
+  const targetType: FocusTargetType = input?.targetType ?? (input?.taskId ? 'task' : 'free')
+  const targetId = input?.targetId ?? (targetType === 'task' ? input?.taskId ?? null : null)
+
   // Open the DB row up front so a crash never loses the focused time.
   const sessionId = focusQueries.create({
-    task_id: input?.taskId ?? null,
+    task_id: targetType === 'task' ? targetId : null,
     task_title: input?.taskTitle ?? null,
     context: input?.context ?? null,
     duration_minutes: durationMinutes,
@@ -165,9 +297,11 @@ export function beginFocusSession(input: {
   })
 
   carried = {
-    id: input?.taskId ?? null,
+    id: targetType === 'task' ? targetId : null,
     taskTitle: input?.taskTitle ?? '',
-    context: input?.context ?? ''
+    context: input?.context ?? '',
+    targetType,
+    targetId
   }
 
   endsAt = Date.now() + totalSeconds * 1000
@@ -178,7 +312,9 @@ export function beginFocusSession(input: {
     taskTitle: carried.taskTitle,
     context: carried.context,
     totalSeconds,
-    remainingSeconds: totalSeconds
+    remainingSeconds: totalSeconds,
+    targetType,
+    targetId
   }
 
   startTicker()
@@ -235,7 +371,9 @@ export function endFocusSession(completed = false): FocusTimerSnapshot {
   broadcast('focus:tick', snapshot)
 
   if (completed) {
-    const notice = completionNotice(finished)
+    // A finished pomodoro closes the item it ran against.
+    const autoComplete = autoCompleteTarget(finished)
+    const notice = completionNotice(finished, autoComplete ?? undefined)
     broadcast('focus:completed', notice)
     showNotification(notice)
   }

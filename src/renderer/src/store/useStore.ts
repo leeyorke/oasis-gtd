@@ -18,6 +18,7 @@ import type {
   FocusStats,
   FocusConfig,
   FocusTimer,
+  FocusTargetType,
 } from '../types'
 
 interface AppStore {
@@ -97,6 +98,7 @@ interface AppStore {
   syncFocusTimer: () => Promise<void>
   setFocusGoalMinutes: (minutes: number) => Promise<void>
   setFocusDurationMinutes: (minutes: number) => Promise<void>
+  setFocusAutoComplete: (enabled: boolean) => Promise<void>
   setFocusSound: (filePath: string | null) => Promise<void>
   pickFocusSound: () => Promise<void>
   startFocus: (task?: FocusTask | null) => Promise<void>
@@ -170,12 +172,17 @@ function parseModelList(model: string): string[] {
  * buckets — tasks, waiting items, habits and someday/maybe ideas — so
  * `sourceKey` identifies the item for the UI while `id` is only set for real
  * `tasks` rows (it is the value written to the focus_sessions.task_id FK).
+ *
+ * `targetType` / `targetId` tell the main process what to close when the
+ * pomodoro ends: a task is ticked off, a habit gets a check-in.
  */
 export interface FocusTask {
   id?: string
   sourceKey?: string
   title?: string
   context?: string
+  targetType?: FocusTargetType
+  targetId?: string
 }
 
 const DEFAULT_FOCUS_DURATION = 25
@@ -187,6 +194,8 @@ function idleFocusTimer(durationMinutes: number, carry?: FocusTask | null): Focu
     sessionId: null,
     taskId: carry?.id ?? null,
     sourceKey: carry?.sourceKey ?? null,
+    targetType: carry?.targetType ?? 'free',
+    targetId: carry?.targetId ?? null,
     taskTitle: carry?.title ?? '',
     context: carry?.context ?? '',
     totalSeconds: durationMinutes * 60,
@@ -206,6 +215,8 @@ function applyFocusSnapshot(
   set(state => {
     const sameItem = state.focusTimer.taskTitle === snapshot.taskTitle
       && (state.focusTimer.taskId ?? null) === (snapshot.taskId ?? null)
+      && state.focusTimer.targetType === snapshot.targetType
+      && (state.focusTimer.targetId ?? null) === (snapshot.targetId ?? null)
     return {
       focusTimer: {
         ...snapshot,
@@ -226,7 +237,13 @@ if (typeof window !== 'undefined' && window.api?.onFocusTick) {
     window.api.onFocusCompleted(() => {
       // The OS toast is raised by the main process; this is the in-app side.
       playFocusSound()
-      void useStore.getState().loadFocusStats()
+      const store = useStore.getState()
+      void store.loadFocusStats()
+      // A finished pomodoro closes the item it ran against — pull the fresh
+      // lists so the tick shows up in the task / habit views right away.
+      void store.loadTasks()
+      void store.loadHabits()
+      if (store.selectedHabitId) void store.loadHabitById(store.selectedHabitId)
     })
   }
 }
@@ -492,6 +509,8 @@ export const useStore = create<AppStore>((set, get) => ({
               sourceKey: state.focusTimer.sourceKey ?? undefined,
               title: state.focusTimer.taskTitle || undefined,
               context: state.focusTimer.context || undefined,
+              targetType: state.focusTimer.targetType,
+              targetId: state.focusTimer.targetId ?? undefined,
             })
           : state.focusTimer,
       }))
@@ -518,9 +537,16 @@ export const useStore = create<AppStore>((set, get) => ({
           sourceKey: state.focusTimer.sourceKey ?? undefined,
           title: state.focusTimer.taskTitle || undefined,
           context: state.focusTimer.context || undefined,
+          targetType: state.focusTimer.targetType,
+          targetId: state.focusTimer.targetId ?? undefined,
         }),
       }))
     } catch (err) { logError('setFocusDurationMinutes', err) }
+  },
+  setFocusAutoComplete: async (enabled) => {
+    try {
+      set({ focusConfig: await window.api.setFocusAutoComplete(enabled) })
+    } catch (err) { logError('setFocusAutoComplete', err) }
   },
   setFocusSound: async (filePath) => {
     try {
@@ -548,6 +574,9 @@ export const useStore = create<AppStore>((set, get) => ({
         taskTitle: task?.title,
         context: task?.context,
         durationMinutes: state.focusConfig?.durationMinutes ?? DEFAULT_FOCUS_DURATION,
+        // What to close when the countdown reaches zero.
+        targetType: task?.targetType,
+        targetId: task?.targetId,
       })
       set({ focusTimer: { ...snapshot, sourceKey: task?.sourceKey ?? null } })
     } catch (err) { logError('startFocus', err) }

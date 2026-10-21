@@ -33,6 +33,11 @@ export interface FocusConfig {
   goalMinutes: number
   /** Default focus length in minutes (default 25). */
   durationMinutes: number
+  /**
+   * Close the focused item when a pomodoro runs out (tasks get ticked off,
+   * habits get a check-in). Default true.
+   */
+  autoComplete: boolean
   /** file:// URL of the ringtone the user picked, or null for none. */
   soundPath: string | null
   /** Basename of `soundPath`, for display only. */
@@ -40,6 +45,13 @@ export interface FocusConfig {
 }
 
 export type FocusTimerStatus = 'idle' | 'running' | 'paused'
+
+/**
+ * Which kind of GTD item a session runs against. Only `task` and `habit`
+ * can be completed by a pomodoro — the other buckets are tracked but never
+ * auto-completed.
+ */
+export type FocusTargetType = 'free' | 'task' | 'habit' | 'waiting' | 'someday'
 
 /**
  * Mirror of the main-process clock (see src/main/focus-timer.ts). The renderer
@@ -57,6 +69,13 @@ export interface FocusTimer {
   taskId: string | null
   /** UI-only identity of the focused item, e.g. `habit:abc` — see FocusTask. */
   sourceKey: string | null
+  /** The kind of item being focused — decides how it is completed. */
+  targetType: FocusTargetType
+  /**
+   * Primary key of the focused item in its own table. For tasks this equals
+   * `taskId`; habits keep their own id.
+   */
+  targetId: string | null
   taskTitle: string
   context: string
   totalSeconds: number

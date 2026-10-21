@@ -23,7 +23,7 @@
     "mcp:http": "node mcp/index.ts --http",
     "mcp:inspect": "node mcp/inspect.mjs",
     "test:mcp": "node mcp/test/smoke.mjs && node mcp/test/app-spawn.mjs",
-    "test:unit": "node src/renderer/src/utils/projectStats.test.ts"
+    "test:unit": "node src/renderer/src/utils/projectStats.test.ts && node src/main/focus-completion.test.ts"
   },
   "dependencies": {
     "@phosphor-icons/web": "^2.1.2",

@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { McpServiceState, FocusConfig, FocusStats, FocusTimer } from '../renderer/src/types'
+import type { McpServiceState, FocusConfig, FocusStats, FocusTimer, FocusTargetType } from '../renderer/src/types'
 
 declare global {
   interface Window {
@@ -48,11 +48,19 @@ declare global {
       getFocusConfig: () => Promise<FocusConfig>
       setFocusGoalMinutes: (minutes: number) => Promise<FocusConfig>
       setFocusDurationMinutes: (minutes: number) => Promise<FocusConfig>
+      setFocusAutoComplete: (enabled: boolean) => Promise<FocusConfig>
       setFocusSound: (filePath: string | null) => Promise<FocusConfig>
       pickFocusSound: () => Promise<string | null>
       playFocusSound: () => Promise<{ ok: boolean; bytes?: Uint8Array; mime?: string; reason?: string }>
       getFocusState: () => Promise<FocusTimer>
-      startFocusSession: (payload: { taskId?: string; taskTitle?: string; context?: string; durationMinutes?: number }) => Promise<FocusTimer>
+      startFocusSession: (payload: {
+        taskId?: string
+        taskTitle?: string
+        context?: string
+        durationMinutes?: number
+        targetType?: FocusTargetType
+        targetId?: string
+      }) => Promise<FocusTimer>
       pauseFocusSession: () => Promise<FocusTimer>
       resumeFocusSession: () => Promise<FocusTimer>
       stopFocusSession: () => Promise<FocusTimer>
