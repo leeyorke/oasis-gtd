@@ -124,6 +124,56 @@ test('a free-focus session has no target to close', () => {
   assert.deepEqual(plan, { kind: 'none' })
 })
 
+test('focusing an already completed item never clears the tick', () => {
+  // A finished task produces no write at all — the tick stays.
+  assert.deepEqual(
+    planFocusCompletion({
+      enabled: true,
+      targetType: 'task',
+      targetId: 'task-1',
+      date: TODAY,
+      info: { taskStatus: 'done' },
+    }),
+    { kind: 'already-done' }
+  )
+
+  // A single-shot habit is always *set* to checked, never flipped back.
+  assert.deepEqual(
+    planFocusCompletion({
+      enabled: true,
+      targetType: 'habit',
+      targetId: 'habit-1',
+      date: TODAY,
+      info: { habit: { isQuantitative: false, target: 1 }, count: 1 },
+    }),
+    { kind: 'check-habit' }
+  )
+
+  // A multi-count habit that is already full produces no write either.
+  assert.deepEqual(
+    planFocusCompletion({
+      enabled: true,
+      targetType: 'habit',
+      targetId: 'habit-1',
+      date: TODAY,
+      info: { habit: { isQuantitative: true, target: 3 }, count: 3 },
+    }),
+    { kind: 'already-done' }
+  )
+})
+
+test('a multi-count habit that is not full yet still advances by one', () => {
+  const plan = planFocusCompletion({
+    enabled: true,
+    targetType: 'habit',
+    targetId: 'habit-1',
+    date: TODAY,
+    info: { habit: { isQuantitative: true, target: 3 }, count: 1 },
+  })
+
+  assert.deepEqual(plan, { kind: 'credit-habit', count: 2, target: 3 })
+})
+
 test('the completion notice describes what happened', () => {
   assert.equal(describeCompletion({ kind: 'complete-task' }, false), 'Task marked complete')
   assert.equal(describeCompletion({ kind: 'check-habit' }, false), 'Habit checked off')
