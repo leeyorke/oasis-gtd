@@ -98,6 +98,12 @@ export interface McpServiceState {
   dbPath: string
   /** Absolute path of the system Node runtime used for the child process (null = not found). */
   nodePath: string | null
+  /**
+   * Which runtime the endpoint runs on:
+   *   'system'  — a Node.js installation on this machine
+   *   'electron' — the app's own runtime (no Node.js installation required)
+   */
+  runtime: 'system' | 'electron'
   /** Last startup failure (missing node, port in use, …), if any. */
   error: string | null
   /** Whether agents may create/change/delete data through this endpoint. */

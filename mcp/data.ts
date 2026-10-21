@@ -5,7 +5,7 @@
  * resources. Rows are returned verbatim (snake_case, exactly as stored in
  * SQLite) so agents see the same column names the app uses.
  */
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { queryAll, queryOne, tableRowCounts } from './db.ts'
 import type { DbInfo } from './db.ts'
 

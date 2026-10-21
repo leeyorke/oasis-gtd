@@ -18,6 +18,7 @@
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,6 +28,20 @@ import { build as esbuild } from 'esbuild'
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const devEntry = join(repoRoot, 'mcp', 'index.ts')
+const require = createRequire(import.meta.url)
+
+/**
+ * Absolute path of the Electron binary — the runtime the desktop app falls
+ * back to when the machine has no system Node.js (ELECTRON_RUN_AS_NODE=1).
+ */
+function electronExePath() {
+  try {
+    const electronPath = require('electron')
+    return typeof electronPath === 'string' && existsSync(electronPath) ? electronPath : null
+  } catch {
+    return null
+  }
+}
 
 const failures = []
 let checks = 0
@@ -182,7 +197,9 @@ async function main() {
     bundle: true,
     platform: 'node',
     format: 'cjs',
-    target: 'node22',
+    // Same target as scripts/build-mcp.mjs — the bundle must also run on
+    // Electron's own Node 20.
+    target: 'node20',
     logLevel: 'error'
   })
   check('esbuild bundle of mcp/index.ts produced', true)
@@ -235,11 +252,73 @@ async function main() {
     bundleChild.kill()
   }
 
-  // 2. The controller the app uses (src/main/mcp-http.ts, wired with the real
+  // 2. The packaged artifact on a machine WITHOUT a system Node.js.
+  //
+  //    The desktop app falls back to its own Electron runtime
+  //    (ELECTRON_RUN_AS_NODE=1) when no Node installation is found. Electron's
+  //    Node is 20.x and has no `node:sqlite`, so the server drives SQLite
+  //    through the app's better-sqlite3 build (OASIS_SQLITE_MODULE) instead.
+  //    This is the case that used to make the endpoint fail with
+  //    "Node.js >= 22.5 was not found".
+  console.log('\n── electron runtime (no system Node.js) ──')
+  const electronPath = electronExePath()
+  if (!electronPath) {
+    check('electron runtime: the electron binary is available', false,
+      'node_modules/electron is missing — cannot verify the fallback')
+  } else {
+    const electronPort = await freePort()
+    const electronChild = spawn(electronPath, [bundlePath, '--http'], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        OASIS_DB_PATH: fixturePath,
+        OASIS_MCP_TOKEN: 'electron-token-1',
+        OASIS_MCP_PORT: String(electronPort),
+        OASIS_MCP_HOST: '127.0.0.1',
+        OASIS_MCP_WRITE: '1',
+        OASIS_SQLITE_MODULE: join(repoRoot, 'node_modules', 'better-sqlite3')
+      },
+      stdio: ['ignore', 'ignore', 'pipe']
+    })
+    let electronStderr = ''
+    electronChild.stderr?.setEncoding('utf8')
+    electronChild.stderr?.on('data', (chunk) => {
+      electronStderr += chunk
+    })
+    try {
+      check('electron runtime: endpoint becomes ready without a system Node.js',
+        await waitForHealth(electronPort), electronStderr.slice(-500))
+      const electronInit = await rpc(electronPort, {
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'electron-runtime', version: '1.0.0' } }
+      }, 'electron-token-1')
+      check('electron runtime: initialize', electronInit.message?.result?.serverInfo?.name === 'oasis-gtd')
+      const electronTools = await rpc(electronPort, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, 'electron-token-1')
+      check('electron runtime: tools/list → 34', (electronTools.message?.result?.tools ?? []).length === 34)
+      const electronTasks = await callTool(electronPort, 'list_tasks', {}, 'electron-token-1')
+      check('electron runtime: reads the app database through better-sqlite3',
+        electronTasks.total_matching === 2,
+        `total_matching=${electronTasks.total_matching}`)
+      const electronWrite = await callTool(electronPort, 'create_note',
+        { content: '来自内置运行时的随想' }, 'electron-token-1')
+      check('electron runtime: writes work through better-sqlite3',
+        typeof electronWrite.id === 'string'
+        && electronWrite.record?.content === '来自内置运行时的随想',
+        JSON.stringify(electronWrite).slice(0, 120))
+      const electronNotes = await callTool(electronPort, 'list_notes', {}, 'electron-token-1')
+      check('electron runtime: the written note is readable',
+        (electronNotes.notes ?? []).some((note) => note.id === electronWrite.id))
+    } finally {
+      electronChild.kill()
+    }
+  }
+
+  // 3. The controller the app uses (src/main/mcp-http.ts, wired with the real
   //    settings/queries in src/main/mcp-controller.ts). Here the settings are
   //    backed by an in-memory store and the entry is the dev TypeScript file.
   console.log('\n── app spawn manager (src/main/mcp-http.ts) ──')
-  const { createMcpController } = await import('../../src/main/mcp-http.ts')
+  const { createMcpController, electronRuntimeCandidate } = await import('../../src/main/mcp-http.ts')
   const settings = new Map()
   const managerPort = await freePort()
   // Seed the persisted port so start() picks a known one.
@@ -402,6 +481,15 @@ async function main() {
   check('manager: bogus node override → ignored, auto-discovery used',
     resolveNodeExecutable('C:\\definitely\\not\\node.exe').source !== 'mcp_http_node_path'
     && resolveNodeExecutable('C:\\definitely\\not\\node.exe').path !== null)
+
+  // Fallback for machines without a system Node.js: the app runs the endpoint
+  // on its own Electron runtime (ELECTRON_RUN_AS_NODE=1). Only JavaScript
+  // entries qualify — the dev entry is TypeScript and needs Node >= 22.18 for
+  // type stripping.
+  check('manager: electron runtime offered for the bundled JavaScript entry',
+    electronRuntimeCandidate(join(workDir, 'server.cjs'))?.env?.ELECTRON_RUN_AS_NODE === '1')
+  check('manager: electron runtime not offered for the TypeScript dev entry',
+    electronRuntimeCandidate(devEntry) === null)
 
   const overridePort = await freePort()
   const overridden = createMcpController({

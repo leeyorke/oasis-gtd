@@ -21,7 +21,7 @@
  * app's short transactions instead of failing. Writes are only possible when
  * the server was started in write mode (see `resolveWritePolicy`).
  */
-import { DatabaseSync } from 'node:sqlite'
+import { openSqlite, type DatabaseSync } from './sqlite.ts'
 import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -273,10 +273,10 @@ export function openDatabase(options: { allowWrite?: boolean } = {}): { db: Data
   const candidate = resolveCandidate()
   const allowWrite = options.allowWrite === true
   const attempts: Array<{ mode: OpenMode; open: () => DatabaseSync }> = allowWrite
-    ? [{ mode: 'read-write', open: () => new DatabaseSync(candidate.path) }]
+    ? [{ mode: 'read-write', open: () => openSqlite(candidate.path).db }]
     : [
-        { mode: 'read-only', open: () => new DatabaseSync(candidate.path, { readOnly: true }) },
-        { mode: 'read-write', open: () => new DatabaseSync(candidate.path) }
+        { mode: 'read-only', open: () => openSqlite(candidate.path, { readOnly: true }).db },
+        { mode: 'read-write', open: () => openSqlite(candidate.path).db }
       ]
 
   let lastError: unknown = null

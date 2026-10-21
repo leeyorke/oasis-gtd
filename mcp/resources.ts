@@ -6,7 +6,7 @@
  * their concrete instances through the template `list` callback so clients can
  * discover them.
  */
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js'
 import {

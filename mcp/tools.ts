@@ -8,7 +8,7 @@
  * readOnlyHint:false / destructiveHint so a well-behaved client can warn the
  * user before something is removed.
  */
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'

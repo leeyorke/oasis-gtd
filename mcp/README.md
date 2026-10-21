@@ -276,9 +276,12 @@ rebuilds) and refuses to spawn when another process already listens on the port
 
 Requirements / failure modes (all non-fatal — the app keeps running):
 
-- The **system Node** must be ≥ 22.5 and on `PATH` (Electron's bundled Node 20
-  lacks `node:sqlite`, which is why the server is a separate process). Missing
-  node → Settings shows `Start failed: … (is Node.js installed and on PATH?)`.
+- The **system Node** must be ≥ 22.5 and on `PATH`. When none is found the app
+  falls back to its **own Electron runtime** (`ELECTRON_RUN_AS_NODE=1`), so the
+  endpoint also works on a machine where Node.js was never installed. Electron's
+  Node 20 has no `node:sqlite`, so the server then drives SQLite through the
+  app's own `better-sqlite3` build (passed in `OASIS_SQLITE_MODULE`). Settings
+  shows which runtime is in use.
 - Port already in use (e.g. a second app instance) → the child exits and the
   error is surfaced in the Settings section; the first instance keeps serving.
 - `stdio` mode is unaffected: it stays per-client spawn, independent of the app.
@@ -406,9 +409,10 @@ mcp/
 ├── data.ts           # all read queries (the data access layer)
 ├── write.ts          # all write operations (validation, transactions, whitelisted columns)
 ├── db.ts             # database resolution, read-only/read-write open, statement whitelisting
+├── sqlite.ts         # driver adapter: node:sqlite, or better-sqlite3 on Electron's own runtime
 ├── types/sqlite.d.ts # ambient typings for Node's built-in node:sqlite
-├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP + writes, 167 assertions)
-├── test/app-spawn.mjs # app-managed spawn test (bundle + src/main/mcp-http.ts wiring, 46 assertions)
+├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP + writes, 169 assertions)
+├── test/app-spawn.mjs # app-managed spawn test (bundle + Electron runtime + src/main/mcp-http.ts wiring, 54 assertions)
 └── tsconfig.json     # editor / `tsc --noEmit` support (no emit — Node runs the TS directly)
 ```
 
@@ -434,7 +438,8 @@ traced to network layer, HTTP layer, or auth layer.
 | `Could not find an Oasis GTD database` | The app has never run on this profile, or the DB lives elsewhere — set `OASIS_DB_PATH`. |
 | `spawn <path> ENOENT` in the packaged build | Historically caused by the child being spawned with `cwd` pointing inside `app.asar` (a file, not a directory) — CreateProcess then reports ENOENT against node.exe. Fixed by not passing a cwd. If you still see it: the error names the runtime that could not be launched, each attempt is logged (`could not launch …`), and the resolver retries the remaining candidates. Pin a known-good absolute path with `app_settings.mcp_http_node_path` (e.g. the real version directory of an nvm install) if you want to force one. |
 | `failed to start any node runtime. Attempts: …` | Every candidate failed to launch — the log lists each attempt and its error. Usually a broken pin, an antivirus blocking node.exe, or permissions. |
-| `Node.js >= 22.5 was not found` | No usable node on PATH, in the registry, or in common install locations — install Node.js ≥ 22.5 or pin `app_settings.mcp_http_node_path`. |
+| `Node.js >= 22.5 was not found` | No usable node on PATH, in the registry, or in common install locations. The app falls back to its own Electron runtime automatically (`ELECTRON_RUN_AS_NODE=1`) — that path only exists for the bundled JavaScript entry, so a dev build (TypeScript entry) still needs a system Node. Pin one with `app_settings.mcp_http_node_path` to force a specific runtime. |
+| `No usable SQLite driver: … better-sqlite3 fallback could not be loaded` | The server runs on a runtime without `node:sqlite` and could not load the app's `better-sqlite3` build. In a packaged build that means the driver was not unpacked from `app.asar` — check that `node_modules/better-sqlite3`, `node_modules/bindings` and `node_modules/file-uri-to-path` are in `asarUnpack`. |
 | `SyntaxError: Invalid or unexpected token` / type errors at startup | Node too old. Use Node ≥ 22.18 (or `node --experimental-strip-types`). |
 | Serves the wrong database | Both `oasis-gtd-dev.db` and `oasis-gtd.db` exist; pin one with `OASIS_PROFILE=dev\|packaged` or `OASIS_DB_PATH`. |
 | `unable to open database file` | Read-only WAL open needs the `-shm` sidecar; the server retries with a read-write handle. If both fail, the file is locked or missing. |

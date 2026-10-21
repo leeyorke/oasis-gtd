@@ -19,7 +19,7 @@
  *     from here — they stay out of reach of every agent
  */
 import { randomUUID } from 'node:crypto'
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { queryAll, queryOne, runStatement, transact } from './db.ts'
 import type { NoteRow, ProjectRow, SomedayRow, TaskRow, WaitingRow } from './data.ts'
 import { SOMEDAY_HORIZONS, TASK_PRIORITIES } from './data.ts'

@@ -2,9 +2,10 @@
  * Minimal ambient declarations for Node's built-in `node:sqlite` module.
  *
  * The repository pins @types/node ^20, which predates the `node:sqlite`
- * typings shipped with @types/node ^22. The MCP server runs directly on
- * Node's built-in SQLite driver (no native addon), so these declarations
- * only need to cover the surface this server uses.
+ * typings shipped with @types/node ^22. The MCP server loads the module through
+ * the driver adapter in `mcp/sqlite.ts` (so it can fall back to better-sqlite3
+ * when the runtime has no node:sqlite — Electron's own Node 20, for instance),
+ * which is why these declarations are kept for reference.
  */
 declare module 'node:sqlite' {
   export interface DatabaseSyncOptions {

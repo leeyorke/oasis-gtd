@@ -15,8 +15,11 @@
  * is not supported"). Our own sources contain no top-level await, so the
  * ESM→CJS conversion is safe.
  *
- * Node's built-ins (node:sqlite, node:child_process, …) stay external, so the
- * bundle still requires Node >= 22.5 at runtime.
+ * Node's built-ins (node:crypto, node:http, …) stay external. The bundle is
+ * compiled for Node 20 so it also runs on Electron's own runtime (Node 20.x),
+ * which is the fallback the app uses on machines without a system Node.js —
+ * there the server drives SQLite through the app's better-sqlite3 build
+ * instead of node:sqlite (see mcp/sqlite.ts).
  *
  * Usage: node scripts/build-mcp.mjs   (wired into `npm run build`)
  */
@@ -38,7 +41,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  target: 'node22',
+  target: 'node20',
   logLevel: 'info'
 })
 

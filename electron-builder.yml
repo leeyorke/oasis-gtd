@@ -18,6 +18,13 @@ files:
 asarUnpack:
   - resources/**
   - node_modules/better-sqlite3/**
+  # better-sqlite3 loads its native addon through these two pure-JS helpers.
+  # The MCP server runs as a separate process OUTSIDE app.asar (plain node
+  # cannot read inside the archive), so they have to be unpacked too —
+  # otherwise the endpoint cannot start on a machine without Node.js, where it
+  # falls back to the app's own runtime and this driver.
+  - node_modules/bindings/**
+  - node_modules/file-uri-to-path/**
 
 extraResources:
   - from: resources/icon.ico

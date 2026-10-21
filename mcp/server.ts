@@ -1,7 +1,7 @@
 /**
  * Assembles the MCP server: identity, agent instructions, tools and resources.
  */
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { DbInfo, WritePolicy } from './db.ts'
 import { registerTools } from './tools.ts'

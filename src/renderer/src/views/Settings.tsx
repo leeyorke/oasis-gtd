@@ -990,6 +990,9 @@ function McpSection() {
             <div style={{ ...codeBoxStyle, color: state.nodePath ? undefined : '#a83232' }}>
               {state.nodePath ?? t.mcp_nodeMissing}
             </div>
+            {state.runtime === 'electron' && (
+              <FieldHint>{t.mcp_runtimeEmbedded}</FieldHint>
+            )}
             <FieldHint>{t.mcp_nodeHint}</FieldHint>
           </FieldGroup>
         </>

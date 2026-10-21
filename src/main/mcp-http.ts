@@ -43,6 +43,15 @@ export interface McpControllerDeps {
   dbPath: () => string
   /** Absolute path to the MCP server entry (mcp/index.ts in dev, server.cjs when packaged). */
   entryScript: string
+  /**
+   * Absolute path of the app's better-sqlite3 module directory.
+   *
+   * The MCP server uses it when it runs on a runtime without `node:sqlite`
+   * (Electron's own Node 20 — the fallback for machines without a system
+   * Node.js). Plain node cannot read inside app.asar, so a packaged build
+   * points at the unpacked copy.
+   */
+  sqliteModulePath?: string
   /** Port used when `mcp_http_port` is not set (packaged: 7800, dev: 7801). */
   defaultPort?: number
   /** Receives every log line the MCP server writes to stderr. */
@@ -64,6 +73,12 @@ export interface McpServiceState {
   dbPath: string
   /** Absolute path of the system node used to spawn the server (null = not found). */
   nodePath: string | null
+  /**
+   * Which runtime the endpoint runs on:
+   *   'system'  — a Node.js installation on this machine
+   *   'electron' — the app's own runtime (no Node.js installation required)
+   */
+  runtime: 'system' | 'electron'
   /** Last startup failure, if any (missing node, port in use, …). */
   error: string | null
   /** Whether agents may create/change/delete data through this endpoint. */
@@ -218,6 +233,8 @@ export interface NodeResolution {
 export interface NodeCandidate {
   path: string
   source: string
+  /** Extra environment variables this runtime needs (e.g. ELECTRON_RUN_AS_NODE). */
+  env?: Record<string, string>
 }
 
 /** Existence is not enough: a reparse point (nvm4w symlink) can pass existsSync yet fail CreateProcess. Verify by running it. */
@@ -319,6 +336,32 @@ export function resolveNodeExecutable(override?: string | null): NodeResolution 
   return { path: null, source: '' }
 }
 
+/**
+ * The app's own Electron binary as a Node runtime.
+ *
+ * Electron ships a Node runtime, and `ELECTRON_RUN_AS_NODE=1` turns the binary
+ * into a plain `node` executable. That is the fallback for machines without a
+ * system Node.js: the endpoint then runs on the runtime that shipped with the
+ * app instead of failing with "Node.js was not found".
+ *
+ * Two caveats, both handled by the caller:
+ *   - Electron's Node (20.x on Electron 29) has no `node:sqlite`, so the MCP
+ *     server falls back to the app's better-sqlite3 build (OASIS_SQLITE_MODULE).
+ *   - It can only run a JavaScript entry point. The dev entry (mcp/index.ts) is
+ *     TypeScript and needs Node >= 22.18 for type stripping, so this runtime
+ *     is only offered for the bundled server.cjs.
+ */
+export function electronRuntimeCandidate(entryScript: string): NodeCandidate | null {
+  const isJavaScript = /\.(c?js|mjs)$/i.test(entryScript)
+  if (!isJavaScript) return null
+  if (!process.execPath || !existsSync(process.execPath)) return null
+  return {
+    path: process.execPath,
+    source: 'Electron 内置运行时',
+    env: { ELECTRON_RUN_AS_NODE: '1' }
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -387,6 +430,10 @@ export function createMcpController(deps: McpControllerDeps): McpController {
   const getState = (): McpServiceState => {
     const port = resolvePort(deps)
     const node = resolveNodeExecutable(deps.getSetting(MCP_SETTING_NODE_PATH))
+    // Without a system Node the endpoint still runs — on the app's own
+    // runtime — as long as the entry point is plain JavaScript.
+    const usesElectronRuntime =
+      !node.path && electronRuntimeCandidate(deps.entryScript) !== null
     return {
       enabled: deps.getSetting(MCP_SETTING_ENABLED) !== '0',
       running: isRunning(),
@@ -395,6 +442,7 @@ export function createMcpController(deps: McpControllerDeps): McpController {
       urls: endpointUrls(port),
       dbPath: deps.dbPath(),
       nodePath: node.path,
+      runtime: usesElectronRuntime ? 'electron' : 'system',
       error,
       allowWrite: resolveAllowWrite(deps)
     }
@@ -419,15 +467,19 @@ export function createMcpController(deps: McpControllerDeps): McpController {
     const allowWrite = resolveAllowWrite(deps)
     error = null
 
-    // The MCP server needs Node ≥ 22.5, which Electron's own Node (20.x) does
-    // not provide — spawn the system node. Resolution probes PATH → the Windows
-    // registry (packaged GUI apps do not inherit the shell PATH) → common
-    // install locations, verifying each candidate by actually running it.
+    // The MCP server prefers Node's built-in node:sqlite (Node >= 22.5), so the
+    // SYSTEM node is tried first. When the machine has none, the app falls back
+    // to its own Electron runtime (ELECTRON_RUN_AS_NODE=1) — the server then
+    // uses the app's better-sqlite3 build instead of node:sqlite.
     const candidates = nodeCandidates(deps.getSetting(MCP_SETTING_NODE_PATH))
+    const electronCandidate = electronRuntimeCandidate(deps.entryScript)
+    if (electronCandidate) candidates.push(electronCandidate)
+
     if (candidates.length === 0) {
       error =
         `Node.js >= 22.5 was not found (searched PATH, the registry and common install ` +
-        `locations). Install Node.js, or pin the executable in app_settings.${MCP_SETTING_NODE_PATH}.`
+        `locations), and this build cannot use its own runtime. Install Node.js, or pin ` +
+        `the executable in app_settings.${MCP_SETTING_NODE_PATH}.`
       deps.onLog?.(`[MCP] ${error}`)
       return getState()
     }
@@ -468,6 +520,9 @@ export function createMcpController(deps: McpControllerDeps): McpController {
         attempt = spawn(candidate.path, [deps.entryScript, '--http'], {
           env: {
             ...process.env,
+            // Runs the Electron binary as a plain Node (see
+            // electronRuntimeCandidate) — the system node ignores it.
+            ...(candidate.env ?? {}),
             OASIS_DB_PATH: deps.dbPath(),
             OASIS_MCP_TOKEN: token,
             OASIS_MCP_PORT: String(port),
@@ -475,7 +530,10 @@ export function createMcpController(deps: McpControllerDeps): McpController {
             // (create_/update_/delete_/capture_item) may touch the database.
             OASIS_MCP_WRITE: allowWrite ? '1' : '0',
             // LAN-accessible by design; the bearer token is the access control.
-            OASIS_MCP_HOST: '0.0.0.0'
+            OASIS_MCP_HOST: '0.0.0.0',
+            // Where the app's better-sqlite3 build lives — the fallback driver
+            // for runtimes without node:sqlite (Electron's own Node 20).
+            ...(deps.sqliteModulePath ? { OASIS_SQLITE_MODULE: deps.sqliteModulePath } : {})
           },
           // stdout is unused in HTTP mode; the server logs to stderr.
           stdio: ['ignore', 'ignore', 'pipe'],

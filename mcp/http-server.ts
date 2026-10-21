@@ -31,7 +31,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.ts'
 import { createServer } from './server.ts'
 import type { DbInfo, WritePolicy } from './db.ts'
 
