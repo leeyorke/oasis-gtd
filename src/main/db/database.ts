@@ -104,17 +104,28 @@ function runMigrations(): void {
     db.prepare(`UPDATE waiting_items SET project_id = NULL WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT id FROM projects)`).run()
     db.prepare(`UPDATE chat_conversations SET provider_id = NULL WHERE provider_id IS NOT NULL AND provider_id NOT IN (SELECT id FROM ai_providers)`).run()
 
-    db.exec(`CREATE TABLE IF NOT EXISTS tasks_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,notes TEXT,context TEXT,due_date TEXT,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,status TEXT NOT NULL DEFAULT 'inbox',waiting_for TEXT,priority TEXT DEFAULT 'medium',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
-    db.exec('INSERT INTO tasks_new SELECT id,title,notes,context,due_date,project_id,status,waiting_for,priority,created_at,updated_at FROM tasks')
-    db.exec('DROP TABLE tasks'); db.exec('ALTER TABLE tasks_new RENAME TO tasks')
+    // DROP TABLE runs an implicit DELETE FROM, and with foreign keys on that
+    // cascades into the child tables — chat_messages would be wiped. Switch
+    // them off for the swap and restore them right after.
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.exec(`CREATE TABLE IF NOT EXISTS tasks_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,notes TEXT,context TEXT,due_date TEXT,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,status TEXT NOT NULL DEFAULT 'inbox',waiting_for TEXT,priority TEXT DEFAULT 'medium',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
+      db.exec('INSERT INTO tasks_new SELECT id,title,notes,context,due_date,project_id,status,waiting_for,priority,created_at,updated_at FROM tasks')
+      db.exec('DROP TABLE tasks'); db.exec('ALTER TABLE tasks_new RENAME TO tasks')
 
-    db.exec(`CREATE TABLE IF NOT EXISTS waiting_items_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,waiting_for TEXT NOT NULL,since TEXT NOT NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,notes TEXT,created_at TEXT NOT NULL)`)
-    db.exec('INSERT INTO waiting_items_new SELECT * FROM waiting_items')
-    db.exec('DROP TABLE waiting_items'); db.exec('ALTER TABLE waiting_items_new RENAME TO waiting_items')
+      db.exec(`CREATE TABLE IF NOT EXISTS waiting_items_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,waiting_for TEXT NOT NULL,since TEXT NOT NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,notes TEXT,created_at TEXT NOT NULL)`)
+      db.exec('INSERT INTO waiting_items_new SELECT id,title,waiting_for,since,project_id,notes,created_at FROM waiting_items')
+      db.exec('DROP TABLE waiting_items'); db.exec('ALTER TABLE waiting_items_new RENAME TO waiting_items')
 
-    db.exec(`CREATE TABLE IF NOT EXISTS chat_conversations_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,provider_id TEXT REFERENCES ai_providers(id) ON DELETE SET NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
-    db.exec('INSERT INTO chat_conversations_new SELECT * FROM chat_conversations')
-    db.exec('DROP TABLE chat_conversations'); db.exec('ALTER TABLE chat_conversations_new RENAME TO chat_conversations')
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_conversations_new (id TEXT PRIMARY KEY,title TEXT NOT NULL,provider_id TEXT REFERENCES ai_providers(id) ON DELETE SET NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`)
+      // List the columns explicitly — `SELECT *` breaks on a fresh database,
+      // where createTables() already added `model` and the copy has 6 values
+      // for a 5-column table.
+      db.exec('INSERT INTO chat_conversations_new SELECT id,title,provider_id,created_at,updated_at FROM chat_conversations')
+      db.exec('DROP TABLE chat_conversations'); db.exec('ALTER TABLE chat_conversations_new RENAME TO chat_conversations')
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
     setSchemaVersion(2)
   }
 
