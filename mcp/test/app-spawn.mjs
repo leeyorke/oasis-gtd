@@ -229,7 +229,7 @@ async function main() {
     }, 'bundle-token-1')
     check('bundle: initialize', init.message?.result?.serverInfo?.name === 'oasis-gtd')
     const tools = await rpc(bundlePort, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, 'bundle-token-1')
-    check('bundle: tools/list → 34', (tools.message?.result?.tools ?? []).length === 34)
+    check('bundle: tools/list → 35', (tools.message?.result?.tools ?? []).length === 35)
     const bundleTasks = await callTool(bundlePort, 'list_tasks', {}, 'bundle-token-1')
     check('bundle: reads the app database', bundleTasks.total_matching === 2
       && bundleTasks.tasks.every((task) => task.id.startsWith('aaaaaaaa-')))
@@ -295,7 +295,7 @@ async function main() {
       }, 'electron-token-1')
       check('electron runtime: initialize', electronInit.message?.result?.serverInfo?.name === 'oasis-gtd')
       const electronTools = await rpc(electronPort, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, 'electron-token-1')
-      check('electron runtime: tools/list → 34', (electronTools.message?.result?.tools ?? []).length === 34)
+      check('electron runtime: tools/list → 35', (electronTools.message?.result?.tools ?? []).length === 35)
       const electronTasks = await callTool(electronPort, 'list_tasks', {}, 'electron-token-1')
       check('electron runtime: reads the app database through better-sqlite3',
         electronTasks.total_matching === 2,

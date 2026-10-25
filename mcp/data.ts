@@ -39,6 +39,20 @@ export type ResourceType = (typeof RESOURCE_TYPES)[number]
 export const DEFAULT_LIMIT = 100
 export const MAX_LIMIT = 500
 
+/**
+ * Local-time `YYYY-MM-DD` — the format the app stores dates in
+ * (`getLocalDateString()` in src/main/ipc/handlers.ts). Habit records are keyed
+ * by this string, so "today" must be computed in local time: SQLite's
+ * `date('now')` is UTC and disagrees with the user's day for anyone east or
+ * west of Greenwich.
+ */
+export function localDateString(date: Date = new Date()): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // ─── Row shapes ──────────────────────────────────────────────────────────────
 
 export interface TaskRow {
@@ -556,10 +570,11 @@ export function listHabits(db: DatabaseSync, includeArchived = false): HabitRow[
     `SELECT h.id, h.title, h.description, h.frequency, h.time_of_day, h.color,
             h.target, h.is_quantitative, h.is_archived, h.created_at, h.updated_at,
             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
-              WHERE r.habit_id = h.id AND r.record_date = date('now')) AS today_count,
+              WHERE r.habit_id = h.id AND r.record_date = ?) AS today_count,
             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
               WHERE r.habit_id = h.id) AS total_sessions
-     FROM habits h${where} ORDER BY h.created_at ASC`
+     FROM habits h${where} ORDER BY h.created_at ASC`,
+    [localDateString()]
   )
 }
 
@@ -574,11 +589,11 @@ export function getHabit(db: DatabaseSync, id: string, days = 30): HabitDetail |
     `SELECT h.id, h.title, h.description, h.frequency, h.time_of_day, h.color,
             h.target, h.is_quantitative, h.is_archived, h.created_at, h.updated_at,
             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
-              WHERE r.habit_id = h.id AND r.record_date = date('now')) AS today_count,
+              WHERE r.habit_id = h.id AND r.record_date = ?) AS today_count,
             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
               WHERE r.habit_id = h.id) AS total_sessions
      FROM habits h WHERE h.id = ?`,
-    [id]
+    [localDateString(), id]
   )
   if (!habit) return undefined
   const window = Math.min(Math.max(Math.trunc(days), 1), 365)

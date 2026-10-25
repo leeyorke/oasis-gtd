@@ -16,7 +16,7 @@ const DATA_MODEL = `Data model (SQLite tables served directly):
 - waiting_items: things delegated to other people; waiting_for is the person, since is when delegation started.
 - someday_items: future ideas; horizon is soon/1month/3months/1year/someday.
 - notes: quick captured thoughts — this is the 随想 view.
-- habits + habit_records: habit tracking (record_date is YYYY-MM-DD).
+- habits + habit_records: habit tracking. record_date is a local YYYY-MM-DD; a simple habit (is_quantitative=0) stores completed=1 for the day, a counted habit (is_quantitative=1) stores count against the day's target.
 - chat_conversations + chat_messages: the user's AI chat history from the app's built-in assistant.
 - resources: reference material (documents, links, ...).
 - review_checklist: the weekly review checklist.
@@ -28,6 +28,7 @@ function buildInstructions(policy: WritePolicy): string {
     ? `Writing (ENABLED on this server):
 - Capture a thought: capture_item with target="note" (随想) or target="inbox"/"next"/"waiting"/"someday" (a task in that GTD bucket), "project", "waiting_item" or "someday_item".
 - Fine-grained tools exist too: create_note / update_note / delete_note, create_task / update_task / delete_task, create_project / update_project / delete_project, create_waiting_item / delete_waiting_item, create_someday_item / update_someday_item / delete_someday_item.
+- Habit check-in: check_in_habit ticks the day for a simple habit (is_quantitative=0) and adds exactly one count — capped at the habit's target — for a counted habit (is_quantitative=1). "date" defaults to today and can backfill a missed day.
 - create_task and capture_item accept a project by id (project_id) or by title (project) — the title is matched case-insensitively and must be unambiguous.
 - Updates are partial: only the fields you pass are changed. Deletes are permanent, so confirm with the user first.
 - Writes go straight into the app's SQLite file; the desktop app picks them up on its next refresh.`

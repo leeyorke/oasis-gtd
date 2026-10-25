@@ -3,8 +3,8 @@
  *
  * The server used to be strictly read-only. This module adds the write half:
  * creating, updating and deleting the GTD records an agent legitimately needs
- * to touch — 随想 (notes), tasks, projects, waiting-for items and someday/maybe
- * ideas.
+ * to touch — 随想 (notes), tasks, projects, waiting-for items, someday/maybe
+ * ideas — plus the habit 打卡 (check-in) action.
  *
  * Safety rules enforced here:
  *   - every statement is parameterised; no user-supplied value is ever
@@ -21,8 +21,8 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from './sqlite.ts'
 import { queryAll, queryOne, runStatement, transact } from './db.ts'
-import type { NoteRow, ProjectRow, SomedayRow, TaskRow, WaitingRow } from './data.ts'
-import { SOMEDAY_HORIZONS, TASK_PRIORITIES } from './data.ts'
+import type { HabitRecordRow, HabitRow, NoteRow, ProjectRow, SomedayRow, TaskRow, WaitingRow } from './data.ts'
+import { SOMEDAY_HORIZONS, TASK_PRIORITIES, localDateString } from './data.ts'
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
@@ -725,6 +725,164 @@ export function deleteSomedayItem(db: DatabaseSync, id: string): SomedayRow {
     runStatement(db, 'DELETE FROM someday_items WHERE id = ?', [id])
   })
   return existing
+}
+
+// ─── Habit check-in (打卡) ─────────────────────────────────────────────────────
+
+export interface CheckInHabitInput {
+  /** Day to check in for (YYYY-MM-DD or any ISO date/timestamp). Defaults to today, local time. */
+  date?: string | null
+  /** Optional note stored on the day's record. */
+  notes?: string | null
+}
+
+/** What a check-in actually did. */
+export type CheckInEffect =
+  /** A simple habit: the day is now ticked (completed = 1). */
+  | 'ticked'
+  /** A counted habit: one more count was added to the day. */
+  | 'counted'
+  /** The day was already complete — nothing changed. */
+  | 'already-complete'
+
+export interface CheckInHabitResult {
+  /** The habit after the change, in the same shape list_habits returns. */
+  habit: HabitRow
+  /** The day's record after the change. */
+  record: HabitRecordRow
+  /** What this call did. */
+  effect: CheckInEffect
+  /** The day's count after the change. */
+  count: number
+  /** The habit's daily goal (1 for a simple yes/no habit). */
+  target: number
+  /** Whether the day now counts as complete (count >= target). */
+  completed_today: boolean
+  /** One-line summary the agent can relay to the user. */
+  message: string
+}
+
+/** One habit with its derived counters — same shape list_habits returns. */
+export function getHabitRow(db: DatabaseSync, id: string): HabitRow | undefined {
+  return queryOne<HabitRow>(
+    db,
+    `SELECT h.id, h.title, h.description, h.frequency, h.time_of_day, h.color,
+             h.target, h.is_quantitative, h.is_archived, h.created_at, h.updated_at,
+             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
+               WHERE r.habit_id = h.id AND r.record_date = ?) AS today_count,
+             (SELECT COALESCE(SUM(r.count), 0) FROM habit_records r
+               WHERE r.habit_id = h.id) AS total_sessions
+      FROM habits h WHERE h.id = ?`,
+    [localDateString(), id]
+  )
+}
+
+function getHabitRecord(
+  db: DatabaseSync,
+  habitId: string,
+  recordDate: string
+): HabitRecordRow | undefined {
+  return queryOne<HabitRecordRow>(
+    db,
+    'SELECT * FROM habit_records WHERE habit_id = ? AND record_date = ?',
+    [habitId, recordDate]
+  )
+}
+
+/** Inserts the day's first record (completed = 1, one count). */
+function insertHabitRecord(
+  db: DatabaseSync,
+  habitId: string,
+  recordDate: string,
+  notes: string | null
+): void {
+  runStatement(
+    db,
+    `INSERT INTO habit_records (id, habit_id, record_date, completed, count, notes, created_at)
+     VALUES (?, ?, ?, 1, 1, ?, ?)`,
+    [newId(), habitId, recordDate, notes, nowIso()]
+  )
+}
+
+/**
+ * Marks a habit as done for one day — the app's 打卡 action.
+ *
+ * The semantics follow the desktop app (and the Pomodoro auto-completion rules):
+ *   - a simple habit (is_quantitative = 0) is ticked for the day (completed = 1);
+ *   - a counted habit (is_quantitative = 1) gets exactly ONE count added to the
+ *     day, capped at the habit's `target` — the counter never runs past it, and
+ *     calling this again once the target is reached changes nothing.
+ *
+ * `date` defaults to today in local time (the app stores YYYY-MM-DD local dates,
+ * see getLocalDateString in src/main/ipc/handlers.ts) and accepts any ISO date or
+ * timestamp so a missed day can be backfilled.
+ */
+export function checkInHabit(
+  db: DatabaseSync,
+  id: string,
+  input: CheckInHabitInput = {}
+): CheckInHabitResult {
+  const habit = getHabitRow(db, id)
+  if (!habit) {
+    throw new WriteError(`No habit with id ${id}. Use list_habits to find valid ids.`)
+  }
+  const target = habit.target >= 1 ? Math.trunc(habit.target) : 1
+  const quantitative = habit.is_quantitative === 1
+  const recordDate = normalizeDate(input.date, 'date') ?? localDateString()
+  const notes = optionalText(input.notes)
+  const existing = getHabitRecord(db, id, recordDate)
+
+  let effect: CheckInEffect
+  if (quantitative) {
+    const current = existing ? Math.max(0, Math.trunc(existing.count) || 0) : 0
+    if (current >= target) {
+      effect = 'already-complete'
+    } else {
+      transact(db, () => {
+        if (existing) {
+          runStatement(db, 'UPDATE habit_records SET count = ?, notes = ? WHERE id = ?', [
+            current + 1,
+            notes ?? existing.notes,
+            existing.id
+          ])
+        } else {
+          insertHabitRecord(db, id, recordDate, notes)
+        }
+      })
+      effect = 'counted'
+    }
+  } else if (existing && existing.completed === 1) {
+    effect = 'already-complete'
+  } else {
+    transact(db, () => {
+      if (existing) {
+        runStatement(db, 'UPDATE habit_records SET completed = 1, notes = ? WHERE id = ?', [
+          notes ?? existing.notes,
+          existing.id
+        ])
+      } else {
+        insertHabitRecord(db, id, recordDate, notes)
+      }
+    })
+    effect = 'ticked'
+  }
+
+  const record = getHabitRecord(db, id, recordDate)
+  if (!record) throw new WriteError('Check-in was recorded but could not be read back')
+  const fresh = getHabitRow(db, id)
+  if (!fresh) throw new WriteError(`No habit with id ${id}`)
+
+  const count = Math.max(0, Math.trunc(record.count) || 0)
+  const completedToday = quantitative ? count >= target : record.completed === 1
+  const day = recordDate === localDateString() ? 'today' : recordDate
+  const message =
+    effect === 'already-complete'
+      ? `"${habit.title}" is already complete for ${day} (${count}/${target}) — nothing changed.`
+      : effect === 'counted'
+        ? `"${habit.title}": ${count}/${target} counts for ${day}.`
+        : `"${habit.title}" is ticked for ${day}.`
+
+  return { habit: fresh, record, effect, count, target, completed_today: completedToday, message }
 }
 
 // ─── One-shot capture (随想 → GTD bucket) ─────────────────────────────────────

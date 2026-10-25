@@ -3,10 +3,10 @@
  *
  * The read tools (get_*, list_*, search_*, export_*) only ever run SELECT
  * statements and advertise readOnlyHint. The write tools (create_*, update_*,
- * delete_*, capture_item) are allowed to change the user's GTD data — they are
- * registered only when the server runs in write mode, and they advertise
- * readOnlyHint:false / destructiveHint so a well-behaved client can warn the
- * user before something is removed.
+ * delete_*, capture_item, check_in_habit) are allowed to change the user's GTD
+ * data — they are registered only when the server runs in write mode, and they
+ * advertise readOnlyHint:false / destructiveHint so a well-behaved client can
+ * warn the user before something is removed.
  */
 import type { DatabaseSync } from './sqlite.ts'
 import { z } from 'zod'
@@ -48,6 +48,7 @@ import {
   WRITABLE_TASK_STATUSES,
   WRITABLE_TASK_STATUSES_ALL,
   captureItem,
+  checkInHabit,
   createNote,
   createProject,
   createSomedayItem,
@@ -860,6 +861,44 @@ export function registerTools(
       write(() => {
         const record = deleteSomedayItem(db, id)
         return { action: 'delete', entity: 'someday_item', id: record.id, record }
+      })
+  )
+
+  // ── Habits (打卡) ───────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'check_in_habit',
+    {
+      title: 'Check In Habit (习惯打卡)',
+      description:
+        'Mark a habit as done for one day — the app\'s 打卡 action. For a simple habit ' +
+        '(is_quantitative=0) this ticks the day (completed=1). For a counted habit ' +
+        '(is_quantitative=1) this adds exactly ONE count to the day (count + 1), capped at the ' +
+        'habit\'s target — once the target is reached another call changes nothing. "date" ' +
+        'defaults to today (local time) and accepts YYYY-MM-DD to backfill a missed day. ' +
+        'Use list_habits / get_habit to find ids.',
+      inputSchema: {
+        id: idSchema,
+        date: z.string().optional().describe('Day to check in for (YYYY-MM-DD, default: today)'),
+        notes: z.string().optional().describe('Optional note stored on the day\'s record')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ id, date, notes }) =>
+      write(() => {
+        const result = checkInHabit(db, id, { date, notes })
+        return {
+          action: 'check_in',
+          entity: 'habit',
+          id,
+          effect: result.effect,
+          count: result.count,
+          target: result.target,
+          completed_today: result.completed_today,
+          record: result.record,
+          habit: result.habit,
+          message: result.message
+        }
       })
   )
 

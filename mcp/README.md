@@ -37,8 +37,8 @@ With writes disabled the write tools stay registered but answer with a clear
 # from the repository root
 npm install       # once (installs @modelcontextprotocol/sdk as a devDependency)
 npm run mcp       # start the server on stdio
-npm run test:mcp  # 167-assertion end-to-end smoke test (fixture DB + tool/resource + HTTP sweep)
-                  # + app-spawn.mjs (46 assertions: app-managed spawn, packaged bundle, lifecycle)
+npm run test:mcp  # 181-assertion end-to-end smoke test (fixture DB + tool/resource + HTTP sweep)
+                  # + app-spawn.mjs (54 assertions: app-managed spawn, packaged bundle, lifecycle)
 ```
 
 The repository already registers the server for Claude Code-style clients in
@@ -157,7 +157,7 @@ work as-is through the legacy handshake above.
 ### Discovering the tools
 
 Tool discovery is built into the protocol: after `initialize`, every MCP client
-calls `tools/list` and receives all 34 tools (19 read + 15 write; name, description,
+calls `tools/list` and receives all 35 tools (19 read + 16 write; name, description,
 JSON-Schema parameters) plus `resources/list` / `resources/templates/list`. The
 `initialize` response also carries an **instructions** block that the client
 hands to the agent — it documents the GTD data model, tells the agent to call
@@ -324,6 +324,7 @@ both `done` and `archive`.| `get_task` | One task by UUID. |
 | `list_someday_items` | Future ideas by horizon (`soon`→`someday`). |
 | `list_notes` / `search_notes` | Quick notes, tag filter and keyword search. |
 | `list_habits` / `get_habit` | Habits with today's check-ins; check-in records for the last N days. |
+| `check_in_habit` | *(write)* Habit 打卡 — see the write table below. |
 | `list_conversations` / `get_conversation` | The user's in-app AI chat history with message counts and full messages. |
 | `list_resources` | Reference material (documents, links, spreadsheets, …). |
 | `get_review_checklist` | Weekly review checklist with completion state. |
@@ -351,6 +352,7 @@ exists in the database — so the agent can report exactly what was filed.
 | `create_project` / `update_project` / `delete_project` | Projects: title, description, outcome, status. Deleting detaches the project's tasks and waiting items instead of orphaning them. |
 | `create_waiting_item` / `delete_waiting_item` | Delegated items: title, `waiting_for`, `since`, project, notes. |
 | `create_someday_item` / `update_someday_item` / `delete_someday_item` | Someday/maybe ideas: title, notes, horizon, category. |
+| `check_in_habit` | Habit 打卡: ticks the day for a simple habit (`is_quantitative=0`), adds exactly **one** count for a counted habit (`is_quantitative=1`), capped at the habit's `target`. `date` (default today, local time) backfills a missed day. |
 
 Details worth knowing:
 
@@ -361,6 +363,11 @@ Details worth knowing:
 - **Validation mirrors the app.** `status`, `priority` and `horizon` are checked against the
   app's own `CHECK` constraints; a `waiting` task without `waiting_for` is refused; dates are
   normalised to `YYYY-MM-DD`.
+- **Habit check-in mirrors the app.** `check_in_habit` applies the same rules the app's 打卡 button
+  and the Pomodoro auto-completion use: a simple habit (`is_quantitative=0`) ticks the day
+  (`completed=1`), a counted habit (`is_quantitative=1`) gains exactly **one** count, and the
+  counter stops at the habit's `target` — further calls that day change nothing. `date` defaults to
+  today in local time (the app stores local `YYYY-MM-DD`), so a missed day can be backfilled.
 - **Deletes are permanent.** They are marked `destructiveHint: true`, so a well-behaved client
   asks the user first.
 - **Transactions.** Multi-step changes (e.g. deleting a project) run inside one transaction —
@@ -404,14 +411,14 @@ mcp/
 ├── index.ts          # entry point (stdio or --http transport, env config, logging to stderr only)
 ├── http-server.ts    # Streamable HTTP transport: bearer auth, CORS, /health, stateless per-request
 ├── server.ts         # McpServer identity + agent instructions
-├── tools.ts          # 34 tools (19 read + 15 write, zod-validated inputs)
+├── tools.ts          # 35 tools (19 read + 16 write, zod-validated inputs)
 ├── resources.ts      # static + templated resources
 ├── data.ts           # all read queries (the data access layer)
 ├── write.ts          # all write operations (validation, transactions, whitelisted columns)
 ├── db.ts             # database resolution, read-only/read-write open, statement whitelisting
 ├── sqlite.ts         # driver adapter: node:sqlite, or better-sqlite3 on Electron's own runtime
 ├── types/sqlite.d.ts # ambient typings for Node's built-in node:sqlite
-├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP + writes, 169 assertions)
+├── test/smoke.mjs    # end-to-end smoke test (fixture DB, stdio JSON-RPC + HTTP + writes, 181 assertions)
 ├── test/app-spawn.mjs # app-managed spawn test (bundle + Electron runtime + src/main/mcp-http.ts wiring, 54 assertions)
 └── tsconfig.json     # editor / `tsc --noEmit` support (no emit — Node runs the TS directly)
 ```

@@ -113,6 +113,14 @@ CREATE TABLE focus_sessions (
 
 const SECRET = 'SUPER-SECRET-API-KEY-7f3a9'
 const today = new Date().toISOString().split('T')[0]
+// Habit records are keyed by a LOCAL YYYY-MM-DD (the app's getLocalDateString),
+// so the fixture's habit rows must use local today, not the UTC one.
+const todayLocal = (() => {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+})()
 const isoNow = new Date().toISOString()
 const isoAgo = (days) => new Date(Date.now() - days * 86400000).toISOString()
 const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
@@ -225,11 +233,11 @@ function buildFixtureDb(filePath) {
     IDS.habitSimple, 'Read 20 pages', null, 'daily', 1, 0, isoAgo(14), isoAgo(14)
   )
   run('INSERT INTO habit_records (id,habit_id,record_date,completed,count,created_at) VALUES (?,?,?,?,?,?)',
-    'dddddddd-0000-0000-0000-000000000001', IDS.habit, today, 1, 3, isoNow)
+    'dddddddd-0000-0000-0000-000000000001', IDS.habit, todayLocal, 1, 3, isoNow)
   run('INSERT INTO habit_records (id,habit_id,record_date,completed,count,created_at) VALUES (?,?,?,?,?,?)',
     'dddddddd-0000-0000-0000-000000000002', IDS.habit, dateAgo(1), 1, 8, isoNow)
   run('INSERT INTO habit_records (id,habit_id,record_date,completed,count,created_at) VALUES (?,?,?,?,?,?)',
-    'dddddddd-0000-0000-0000-000000000003', IDS.habitSimple, today, 1, 1, isoNow)
+    'dddddddd-0000-0000-0000-000000000003', IDS.habitSimple, todayLocal, 1, 1, isoNow)
   run(
     'INSERT INTO resources (id,title,type,description,url,tags,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
     IDS.resource, 'GTD book notes', 'document', 'Summary of Getting Things Done',
@@ -526,7 +534,7 @@ async function testHttpMode(fixturePath) {
 
     const toolsRes = await postMcp(port, { jsonrpc: '2.0', id: 2, method: 'tools/list' })
     const toolsJson = await parseMcpResponse(toolsRes)
-    check('http: tools/list → 34 tools', (toolsJson.result?.tools ?? []).length === 34)
+    check('http: tools/list → 35 tools', (toolsJson.result?.tools ?? []).length === 35)
 
     const overviewRes = await postMcp(port, {
       jsonrpc: '2.0',
@@ -764,6 +772,60 @@ async function testWriteMode() {
     check('delete_someday_item returns the deleted row',
       deletedSomeday.record?.title === '学钢琴')
 
+    // ── Habit check-in (打卡) ─────────────────────────────────────────────────
+    // Fixture: "Drink water" is counted (target 8) with 3 counts already in
+    // today; "Read 20 pages" is a simple habit already ticked today.
+    const waterCheckIn = await callTool(client, 'check_in_habit', { id: IDS.habit })
+    check('check_in_habit adds one count to a counted habit',
+      waterCheckIn.effect === 'counted' && waterCheckIn.count === 4
+      && waterCheckIn.target === 8 && waterCheckIn.completed_today === false
+      && waterCheckIn.record?.count === 4 && waterCheckIn.habit?.today_count === 4)
+
+    const waterNote = await callTool(client, 'check_in_habit', {
+      id: IDS.habit,
+      notes: '第三杯'
+    })
+    check('check_in_habit stores the optional note',
+      waterNote.count === 5 && waterNote.record?.notes === '第三杯')
+
+    // Count the habit up to its target, then prove the counter never overruns.
+    for (let i = 0; i < 3; i += 1) {
+      await callTool(client, 'check_in_habit', { id: IDS.habit })
+    }
+    const waterFull = await callTool(client, 'check_in_habit', { id: IDS.habit })
+    check('check_in_habit caps the count at the target',
+      waterFull.effect === 'already-complete' && waterFull.count === 8
+      && waterFull.completed_today === true)
+
+    const simpleToday = await callTool(client, 'check_in_habit', { id: IDS.habitSimple })
+    check('check_in_habit on an already ticked simple habit changes nothing',
+      simpleToday.effect === 'already-complete' && simpleToday.count === 1
+      && simpleToday.record?.completed === 1)
+
+    const backfill = await callTool(client, 'check_in_habit', {
+      id: IDS.habitSimple,
+      date: dateAgo(3)
+    })
+    check('check_in_habit backfills a missed day',
+      backfill.effect === 'ticked' && backfill.record?.record_date === dateAgo(3)
+      && backfill.record?.completed === 1)
+
+    const unknownHabit = await client.request('tools/call', {
+      name: 'check_in_habit',
+      arguments: { id: 'does-not-exist' }
+    })
+    check('check_in_habit on an unknown id → isError',
+      unknownHabit.result?.isError === true
+      && /No habit with id/.test(unknownHabit.result?.content?.[0]?.text ?? ''))
+
+    const habitList = await callTool(client, 'list_habits')
+    check('check_in_habit is visible to the read tools',
+      habitList.habits[0].today_count === 8 && habitList.habits[1].today_count === 1)
+    const habitDetail = await callTool(client, 'get_habit', { id: IDS.habit, days: 30 })
+    check('get_habit shows the new counts',
+      habitDetail.habit.total_sessions === 16
+      && habitDetail.recent_records.some((r) => r.record_date === todayLocal && r.count === 8))
+
     // ── One-shot capture (随想 → GTD bucket) ─────────────────────────────────
     const capturedNote = await callTool(client, 'capture_item', {
       content: '随手记一笔',
@@ -852,6 +914,10 @@ async function testWriteMode() {
       .get(waiting.id)
     check('waiting item row is in the database file',
       waitingRows?.waiting_for === 'Alice' && waitingRows?.since === '2026-01-15')
+    const habitRows = db.prepare('SELECT count, notes FROM habit_records WHERE habit_id = ? AND record_date = ?')
+      .get(IDS.habit, todayLocal)
+    check('habit record row is in the database file',
+      habitRows?.count === 8 && habitRows?.notes === '第三杯')
     const orphanTasks = db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE project_id = ?')
       .get(project.id)
     check('deleting a project detaches its tasks', orphanTasks.n === 0)
@@ -905,6 +971,12 @@ async function testWriteDisabled() {
     })
     check('writes disabled → capture_item isError', refusedCapture.result?.isError === true)
 
+    const refusedCheckIn = await client.request('tools/call', {
+      name: 'check_in_habit',
+      arguments: { id: IDS.habit }
+    })
+    check('writes disabled → check_in_habit isError', refusedCheckIn.result?.isError === true)
+
     const overview = await callTool(client, 'get_overview')
     check('writes disabled → the database is opened read-only',
       overview.database.openMode === 'read-only', overview.database.openMode)
@@ -912,6 +984,8 @@ async function testWriteDisabled() {
     const db = new DatabaseSync(fixturePath)
     const count = db.prepare('SELECT COUNT(*) AS n FROM notes').get()
     check('writes disabled → nothing was written', count.n === 2, String(count.n))
+    const habitCount = db.prepare('SELECT COUNT(*) AS n FROM habit_records').get()
+    check('writes disabled → no habit check-in was recorded', habitCount.n === 3, String(habitCount.n))
     db.close()
   } finally {
     await client.close()
@@ -980,12 +1054,13 @@ async function main() {
       'create_project', 'update_project', 'delete_project',
       'create_waiting_item', 'delete_waiting_item',
       'create_someday_item', 'update_someday_item', 'delete_someday_item',
+      'check_in_habit',
       'capture_item'
     ]
     for (const name of [...readOnlyTools, ...writeTools]) {
       check(`tool registered: ${name}`, toolNames.includes(name))
     }
-    check('tools/list → 34 tools', toolNames.length === 34, String(toolNames.length))
+    check('tools/list → 35 tools', toolNames.length === 35, String(toolNames.length))
     const toolByName = new Map((tools.result?.tools ?? []).map((t) => [t.name, t]))
     check('read tools advertise readOnlyHint',
       readOnlyTools.every((name) => toolByName.get(name)?.annotations?.readOnlyHint === true))
