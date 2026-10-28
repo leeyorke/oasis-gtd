@@ -8,7 +8,17 @@
 
 Premium desktop GTD system built with Electron + React + TypeScript.
 
-![](resources/Oasis_GTD_iQfYzpW4Wa.png)
+<div style="display: flex; gap: 10px; justify-content: center; align-items: flex-start; margin-top: 15px;">
+  <figure style="flex: 1; text-align: center; margin: 0;">
+    <img src="resources/Oasis_GTD_GFZcymrnoj.png" style="width: 100%;">
+    <figcaption>图1：侧边栏展开</figcaption>
+  </figure>
+
+  <figure style="flex: 1; text-align: center; margin: 0;">
+    <img src="resources/Oasis_GTD_lsu5iup4B6.png" style="width: 100%;">
+    <figcaption>图2：侧边栏折叠</figcaption>
+  </figure>
+</div>
 
 ## Tech Stack
 
