@@ -201,11 +201,16 @@ body {
   justify-content: center;
 }
 
+/* Match the nav-group labels' left edge. The rail's own 12px inner padding
+   puts the brand icon at x=12, but every .nav-group-header stacks another
+   12px on top, so 总览 starts at x=24. The same 12px indent here lines the
+   icon's left edge up with that label column. */
 .nav-brand {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  margin-left: 12px;
   color: #1a1a1a;
 }
 
@@ -234,6 +239,13 @@ body {
 
 .nav-sidebar.collapsed .nav-brand-icon {
   font-size: 24px;
+}
+
+/* The expanded rail's brand indent must not leak into the collapsed rail:
+   with the brand hidden, the 12px margin would shove the centred toggle
+   6px off the rail's axis. */
+.nav-sidebar.collapsed .nav-brand {
+  margin-left: 0;
 }
 
 .sidebar-toggle {
@@ -2100,11 +2112,16 @@ body {
   --sidebar-width: 280px;
 }
 
+/* 6px of top padding lands every page title's first line on the sidebar's
+   brand row: the canvas starts at y=32 (under the 32px titlebar strip) and
+   the ph-plant icon's top edge sits at y=38, so the title now aligns with
+   the logo row instead of hanging a full brand-row below it (was 32px).
+   Shared by every GTD view, so all page headers move up together. */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 32px 40px;
+  padding: 6px 40px;
   position: relative;
   min-height: 0;
 }
